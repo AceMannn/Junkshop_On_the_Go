@@ -1,0 +1,72 @@
+/* src/styles/global.css */
+
+/* Tailwind directives must be first */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom typography and global styles */
+@layer base {
+  body {
+    @apply bg-light-gray text-charcoal font-base;
+  }
+
+  h1 {
+    @apply font-bold text-5xl leading-tight;
+  }
+
+  h2 {
+    @apply font-bold text-3xl leading-snug;
+  }
+
+  h3 {
+    @apply font-semibold text-2xl leading-snug;
+  }
+
+  h4 {
+    @apply font-semibold text-xl leading-normal;
+  }
+
+  p {
+    @apply font-normal text-base leading-relaxed;
+  }
+
+  button {
+    @apply font-semibold;
+  }
+}
+
+/* Custom utility classes */
+@layer utilities {
+  .grid-8 {
+    gap: 8px;
+  }
+  .grid-16 {
+    gap: 16px;
+  }
+  .grid-24 {
+    gap: 24px;
+  }
+  .grid-32 {
+    gap: 32px;
+  }
+}
+
+/* Custom colors (make sure they match tailwind.config.js) */
+.text-eco-green { color: #3DA35D; }
+.bg-eco-green { background-color: #3DA35D; }
+
+.text-leaf-green { color: #65C18C; }
+.bg-leaf-green { background-color: #65C18C; }
+
+.text-clean-blue { color: #4F9EFF; }
+.bg-clean-blue { background-color: #4F9EFF; }
+
+.text-sunny-yellow { color: #FFD34E; }
+.bg-sunny-yellow { background-color: #FFD34E; }
+
+.text-light-gray { color: #F2F2F2; }
+.bg-light-gray { background-color: #F2F2F2; }
+
+.text-charcoal { color: #2E2E2E; }
+.bg-charcoal { background-color: #2E2E2E; }
