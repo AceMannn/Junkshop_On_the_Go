@@ -1,11 +1,11 @@
-@import "./styles/global.css"; /* Import your global custom styles */
+/* index.css */
 
 /* Tailwind directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Optional base tweaks, mostly for system defaults */
+/* Optional minimal tweaks */
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -13,59 +13,7 @@
   color-scheme: light dark;
 }
 
-/* Make body compatible with Tailwind, don't override min-height or flex unless needed */
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
-}
-
-/* Links styling */
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: none;
-}
-a:hover {
-  color: #535bf2;
-}
-
-/* Headings can rely mostly on Tailwind, keep overrides minimal */
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-/* Button fallback style, Tailwind will mostly handle buttons */
-button {
-  border-radius: 0.75rem; /* ~12px */
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1rem;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-/* Light mode tweaks, Tailwind handles dark/light by default too */
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
 }

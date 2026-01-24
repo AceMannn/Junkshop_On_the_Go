@@ -1,24 +1,24 @@
 // src/App.jsx
 import React from "react";
-import Navbar from "./components/Navbar";
+//import Header from "./components/Header";
 // Import pages here
-// import AboutPage from "./pages/AboutPage";
+import AboutPage from "./pages/AboutPage";
 // import ContactPage from "./pages/ContactPage";
 // import FindJunkshopPage from "./pages/FindJunkshopPage"; // <-- newly added page
 
-import "./App.css";
+import "./styles/global.css";
 
 function App() {
   return (
     <div>
-      {/* Navbar always on top */}
-      <Navbar />
+      {/* Header always on top */}
+      {/* <Header /> */}
 
       <main>
         {/* Add your pages here */}
-        {/* <AboutPage /> */}
+        <AboutPage />
         {/* <ContactPage /> */}
-        {/* <FindJunkshopPage /> */} 
+        {/* <FindJunkshopPage /> */}
       </main>
 
       {/* Footer can go here */}
