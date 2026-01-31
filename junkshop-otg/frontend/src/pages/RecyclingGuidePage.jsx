@@ -1,10 +1,12 @@
-import { motion } from 'motion/react';
+// src/pages/RecyclingGuidePage.jsx
+import { motion } from 'framer-motion';
 import { CheckCircle2, X, Download, Droplet, Scissors, PackageOpen, Trash2, Recycle } from 'lucide-react';
-// import { ImageWithFallback } from '../figma/ImageWithFallback'; // Commented out, not ready yet
-import { Card } from '../Card';
-import { Button } from '../Button';
+// Comment out ImageWithFallback until ready
+// import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { Card } from '../components/Card'; // Make sure Card exists
+import { Button } from '../components/Button'; // Make sure Button exists
 
-export function RecyclingGuidePage() {
+export default function RecyclingGuidePage() {
     const steps = [
         {
             number: 1,
@@ -60,14 +62,14 @@ export function RecyclingGuidePage() {
     ];
 
     const donts = [
-        'Don\'t mix wet and dry waste',
-        'Don\'t include food-contaminated items',
-        'Don\'t throw batteries in regular trash',
-        'Don\'t burn plastic or rubber materials',
-        'Don\'t mix different types of plastic',
-        'Don\'t include items with hazardous materials',
-        'Don\'t leave recyclables exposed to rain',
-        'Don\'t forget to remove metal staples from paper'
+        "Don't mix wet and dry waste",
+        "Don't include food-contaminated items",
+        "Don't throw batteries in regular trash",
+        "Don't burn plastic or rubber materials",
+        "Don't mix different types of plastic",
+        "Don't include items with hazardous materials",
+        "Don't leave recyclables exposed to rain",
+        "Don't forget to remove metal staples from paper"
     ];
 
     const materialGuides = [
@@ -99,13 +101,14 @@ export function RecyclingGuidePage() {
 
     return (
         <div className="pt-20 min-h-screen bg-light-gray">
-            {/* Hero */}
+            {/* Hero Section */}
             <section className="bg-gradient-to-br from-leaf-green to-eco-green text-white py-16">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <motion.div
                         className="text-center"
                         initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
                         transition={{ duration: 0.5 }}
                     >
                         <h2 className="mb-4 text-white">How to Recycle Properly</h2>
@@ -132,7 +135,7 @@ export function RecyclingGuidePage() {
 
                     <div className="space-y-8">
                         {steps.map((step, index) => {
-                            const Icon = step.icon; // FIXED: convert TSX dynamic component to JSX-compatible
+                            const Icon = step.icon; // Dynamic icon for each step
                             return (
                                 <motion.div
                                     key={step.number}

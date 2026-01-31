@@ -1,4 +1,4 @@
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 
 export function Card({ children, className = '', hover = true, delay = 0 }) {
     return (

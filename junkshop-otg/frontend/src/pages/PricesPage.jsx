@@ -1,11 +1,11 @@
 // src/pages/PricesPage.jsx
 import { useState } from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { TrendingUp, ChevronDown } from 'lucide-react';
-// import { SearchBar } from '../SearchBar'; // Commented out if SearchBar isn't ready
-import { Card } from '../Card';
+import { Card } from '../components/Card'; // make sure this exists
+// import { SearchBar } from '../components/SearchBar'; // comment out if not ready
 
-export function PricesPage() {
+export default function PricesPage() {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [priceUnits, setPriceUnits] = useState({});
@@ -16,7 +16,7 @@ export function PricesPage() {
         { id: 'paper', label: 'Paper', color: 'bg-sunny-yellow' },
         { id: 'metal', label: 'Metal', color: 'bg-eco-green' },
         { id: 'glass', label: 'Glass', color: 'bg-leaf-green' },
-        { id: 'ewaste', label: 'E-waste', color: 'bg-charcoal' }
+        { id: 'ewaste', label: 'E-waste', color: 'bg-charcoal' },
     ];
 
     const priceData = [
@@ -28,9 +28,9 @@ export function PricesPage() {
             perPiecePrice: '₱0.50-1',
             notes: 'Clean and flattened preferred',
             trending: true,
-            trendingImage: 'https://images.unsplash.com/photo-1731342484101-c91e0cc1971f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjbGVhciUyMHBsYXN0aWMlMjBib3R0bGVzJTIwcmVjeWNsaW5nfGVufDF8fHx8MTc2NzU0NDE1NHww&ixlib=rb-4.1.0&q=80&w=1080'
+            trendingImage: 'https://images.unsplash.com/photo-1731342484101-c91e0cc1971f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg',
         },
-        // ... other items, keep the same
+        // ... add other items here, same format
     ];
 
     const getPrice = (item, materialKey) => {
@@ -39,14 +39,14 @@ export function PricesPage() {
     };
 
     const getUnit = (materialKey) => priceUnits[materialKey] || 'per kg';
-
     const setUnit = (materialKey, unit) => {
         setPriceUnits(prev => ({ ...prev, [materialKey]: unit }));
     };
 
     const filteredData = priceData.filter(item => {
         const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
-        const matchesSearch = searchQuery === '' ||
+        const matchesSearch =
+            searchQuery === '' ||
             item.material.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.examples.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCategory && matchesSearch;
@@ -56,7 +56,7 @@ export function PricesPage() {
 
     return (
         <div className="pt-20 min-h-screen bg-light-gray">
-            {/* Hero */}
+            {/* Hero Section */}
             <section className="bg-gradient-to-br from-sunny-yellow via-eco-green to-leaf-green text-white py-16">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <motion.div
@@ -84,12 +84,10 @@ export function PricesPage() {
             <section className="bg-white border-b border-gray-200 sticky top-20 z-40">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center gap-3 overflow-x-auto pb-2">
-                        {categories.map((cat) => (
+                        {categories.map(cat => (
                             <motion.button
                                 key={cat.id}
-                                className={`px-4 py-2 rounded-[12px] whitespace-nowrap transition-colors ${selectedCategory === cat.id
-                                        ? `${cat.color} text-white`
-                                        : 'bg-light-gray text-charcoal hover:bg-gray-300'
+                                className={`px-4 py-2 rounded-[12px] whitespace-nowrap transition-colors ${selectedCategory === cat.id ? `${cat.color} text-white` : 'bg-light-gray text-charcoal hover:bg-gray-300'
                                     }`}
                                 onClick={() => setSelectedCategory(cat.id)}
                                 whileHover={{ scale: 1.05 }}
@@ -124,11 +122,7 @@ export function PricesPage() {
                                     </div>
                                     {item.trendingImage && (
                                         <div className="w-full h-48 rounded-lg overflow-hidden mb-3">
-                                            <img
-                                                src={item.trendingImage}
-                                                alt={item.material}
-                                                className="w-full h-full object-cover"
-                                            />
+                                            <img src={item.trendingImage} alt={item.material} className="w-full h-full object-cover" />
                                         </div>
                                     )}
                                     <p className="text-sm text-gray-600">{item.examples}</p>
@@ -142,8 +136,9 @@ export function PricesPage() {
                 <section>
                     <div className="flex items-center justify-between mb-6">
                         <h3>
-                            {selectedCategory === 'all' ? 'All Materials' :
-                                categories.find(c => c.id === selectedCategory)?.label}
+                            {selectedCategory === 'all'
+                                ? 'All Materials'
+                                : categories.find(c => c.id === selectedCategory)?.label}
                         </h3>
                         <span className="text-gray-600">{filteredData.length} items</span>
                     </div>
@@ -172,9 +167,7 @@ export function PricesPage() {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-semibold">{item.material}</span>
-                                                    {item.trending && (
-                                                        <TrendingUp className="text-eco-green" size={16} />
-                                                    )}
+                                                    {item.trending && <TrendingUp className="text-eco-green" size={16} />}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-gray-600">{item.examples}</td>
@@ -186,7 +179,7 @@ export function PricesPage() {
                                                     <div className="relative">
                                                         <select
                                                             value={getUnit(item.material)}
-                                                            onChange={(e) => setUnit(item.material, e.target.value)}
+                                                            onChange={e => setUnit(item.material, e.target.value)}
                                                             className="bg-sunny-yellow px-3 py-1 rounded-lg font-semibold text-charcoal appearance-none pr-8 cursor-pointer border-none outline-none h-full"
                                                         >
                                                             <option value="per kg">per kg</option>
@@ -210,13 +203,9 @@ export function PricesPage() {
                             <Card key={index} delay={index * 0.05}>
                                 <div className="flex items-start justify-between mb-3">
                                     <h4 className="text-base">{item.material}</h4>
-                                    {item.trending && (
-                                        <TrendingUp className="text-eco-green flex-shrink-0" size={20} />
-                                    )}
+                                    {item.trending && <TrendingUp className="text-eco-green flex-shrink-0" size={20} />}
                                 </div>
-
                                 <p className="text-sm text-gray-600 mb-3">{item.examples}</p>
-
                                 <div className="flex gap-2 mb-3 flex-wrap sm:flex-nowrap">
                                     <div className="bg-sunny-yellow px-4 py-2 rounded-lg">
                                         <span className="font-bold text-charcoal text-lg">{getPrice(item, item.material)}</span>
@@ -224,7 +213,7 @@ export function PricesPage() {
                                     <div className="relative">
                                         <select
                                             value={getUnit(item.material)}
-                                            onChange={(e) => setUnit(item.material, e.target.value)}
+                                            onChange={e => setUnit(item.material, e.target.value)}
                                             className="bg-sunny-yellow px-4 py-2 rounded-lg font-semibold text-charcoal text-lg appearance-none pr-8 cursor-pointer border-none outline-none h-full"
                                         >
                                             <option value="per kg">per kg</option>
@@ -233,7 +222,6 @@ export function PricesPage() {
                                         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-charcoal" size={18} />
                                     </div>
                                 </div>
-
                                 <div className="bg-light-gray px-3 py-2 rounded-lg">
                                     <p className="text-sm text-gray-700">
                                         <span className="font-semibold">Note:</span> {item.notes}

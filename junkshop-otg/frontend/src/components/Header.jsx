@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import logoImage from 'figma:asset/c9f53fce1e446cb129eb8ac870625932623f3b5f.png';
+import { motion, AnimatePresence } from 'framer-motion';
+//import logoImage from 'figma:asset/c9f53fce1e446cb129eb8ac870625932623f3b5f.png';
 
-export function Header({ activeSection, onNavigate }) {
+export default function Header({ activeSection, onNavigate }) {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -40,11 +40,10 @@ export function Header({ activeSection, onNavigate }) {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                     >
-                        <img
-                            src={logoImage}
-                            alt="JunkShop On-The-Go"
-                            className="h-14 w-auto"
-                        />
+                        <div className="h-14 w-40 bg-eco-green rounded-xl flex items-center justify-center text-white font-bold tracking-wide shadow-md">
+                            JunkShop
+                        </div>
+
                     </motion.div>
 
                     {/* Desktop Navigation */}
@@ -94,8 +93,8 @@ export function Header({ activeSection, onNavigate }) {
                                 <button
                                     key={item.id}
                                     className={`block w-full text-left px-4 py-3 rounded-lg transition-colors ${activeSection === item.id
-                                            ? 'bg-eco-green text-white'
-                                            : 'hover:bg-light-gray text-charcoal'
+                                        ? 'bg-eco-green text-white'
+                                        : 'hover:bg-light-gray text-charcoal'
                                         }`}
                                     onClick={() => {
                                         onNavigate(item.id);

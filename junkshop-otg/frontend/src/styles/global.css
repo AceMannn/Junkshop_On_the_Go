@@ -1,72 +1,137 @@
-/* src/styles/global.css */
-
-/* Tailwind directives must be first */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Custom typography and global styles */
+@theme {
+  --color-eco-green: #3DA35D;
+  --color-leaf-green: #65C18C;
+  --color-clean-blue: #4F9EFF;
+  --color-sunny-yellow: #FFD34E;
+  --color-light-gray: #F2F2F2;
+  --color-charcoal: #2E2E2E;
+
+  --font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --spacing-1: 8px;
+  --spacing-2: 16px;
+  --spacing-3: 24px;
+  --spacing-4: 32px;
+  --spacing-5: 40px;
+  --spacing-6: 48px;
+  --spacing-8: 64px;
+
+  --radius-button: 12px;
+  --radius-card: 16px;
+}
+
 @layer base {
+
+  * {
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
   body {
-    @apply bg-light-gray text-charcoal font-base;
+    background-color: white;
+    color: var(--color-charcoal);
+    font-family: var(--font-family-base);
   }
 
   h1 {
-    @apply font-bold text-5xl leading-tight;
+    font-family: var(--font-family-base);
+    font-weight: 700;
+    font-size: 3.5rem;
+    line-height: 1.2;
   }
 
   h2 {
-    @apply font-bold text-3xl leading-snug;
+    font-family: var(--font-family-base);
+    font-weight: 700;
+    font-size: 2.5rem;
+    line-height: 1.3;
   }
 
   h3 {
-    @apply font-semibold text-2xl leading-snug;
+    font-family: var(--font-family-base);
+    font-weight: 600;
+    font-size: 1.75rem;
+    line-height: 1.4;
   }
 
   h4 {
-    @apply font-semibold text-xl leading-normal;
+    font-family: var(--font-family-base);
+    font-weight: 600;
+    font-size: 1.25rem;
+    line-height: 1.5;
   }
 
   p {
-    @apply font-normal text-base leading-relaxed;
+    font-family: var(--font-family-base);
+    font-weight: 400;
+    font-size: 1rem;
+    line-height: 1.6;
   }
 
   button {
-    @apply font-semibold;
+    font-family: var(--font-family-base);
+    font-weight: 600;
   }
 }
 
-/* Custom utility classes */
 @layer utilities {
   .grid-8 {
     gap: 8px;
   }
+
   .grid-16 {
     gap: 16px;
   }
+
   .grid-24 {
     gap: 24px;
   }
+
   .grid-32 {
     gap: 32px;
   }
+
+  .bg-eco-green {
+    background-color: var(--color-eco-green);
+  }
+
+  .bg-leaf-green {
+    background-color: var(--color-leaf-green);
+  }
+
+  .bg-clean-blue {
+    background-color: var(--color-clean-blue);
+  }
+
+  .bg-sunny-yellow {
+    background-color: var(--color-sunny-yellow);
+  }
+
+  .bg-light-gray {
+    background-color: var(--color-light-gray);
+  }
+
+  .text-eco-green {
+    color: var(--color-eco-green);
+  }
+
+  .text-charcoal {
+    color: var(--color-charcoal);
+  }
+
+  .border-border {
+    border-color: rgba(0, 0, 0, 0.06);
+  }
+
+  .from-eco-green {
+    --tw-gradient-from: var(--color-eco-green);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(255, 255, 255, 0));
+  }
+
+  .to-leaf-green {
+    --tw-gradient-to: var(--color-leaf-green);
+  }
 }
-
-/* Custom colors (make sure they match tailwind.config.js) */
-.text-eco-green { color: #3DA35D; }
-.bg-eco-green { background-color: #3DA35D; }
-
-.text-leaf-green { color: #65C18C; }
-.bg-leaf-green { background-color: #65C18C; }
-
-.text-clean-blue { color: #4F9EFF; }
-.bg-clean-blue { background-color: #4F9EFF; }
-
-.text-sunny-yellow { color: #FFD34E; }
-.bg-sunny-yellow { background-color: #FFD34E; }
-
-.text-light-gray { color: #F2F2F2; }
-.bg-light-gray { background-color: #F2F2F2; }
-
-.text-charcoal { color: #2E2E2E; }
-.bg-charcoal { background-color: #2E2E2E; }

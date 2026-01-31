@@ -1,30 +1,58 @@
 // src/App.jsx
-import React from "react";
-//import Header from "./components/Header";
-// Import pages here
+import { useState } from "react";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+
+// Pages
+import HomePage from "./pages/HomePage";
+import FindJunkshopPage from "./pages/FindJunkshopPage";
+import PricesPage from "./pages/PricesPage";
+import RecyclingGuidePage from "./pages/RecyclingGuidePage";
 import AboutPage from "./pages/AboutPage";
-// import ContactPage from "./pages/ContactPage";
-// import FindJunkshopPage from "./pages/FindJunkshopPage"; // <-- newly added page
+import ContactPage from "./pages/ContactPage";
 
 import "./styles/global.css";
 
-function App() {
+export default function App() {
+  const [activePage, setActivePage] = useState("home");
+
+  const renderPage = () => {
+    switch (activePage) {
+      case "home":
+        return <HomePage onNavigate={setActivePage} />;
+
+      case "find":
+        return <FindJunkshopPage />;
+
+      case "prices":
+        return <PricesPage />;
+
+      case "guide":
+        return <RecyclingGuidePage />;
+
+      case "about":
+        return <AboutPage />;
+
+      case "contact":
+        return <ContactPage />;
+
+      default:
+        return <HomePage onNavigate={setActivePage} />;
+    }
+  };
+
   return (
     <div>
-      {/* Header always on top */}
-      {/* <Header /> */}
+      <Header
+        activeSection={activePage}
+        onNavigate={setActivePage}
+      />
 
       <main>
-        {/* Add your pages here */}
-        <AboutPage />
-        {/* <ContactPage /> */}
-        {/* <FindJunkshopPage /> */}
+        {renderPage()}
       </main>
 
-      {/* Footer can go here */}
-      {/* <Footer /> */}
+      <Footer onNavigate={setActivePage} />
     </div>
   );
 }
-
-export default App;

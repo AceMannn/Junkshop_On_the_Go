@@ -1,7 +1,6 @@
-import { Facebook, Mail, Instagram } from 'lucide-react';
-import logoImage from 'figma:asset/c9f53fce1e446cb129eb8ac870625932623f3b5f.png';
+import { Facebook, Mail, Instagram, Box } from 'lucide-react'; // Use Box as temp logo
 
-export function Footer({ onNavigate }) {
+export default function Footer({ onNavigate }) {
     const currentYear = new Date().getFullYear();
 
     return (
@@ -11,11 +10,10 @@ export function Footer({ onNavigate }) {
                     {/* Logo & Description */}
                     <div className="lg:col-span-2">
                         <div className="flex items-center mb-4">
-                            <img
-                                src={logoImage}
-                                alt="JunkShop On-The-Go"
-                                className="h-16 w-auto"
-                            />
+                            {/* TEMP LOGO */}
+                            <div className="w-16 h-16 bg-light-gray rounded-full flex items-center justify-center">
+                                <Box className="text-charcoal" size={32} />
+                            </div>
                         </div>
                         <p className="text-gray-300 max-w-md mb-4">
                             Community-driven recycling for Teresa, Sta. Mesa, Manila.
