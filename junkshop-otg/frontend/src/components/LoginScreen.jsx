@@ -1,24 +1,47 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, Chrome, Facebook } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, X } from 'lucide-react';
 
-export function LoginScreen({ onLogin }) {
+export default function LoginScreen({ onCustomerLogin, onProviderLogin, onClose }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [rememberMe, setRememberMe] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [isSignUp, setIsSignUp] = useState(false);
+    const [selectedRole, setSelectedRole] = useState('customer');
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleLogin = (e) => {
         e.preventDefault();
-        // Simulate login - in real app, this would validate credentials
-        onLogin();
-    };
+        setError('');
 
-    const handleSocialLogin = (provider) => {
-        console.log(`Login with ${provider}`);
-        // Simulate social login
-        onLogin();
+        // Validate email and password
+        if (!email || !password) {
+            setError('Please enter both email and password to continue.');
+            return;
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setError('Please enter a valid email address.');
+            return;
+        }
+
+        if (password.length < 6) {
+            setError('Password must be at least 6 characters long.');
+            return;
+        }
+
+        // Simulate authentication process
+        setIsLoading(true);
+        setTimeout(() => {
+            setIsLoading(false);
+            if (selectedRole === 'provider') {
+                onProviderLogin();
+            } else {
+                onCustomerLogin();
+            }
+        }, 1000);
     };
 
     return (
@@ -28,175 +51,160 @@ export function LoginScreen({ onLogin }) {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="w-full max-w-[400px] bg-white rounded-xl shadow-lg p-6"
+                className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 relative"
             >
-                {/* Header */}
-                <div className="text-center mb-6">
-                    <div className="inline-flex items-center justify-center gap-2 mb-2">
-                        <div className="w-10 h-10 bg-eco-green rounded-full flex items-center justify-center">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="white"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="w-6 h-6"
-                            >
-                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                                <line x1="12" y1="22.08" x2="12" y2="12" />
-                            </svg>
-                        </div>
-                    </div>
+                {/* Close Button */}
+                {onClose && (
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="absolute top-5 right-5 text-charcoal/40 hover:text-charcoal/60 transition-colors"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
+                )}
 
-                    <h2 className="text-charcoal mb-1">
-                        {isSignUp ? 'Create Account' : 'Welcome Back'}
-                    </h2>
-                    <p className="text-sm text-charcoal/60">
-                        {isSignUp ? 'Sign up to get started' : 'Log in to continue'}
-                    </p>
+                {/* Role Toggle */}
+                <div className="bg-light-gray rounded-lg p-1 mb-6 flex">
+                    <button
+                        type="button"
+                        onClick={() => setSelectedRole('customer')}
+                        className={`flex-1 py-2.5 px-4 rounded-md font-medium transition-all ${selectedRole === 'customer'
+                                ? 'bg-white text-charcoal shadow-sm'
+                                : 'text-charcoal/60 hover:text-charcoal'
+                            }`}
+                    >
+                        Customer
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSelectedRole('provider')}
+                        className={`flex-1 py-2.5 px-4 rounded-md font-medium transition-all ${selectedRole === 'provider'
+                                ? 'bg-white text-charcoal shadow-sm'
+                                : 'text-charcoal/60 hover:text-charcoal'
+                            }`}
+                    >
+                        Provider
+                    </button>
                 </div>
 
+                {/* Error Message */}
+                {error && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2"
+                    >
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-red-700">{error}</p>
+                    </motion.div>
+                )}
+
                 {/* Login Form */}
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleLogin} className="space-y-4">
                     {/* Email Input */}
                     <div>
-                        <label htmlFor="email" className="block text-sm mb-1 text-charcoal/70">
-                            Email
+                        <label htmlFor="email" className="block font-medium mb-2 text-charcoal">
+                            Email address
                         </label>
                         <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal/40" />
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-charcoal/40" />
                             <input
                                 type="email"
                                 id="email"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                onChange={(e) => {
+                                    setEmail(e.target.value);
+                                    setError('');
+                                }}
                                 placeholder="your@email.com"
-                                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:border-eco-green focus:outline-none focus:ring-1 focus:ring-eco-green/20 transition-colors text-charcoal placeholder:text-charcoal/40 text-sm"
-                                required
+                                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:border-eco-green focus:outline-none focus:ring-2 focus:ring-eco-green/20 transition-all text-charcoal placeholder:text-charcoal/40"
+                                disabled={isLoading}
                             />
                         </div>
                     </div>
 
                     {/* Password Input */}
                     <div>
-                        <label htmlFor="password" className="block text-sm mb-1 text-charcoal/70">
+                        <label htmlFor="password" className="block font-medium mb-2 text-charcoal">
                             Password
                         </label>
                         <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal/40" />
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-charcoal/40" />
                             <input
                                 type={showPassword ? 'text' : 'password'}
                                 id="password"
                                 value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                onChange={(e) => {
+                                    setPassword(e.target.value);
+                                    setError('');
+                                }}
                                 placeholder="••••••••"
-                                className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:border-eco-green focus:outline-none focus:ring-1 focus:ring-eco-green/20 transition-colors text-charcoal placeholder:text-charcoal/40 text-sm"
-                                required
+                                className="w-full pl-11 pr-12 py-3 border border-gray-300 rounded-lg focus:border-eco-green focus:outline-none focus:ring-2 focus:ring-eco-green/20 transition-all text-charcoal placeholder:text-charcoal/40"
+                                disabled={isLoading}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60 transition-colors"
+                                disabled={isLoading}
                             >
-                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                             </button>
                         </div>
                     </div>
 
-                    {/* Remember Me & Forgot Password */}
-                    {!isSignUp && (
-                        <div className="flex items-center justify-between">
-                            <label className="flex items-center gap-1.5 cursor-pointer group">
-                                <input
-                                    type="checkbox"
-                                    checked={rememberMe}
-                                    onChange={(e) => setRememberMe(e.target.checked)}
-                                    className="w-3.5 h-3.5 rounded border-gray-300 text-eco-green focus:ring-eco-green/20"
-                                />
-                                <span className="text-xs text-charcoal/60 group-hover:text-charcoal transition-colors">
-                                    Remember me
-                                </span>
-                            </label>
-                            <button
-                                type="button"
-                                className="text-xs text-clean-blue hover:text-clean-blue/80 transition-colors"
-                            >
-                                Forgot password?
-                            </button>
-                        </div>
-                    )}
+                    {/* Forgot Password */}
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            className="text-eco-green hover:text-eco-green/80 transition-colors font-medium"
+                            disabled={isLoading}
+                        >
+                            Forgot password?
+                        </button>
+                    </div>
 
                     {/* Login Button */}
                     <motion.button
                         type="submit"
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                        className="w-full py-2.5 bg-eco-green text-white rounded-lg font-medium shadow-sm hover:bg-eco-green/90 transition-colors text-sm"
+                        whileHover={!isLoading ? { scale: 1.01 } : {}}
+                        whileTap={!isLoading ? { scale: 0.99 } : {}}
+                        disabled={isLoading}
+                        className="w-full py-3 bg-eco-green text-white rounded-lg font-semibold shadow-sm hover:bg-eco-green/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        {isSignUp ? 'Create Account' : 'Log In'}
+                        {isLoading ? 'Logging in...' : `Log in as ${selectedRole === 'customer' ? 'Customer' : 'Provider'}`}
                     </motion.button>
 
-                    {/* Divider */}
-                    <div className="relative py-2">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-gray-200"></div>
-                        </div>
-                        <div className="relative flex justify-center">
-                            <span className="px-2 bg-white text-xs text-charcoal/50">or continue with</span>
-                        </div>
-                    </div>
-
-                    {/* Social Login */}
-                    <div className="grid grid-cols-2 gap-2">
-                        <motion.button
-                            type="button"
-                            onClick={() => handleSocialLogin('Google')}
-                            whileHover={{ scale: 1.01 }}
-                            whileTap={{ scale: 0.99 }}
-                            className="flex items-center justify-center gap-2 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                        >
-                            <Chrome className="w-4 h-4 text-charcoal/60" />
-                            <span className="text-charcoal/70">Google</span>
-                        </motion.button>
-
-                        <motion.button
-                            type="button"
-                            onClick={() => handleSocialLogin('Facebook')}
-                            whileHover={{ scale: 1.01 }}
-                            whileTap={{ scale: 0.99 }}
-                            className="flex items-center justify-center gap-2 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                        >
-                            <Facebook className="w-4 h-4 text-charcoal/60" />
-                            <span className="text-charcoal/70">Facebook</span>
-                        </motion.button>
-                    </div>
+                    {/* Quick Access Button - Temporary */}
+                    <motion.button
+                        type="button"
+                        onClick={() => {
+                            if (selectedRole === 'provider') {
+                                onProviderLogin();
+                            } else {
+                                onCustomerLogin();
+                            }
+                        }}
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                        className="w-full py-3 bg-clean-blue text-white rounded-lg font-semibold shadow-sm hover:bg-clean-blue/90 transition-all"
+                    >
+                        🚀 Quick Access (No Password)
+                    </motion.button>
                 </form>
 
                 {/* Sign Up Link */}
-                <div className="mt-4 text-center">
-                    <p className="text-xs text-charcoal/60">
-                        {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+                <div className="mt-6 text-center">
+                    <p className="text-charcoal/60">
+                        Don't have an account?{' '}
                         <button
-                            onClick={() => setIsSignUp(!isSignUp)}
-                            className="text-clean-blue hover:text-clean-blue/80 font-medium transition-colors"
+                            className="text-eco-green hover:text-eco-green/80 font-semibold transition-colors"
+                            disabled={isLoading}
                         >
-                            {isSignUp ? 'Log in' : 'Sign up'}
+                            Sign up
                         </button>
                     </p>
-                </div>
-
-                {/* Quick Demo Access */}
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                    <button
-                        type="button"
-                        onClick={onLogin}
-                        className="w-full py-2 text-xs text-eco-green border border-eco-green/30 rounded-lg hover:bg-eco-green/5 transition-colors"
-                    >
-                        Continue as Guest
-                    </button>
                 </div>
             </motion.div>
         </div>

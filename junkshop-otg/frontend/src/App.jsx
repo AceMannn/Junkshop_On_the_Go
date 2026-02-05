@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Header } from './components/Header';
-import { Footer } from './components/Footer';
-import { HomePage } from './pages/HomePage';
-import { FindJunkshopPage } from './pages/FindJunkshopPage';
-import { PricesPage } from './pages/PricesPage';
-import { RecyclingGuidePage } from './pages/RecyclingGuidePage';
-import { AboutPage } from './pages/AboutPage';
-import { ContactPage } from './pages/ContactPage';
-import { LoginScreen } from './components/LoginScreen';
-import { ProviderDashboard } from './components/ProviderDashboard';
-import { CustomerDashboard } from './components/CustomerDashboard';
+import Header from './components/Header';
+import Footer from './components/Footer';
+import HomePage from './pages/HomePage';
+import FindJunkshopPage from './pages/FindJunkshopPage';
+import PricesPage from './pages/PricesPage';
+import RecyclingGuidePage from './pages/RecyclingGuidePage';
+import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
+import LoginScreen from './components/LoginScreen';
+import ProviderDashboard from './components/ProviderDashboard';
+import CustomerDashboard from './components/CustomerDashboard';
 
 export default function App() {
   const [activeSection, setActiveSection] = useState('home');
@@ -138,7 +138,7 @@ export default function App() {
       <main>
         {renderPage()}
       </main>
-      <Footer />
+      <Footer onNavigate={handleNavigate} />
 
       {/* Login Modal */}
       {showLoginModal && (

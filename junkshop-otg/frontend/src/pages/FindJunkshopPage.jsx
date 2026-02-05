@@ -7,7 +7,7 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 
 export default function FindJunkshopPage() {
-  const [selectedFilter, setSelectedFilter] = useState<string>('all');
+  const [selectedFilter, setSelectedFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const filters = [
@@ -83,7 +83,7 @@ export default function FindJunkshopPage() {
             <p className="text-lg lg:text-xl text-white/90 mb-6 lg:mb-8">
               Discover trusted junkshops in Teresa, Sta. Mesa, Manila
             </p>
-            
+
             <div className="max-w-2xl">
               <SearchBar
                 placeholder="Search by name, material, or location..."
@@ -104,11 +104,10 @@ export default function FindJunkshopPage() {
             {filters.map((filter) => (
               <motion.button
                 key={filter.id}
-                className={`px-3 lg:px-4 py-2 rounded-[12px] whitespace-nowrap transition-colors text-sm lg:text-base ${
-                  selectedFilter === filter.id
+                className={`px-3 lg:px-4 py-2 rounded-[12px] whitespace-nowrap transition-colors text-sm lg:text-base ${selectedFilter === filter.id
                     ? 'bg-eco-green text-white'
                     : 'bg-light-gray text-charcoal hover:bg-gray-300'
-                }`}
+                  }`}
                 onClick={() => setSelectedFilter(filter.id)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -156,10 +155,10 @@ export default function FindJunkshopPage() {
                     whileHover={{ scale: 1.3 }}
                   >
                     <div className="relative group cursor-pointer">
-                      <MapPin 
-                        className={shop.status === 'Open' ? 'text-eco-green' : 'text-gray-400'} 
+                      <MapPin
+                        className={shop.status === 'Open' ? 'text-eco-green' : 'text-gray-400'}
                         size={32}
-                        fill={shop.status === 'Open' ? '#3DA35D' : '#9CA3AF'} 
+                        fill={shop.status === 'Open' ? '#3DA35D' : '#9CA3AF'}
                       />
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-charcoal text-white text-xs lg:text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                         {shop.name}
@@ -177,7 +176,7 @@ export default function FindJunkshopPage() {
               <h3 className="text-xl lg:text-2xl">Nearby Junkshops</h3>
               <span className="text-sm text-gray-600">{junkshops.length} results</span>
             </div>
-            
+
             {junkshops.map((shop, index) => (
               <motion.div
                 key={shop.id}
@@ -194,11 +193,10 @@ export default function FindJunkshopPage() {
                         <span className="text-sm font-semibold">{shop.rating}</span>
                       </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm ${
-                      shop.status === 'Open' 
-                        ? 'bg-eco-green text-white' 
+                    <span className={`px-3 py-1 rounded-full text-sm ${shop.status === 'Open'
+                        ? 'bg-eco-green text-white'
                         : 'bg-gray-300 text-gray-600'
-                    }`}>
+                      }`}>
                       {shop.status}
                     </span>
                   </div>
