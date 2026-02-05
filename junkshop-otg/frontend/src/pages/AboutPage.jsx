@@ -118,9 +118,9 @@ export default function AboutPage() {
                   </div>
                   <h2 className="text-red-700">{mission.problem.title}</h2>
                 </div>
-                
+
                 <p className="text-gray-700 mb-6">{mission.problem.description}</p>
-                
+
                 <div className="space-y-3">
                   {mission.problem.points.map((point, index) => (
                     <div key={index} className="flex items-start gap-3">
@@ -145,9 +145,9 @@ export default function AboutPage() {
                   </div>
                   <h2 className="text-eco-green">{mission.solution.title}</h2>
                 </div>
-                
+
                 <p className="text-gray-700 mb-6">{mission.solution.description}</p>
-                
+
                 <div className="space-y-3">
                   {mission.solution.points.map((point, index) => (
                     <div key={index} className="flex items-start gap-3">
@@ -221,7 +221,7 @@ export default function AboutPage() {
                 <Card className="bg-gradient-to-br from-clean-blue/5 to-eco-green/5 border-2 border-eco-green/30">
                   <h3 className="mb-4 text-eco-green">{theory.title}</h3>
                   <p className="text-gray-700 mb-6">{theory.description}</p>
-                  
+
                   <div className="bg-white rounded-lg p-6">
                     <h4 className="text-base mb-4">Key Principles:</h4>
                     <div className="grid sm:grid-cols-2 gap-4">
@@ -248,12 +248,12 @@ export default function AboutPage() {
           <Card className="text-center">
             <h2 className="mb-6">Our Vision for Teresa, Sta. Mesa</h2>
             <p className="text-xl text-gray-700 mb-8">
-              We envision a community where every resident has the knowledge, tools, and motivation 
-              to participate in sustainable waste management. Through collective action and accessible 
-              information, we aim to create a cleaner, greener neighborhood while providing economic 
+              We envision a community where every resident has the knowledge, tools, and motivation
+              to participate in sustainable waste management. Through collective action and accessible
+              information, we aim to create a cleaner, greener neighborhood while providing economic
               opportunities for families.
             </p>
-            
+
             <div className="grid sm:grid-cols-3 gap-6 mt-12">
               <div className="text-center">
                 <div className="text-4xl font-bold text-eco-green mb-2">100%</div>
