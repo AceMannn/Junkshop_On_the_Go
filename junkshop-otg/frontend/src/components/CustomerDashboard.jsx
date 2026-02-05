@@ -10,7 +10,7 @@ import {
     TrendingUp,
     Star
 } from 'lucide-react';
-import logoImage from 'figma:asset/c9f53fce1e446cb129eb8ac870625932623f3b5f.png';
+import logoImage from '../assets/junkshop-logo.png';
 
 export default function CustomerDashboard({ onLogout }) {
     const [activeTab, setActiveTab] = useState('overview');

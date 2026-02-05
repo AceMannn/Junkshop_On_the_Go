@@ -1,34 +1,62 @@
-import { Facebook, Mail, Instagram, Box } from 'lucide-react'; // Use Box as temp logo
+import { Facebook, Mail, Instagram } from 'lucide-react';
+import logoImage from '../assets/junkshop-logo.png';
 
 export default function Footer({ onNavigate }) {
     const currentYear = new Date().getFullYear();
 
+    const handleSocialClick = (platform) => {
+        switch (platform) {
+            case 'facebook':
+                window.open('https://www.facebook.com/junkshop.otg', '_blank', 'noopener,noreferrer');
+                break;
+            case 'instagram':
+                window.open('https://www.instagram.com/junkshop.otg', '_blank', 'noopener,noreferrer');
+                break;
+            case 'email':
+                window.location.href = 'https://mail.google.com/';
+                break;
+        }
+    };
+
     return (
-        <footer className="bg-charcoal text-white pt-16 pb-8">
+        <footer className="bg-charcoal text-white pt-12 pb-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
                     {/* Logo & Description */}
                     <div className="lg:col-span-2">
                         <div className="flex items-center mb-4">
-                            {/* TEMP LOGO */}
-                            <div className="w-16 h-16 bg-light-gray rounded-full flex items-center justify-center">
-                                <Box className="text-charcoal" size={32} />
-                            </div>
+                            <img
+                                src={logoImage}
+                                alt="JunkShop On-The-Go"
+                                className="h-14 w-auto"
+                            />
                         </div>
                         <p className="text-gray-300 max-w-md mb-4">
                             Community-driven recycling for Teresa, Sta. Mesa, Manila.
                             Empowering residents to recycle smarter and earn more.
                         </p>
                         <div className="flex gap-4">
-                            <a href="#" className="text-white hover:text-eco-green transition-colors">
+                            <button
+                                onClick={() => handleSocialClick('facebook')}
+                                className="text-white hover:text-eco-green transition-colors"
+                                aria-label="Visit our Facebook page"
+                            >
                                 <Facebook size={24} />
-                            </a>
-                            <a href="#" className="text-white hover:text-eco-green transition-colors">
+                            </button>
+                            <button
+                                onClick={() => handleSocialClick('email')}
+                                className="text-white hover:text-eco-green transition-colors"
+                                aria-label="Send us an email"
+                            >
                                 <Mail size={24} />
-                            </a>
-                            <a href="#" className="text-white hover:text-eco-green transition-colors">
+                            </button>
+                            <button
+                                onClick={() => handleSocialClick('instagram')}
+                                className="text-white hover:text-eco-green transition-colors"
+                                aria-label="Visit our Instagram page"
+                            >
                                 <Instagram size={24} />
-                            </a>
+                            </button>
                         </div>
                     </div>
 
@@ -36,17 +64,13 @@ export default function Footer({ onNavigate }) {
                     <div>
                         <h4 className="mb-4">Quick Links</h4>
                         <ul className="space-y-2">
-                            {['home', 'find', 'prices', 'guide'].map((section) => (
+                            {['home', 'find', 'prices', 'guide', 'about', 'contact'].map((section) => (
                                 <li key={section}>
                                     <button
                                         onClick={() => onNavigate(section)}
                                         className="text-gray-300 hover:text-eco-green transition-colors capitalize"
                                     >
-                                        {section === 'find'
-                                            ? 'Find Junkshop'
-                                            : section === 'guide'
-                                                ? 'Recycling Guide'
-                                                : section}
+                                        {section === 'find' ? 'Find Junkshop' : section === 'guide' ? 'Recycling Guide' : section}
                                     </button>
                                 </li>
                             ))}

@@ -4,7 +4,7 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 
-export function HomePage({ onNavigate }) {
+export default function HomePage({ onNavigate }) {
   const howItWorks = [
     {
       icon: Search,

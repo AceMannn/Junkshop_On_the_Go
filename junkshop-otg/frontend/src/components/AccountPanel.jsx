@@ -13,7 +13,7 @@ import {
 import { useEffect } from 'react';
 import PropTypes from 'prop-types';
 
-export default function AccountPanel({ isOpen, onClose, onLogout, role }) {
+export function AccountPanel({ isOpen, onClose, onLogout, role }) {
     // Close on ESC key
     useEffect(() => {
         const handleEscape = (e) => {
