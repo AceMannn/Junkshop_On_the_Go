@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import logoImage from '../assets/junkshop-logo.png';
 import { AccountPanel } from './AccountPanel';
 
-export default function Header({ activeSection, onNavigate, onLogout, isAuthenticated = false, onShowLogin }) {
+export default function Header({ activeSection, onNavigate, onLogout, isAuthenticated = false, onShowLogin, onShowSignUp }) {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
@@ -21,6 +21,7 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
         { id: 'home', label: 'Home' },
         { id: 'prices', label: 'Prices' },
         { id: 'guide', label: 'Recycling Guide' },
+        { id: 'find', label: 'Find Junkshop' },
         { id: 'about', label: 'About' },
         { id: 'contact', label: 'Contact' },
     ];
@@ -39,7 +40,7 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                 animate={{ y: 0 }}
                 transition={{ duration: 0.5 }}
             >
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px- lg:px-0">
                     <div className="flex items-center justify-between h-20">
                         {/* Logo */}
                         <motion.div
@@ -51,7 +52,7 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                             <img
                                 src={logoImage}
                                 alt="JunkShop On-The-Go"
-                                className="h-14 w-auto"
+                                className="h-15 w-auto"
                             />
                         </motion.div>
 
@@ -95,10 +96,10 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                             )}
 
                             {/* Sign Up Button */}
-                            {!isAuthenticated && onShowLogin && (
+                            {!isAuthenticated && onShowSignUp && (
                                 <motion.button
                                     className="bg-eco-green text-white px-6 py-3 rounded-[12px] hover:bg-[#358F52] transition-colors shadow-md"
-                                    onClick={onShowLogin}
+                                    onClick={onShowSignUp}
                                     whileHover={{ scale: 1.04 }}
                                     whileTap={{ scale: 0.96 }}
                                 >
@@ -169,11 +170,11 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                                 )}
 
                                 {/* Sign Up Button (only when not authenticated) */}
-                                {!isAuthenticated && onShowLogin && (
+                                {!isAuthenticated && onShowSignUp && (
                                     <button
                                         className="w-full bg-eco-green text-white px-6 py-3 rounded-[12px] mt-4"
                                         onClick={() => {
-                                            onShowLogin();
+                                            onShowSignUp();
                                             setIsMobileMenuOpen(false);
                                         }}
                                     >

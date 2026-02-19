@@ -8,6 +8,7 @@ import RecyclingGuidePage from './pages/RecyclingGuidePage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import LoginScreen from './components/LoginScreen';
+import SignUpModal from './components/SignUpModal';
 import ProviderDashboard from './components/ProviderDashboard';
 import CustomerDashboard from './components/CustomerDashboard';
 
@@ -16,6 +17,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isProviderMode, setIsProviderMode] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
 
   // Initial materials data
   const [materials, setMaterials] = useState([
@@ -76,7 +78,7 @@ export default function App() {
 
   // Disable body scroll when login modal is open
   useEffect(() => {
-    if (showLoginModal) {
+    if (showLoginModal || showSignUpModal) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -84,7 +86,7 @@ export default function App() {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showLoginModal]);
+  }, [showLoginModal, showSignUpModal]);
 
   // Show provider dashboard if logged in as provider
   if (isAuthenticated && isProviderMode) {
@@ -128,12 +130,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header 
-        activeSection={activeSection} 
-        onNavigate={handleNavigate} 
+      <Header
+        activeSection={activeSection}
+        onNavigate={handleNavigate}
         onLogout={handleLogout}
         isAuthenticated={isAuthenticated}
         onShowLogin={() => setShowLoginModal(true)}
+        onShowSignUp={() => setShowSignUpModal(true)}
       />
       <main>
         {renderPage()}
@@ -144,7 +147,7 @@ export default function App() {
       {showLoginModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Backdrop - no blur */}
-          <div 
+          <div
             className="absolute inset-0 bg-transparent"
             onClick={() => setShowLoginModal(false)}
           />
@@ -154,10 +157,35 @@ export default function App() {
               onCustomerLogin={handleCustomerLogin}
               onProviderLogin={handleProviderLogin}
               onClose={() => setShowLoginModal(false)}
+              onShowSignUp={() => {
+                setShowLoginModal(false);
+                setShowSignUpModal(true);
+              }}
             />
           </div>
         </div>
       )}
+
+      {/* Sign Up Modal */}
+      {showSignUpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-transparent"
+            onClick={() => setShowSignUpModal(false)}
+          />
+          <div className="relative z-10">
+            <SignUpModal
+              isOpen={showSignUpModal}
+              onClose={() => setShowSignUpModal(false)}
+              onShowLogin={() => {
+                setShowSignUpModal(false);
+                setShowLoginModal(true);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
