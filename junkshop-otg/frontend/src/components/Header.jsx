@@ -1,22 +1,55 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, User } from 'lucide-react';
+import { Menu, X, User, LogIn } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoImage from '../assets/junkshop-logo.png';
 import { AccountPanel } from './AccountPanel';
 
-export default function Header({ activeSection, onNavigate, onLogout, isAuthenticated = false, onShowLogin, onShowSignUp }) {
+/* ==========================
+   HEADER COMPONENT - MAIN PROGRAM GROUP
+   ========================== */
+export default function Header({
+    activeSection,
+    onNavigate,
+    onLogout,
+    isAuthenticated = false,
+    onShowLogin,
+    onShowSignUp,
+}) {
+    // Track scroll for header style changes
     const [isScrolled, setIsScrolled] = useState(false);
+    // Mobile menu toggle
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    // Account panel overlay toggle
     const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
+
+    // ==========================
+    // SCROLL HIDE/REVEAL LOGIC
+    // ==========================
+    const [lastScrollY, setLastScrollY] = useState(0);
+    const [headerVisible, setHeaderVisible] = useState(true);
 
     useEffect(() => {
         const handleScroll = () => {
-            setIsScrolled(window.scrollY > 20);
+            const currentScrollY = window.scrollY;
+
+            // Show header if scrolling up, hide if scrolling down
+            if (currentScrollY > lastScrollY && currentScrollY > 100) {
+                setHeaderVisible(false); // scrolling down
+            } else {
+                setHeaderVisible(true); // scrolling up
+            }
+
+            setLastScrollY(currentScrollY);
+
+            // Optional: original scroll effect
+            setIsScrolled(currentScrollY > 80);
         };
+
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+    }, [lastScrollY]);
 
+    // Navigation items
     const navItems = [
         { id: 'home', label: 'Home' },
         { id: 'prices', label: 'Prices' },
@@ -26,6 +59,7 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
         { id: 'contact', label: 'Contact' },
     ];
 
+    // Handle opening the account panel
     const handleAccountClick = () => {
         setIsAccountPanelOpen(true);
         setIsMobileMenuOpen(false);
@@ -33,16 +67,19 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
 
     return (
         <>
+            {/* ==========================
+                HEADER BAR - ANIMATED WITH SCROLL HIDE/REVEAL
+                ========================== */}
             <motion.header
-                className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-md' : 'bg-white/95'
-                    }`}
+                className="fixed top-0 left-0 right-0 z-50 bg-white/30 backdrop-blur-md transition-all duration-300"
                 initial={{ y: -100 }}
-                animate={{ y: 0 }}
-                transition={{ duration: 0.5 }}
+                animate={{ y: headerVisible ? 0 : -120 }} // smart hide/reveal
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             >
                 <div className="max-w-7xl mx-auto px-4 sm:px- lg:px-0">
                     <div className="flex items-center justify-between h-20">
-                        {/* Logo */}
+
+                        {/* Logo Section */}
                         <motion.div
                             className="flex items-center cursor-pointer"
                             onClick={() => onNavigate('home')}
@@ -68,9 +105,8 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                             ))}
                         </nav>
 
-                        {/* Desktop Actions */}
+                        {/* Desktop Action Buttons */}
                         <div className="hidden lg:flex items-center gap-3">
-                            {/* Account Button (only when authenticated) */}
                             {isAuthenticated && (
                                 <motion.button
                                     onClick={handleAccountClick}
@@ -82,33 +118,31 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                                     <User size={24} />
                                 </motion.button>
                             )}
-
-                            {/* Login Button (only when not authenticated) */}
                             {!isAuthenticated && onShowLogin && (
                                 <motion.button
                                     onClick={onShowLogin}
-                                    className="px-6 py-3 text-charcoal hover:bg-light-gray rounded-[12px] transition-colors"
-                                    whileHover={{ scale: 1.04 }}
-                                    whileTap={{ scale: 0.96 }}
+                                    className="flex items-center gap-2 px-3 py-2.5 bg-[#9BCF53] text-charcoal rounded-full hover:bg-[#8bc34a] transition-all"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
                                 >
                                     Login
+                                    <LogIn size={18} />
                                 </motion.button>
                             )}
-
-                            {/* Sign Up Button */}
                             {!isAuthenticated && onShowSignUp && (
                                 <motion.button
-                                    className="bg-eco-green text-white px-6 py-3 rounded-[12px] hover:bg-[#358F52] transition-colors shadow-md"
                                     onClick={onShowSignUp}
-                                    whileHover={{ scale: 1.04 }}
-                                    whileTap={{ scale: 0.96 }}
+                                    className="flex items-center gap-2 px-3 py-2.5 bg-[#9BCF53] text-charcoal rounded-full hover:bg-[#8bc34a] transition-all shadow-sm"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
                                 >
                                     Sign Up
+                                    <User size={18} />
                                 </motion.button>
                             )}
                         </div>
 
-                        {/* Mobile Menu Button */}
+                        {/* Mobile Menu Toggle Button */}
                         <button
                             className="lg:hidden p-2 text-charcoal"
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -118,7 +152,9 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                     </div>
                 </div>
 
-                {/* Mobile Menu */}
+                {/* ==========================
+                    MOBILE MENU PANEL
+                    ========================== */}
                 <AnimatePresence>
                     {isMobileMenuOpen && (
                         <motion.div
@@ -133,8 +169,8 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                                     <button
                                         key={item.id}
                                         className={`block w-full text-left px-4 py-3 rounded-lg transition-colors ${activeSection === item.id
-                                                ? 'bg-eco-green text-white'
-                                                : 'hover:bg-light-gray text-charcoal'
+                                            ? 'bg-eco-green text-white'
+                                            : 'hover:bg-light-gray text-charcoal'
                                             }`}
                                         onClick={() => {
                                             onNavigate(item.id);
@@ -144,8 +180,6 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                                         {item.label}
                                     </button>
                                 ))}
-
-                                {/* Account Menu Item (only when authenticated) */}
                                 {isAuthenticated && (
                                     <button
                                         className="flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors hover:bg-light-gray text-charcoal border-t border-gray-200 mt-2 pt-4"
@@ -155,8 +189,6 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                                         <span>Account</span>
                                     </button>
                                 )}
-
-                                {/* Login Menu Item (only when not authenticated) */}
                                 {!isAuthenticated && onShowLogin && (
                                     <button
                                         className="flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors hover:bg-light-gray text-charcoal border-t border-gray-200 mt-2 pt-4"
@@ -168,8 +200,6 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                                         <span>Login</span>
                                     </button>
                                 )}
-
-                                {/* Sign Up Button (only when not authenticated) */}
                                 {!isAuthenticated && onShowSignUp && (
                                     <button
                                         className="w-full bg-eco-green text-white px-6 py-3 rounded-[12px] mt-4"
@@ -187,7 +217,9 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
                 </AnimatePresence>
             </motion.header>
 
-            {/* Account Panel - Overlay */}
+            {/* ==========================
+                ACCOUNT PANEL OVERLAY
+                ========================== */}
             <AccountPanel
                 isOpen={isAccountPanelOpen}
                 onClose={() => setIsAccountPanelOpen(false)}
@@ -198,22 +230,20 @@ export default function Header({ activeSection, onNavigate, onLogout, isAuthenti
     );
 }
 
+/* ==========================
+   NAVLINK COMPONENT - SMALL COMPONENT
+   ========================== */
 function NavLink({ label, isActive, onClick }) {
     return (
-        <motion.button
+        <button
             className="relative text-charcoal hover:text-eco-green transition-colors py-2"
             onClick={onClick}
-            whileHover={{ y: -2 }}
         >
             {label}
-            {isActive && (
-                <motion.div
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-eco-green"
-                    layoutId="activeNav"
-                    initial={false}
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                />
-            )}
-        </motion.button>
+            <span
+                className={`absolute bottom-0 left-0 h-0.5 bg-eco-green transition-all duration-300 ${isActive ? 'w-full' : 'w-0'
+                    }`}
+            />
+        </button>
     );
 }
