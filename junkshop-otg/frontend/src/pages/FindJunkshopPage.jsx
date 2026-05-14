@@ -1,27 +1,75 @@
-// src/pages/FindJunkshopPage.jsx
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { MapPin, Clock, Phone, Star, Filter } from 'lucide-react';
-import { SearchBar } from '../components/SearchBar';
-import { Card } from '../components/Card';
+// ==============================
+// IMPORTS (libraries + components)
+// ==============================
+import { useMemo, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MapPin, Clock, Phone, Star, Search, Navigation, X } from 'lucide-react';
+import {
+  GoogleMap,
+  Marker,
+  InfoWindow,
+  useJsApiLoader,
+} from '@react-google-maps/api';
 import { Button } from '../components/Button';
 
+// ==============================
+// MAP CONFIG (size + center)
+// ==============================
+const containerStyle = {
+  width: '100%',
+  height: '100%',
+};
+
+const defaultCenter = {
+  lat: 14.5995,
+  lng: 121.0055,
+};
+
+// ==============================
+// MAP OPTIONS (UI behavior)
+// ==============================
+const mapOptions = {
+  disableDefaultUI: true,
+  zoomControl: true,
+  streetViewControl: false,
+  mapTypeControl: false,
+  fullscreenControl: false,
+  clickableIcons: false,
+};
+
+// ==============================
+// MAIN COMPONENT
+// ==============================
 export default function FindJunkshopPage() {
-  const [selectedFilter, setSelectedFilter] = useState('all');
+
+  // ==============================
+  // STATE MANAGEMENT
+  // ==============================
   const [searchQuery, setSearchQuery] = useState('');
+  const [hoveredShop, setHoveredShop] = useState(null);
+  const [selectedShop, setSelectedShop] = useState(null);
+  const [showOpenOnly, setShowOpenOnly] = useState(false);
+  const [filterMaterial, setFilterMaterial] = useState('all');
+  const [userLocation, setUserLocation] = useState(null);
+  const [map, setMap] = useState(null);
+  const [showFilters, setShowFilters] = useState(true);
 
-  const filters = [
-    { id: 'all', label: 'All' },
-    { id: 'open', label: 'Open Now' },
-    { id: 'plastic', label: 'Accepts Plastic' },
-    { id: 'metal', label: 'Accepts Metal' },
-    { id: 'paper', label: 'Accepts Paper' }
-  ];
+  // ==============================
+  // GOOGLE MAPS LOADER
+  // ==============================
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+  });
 
+  // ==============================
+  // STATIC JUNKSHOP DATA
+  // ==============================
   const junkshops = [
     {
       id: 1,
-      name: 'Mang Tonio\'s Junkshop',
+      name: "Mang Tonio's Junkshop",
+      lat: 14.5995,
+      lng: 121.0055,
       distance: '0.3 km',
       address: '123 P. Sanchez St., Teresa, Sta. Mesa',
       phone: '0912-345-6789',
@@ -29,11 +77,13 @@ export default function FindJunkshopPage() {
       status: 'Open',
       rating: 4.8,
       materials: ['Plastic', 'Metal', 'Paper', 'Glass'],
-      topPrice: 'Metal: ₱50/kg'
+      topPrice: 'Metal: ₱50/kg',
     },
     {
       id: 2,
       name: 'Green Recyclers Teresa',
+      lat: 14.6005,
+      lng: 121.0035,
       distance: '0.5 km',
       address: '456 N. Domingo St., Teresa, Sta. Mesa',
       phone: '0923-456-7890',
@@ -41,11 +91,13 @@ export default function FindJunkshopPage() {
       status: 'Open',
       rating: 4.6,
       materials: ['Plastic', 'Paper', 'E-waste'],
-      topPrice: 'E-waste: ₱100/kg'
+      topPrice: 'E-waste: ₱100/kg',
     },
     {
       id: 3,
       name: 'Barangay Recycle Hub',
+      lat: 14.5985,
+      lng: 121.0065,
       distance: '0.8 km',
       address: '789 Mayon St., Teresa, Sta. Mesa',
       phone: '0934-567-8901',
@@ -53,11 +105,13 @@ export default function FindJunkshopPage() {
       status: 'Closed',
       rating: 4.5,
       materials: ['Plastic', 'Metal', 'Paper', 'Glass', 'E-waste'],
-      topPrice: 'All materials accepted'
+      topPrice: 'All materials accepted',
     },
     {
       id: 4,
       name: 'EcoStar Junkshop',
+      lat: 14.6015,
+      lng: 121.0025,
       distance: '1.2 km',
       address: '321 Arayat St., Teresa, Sta. Mesa',
       phone: '0945-678-9012',
@@ -65,164 +119,456 @@ export default function FindJunkshopPage() {
       status: 'Open',
       rating: 4.7,
       materials: ['Metal', 'Paper', 'Cardboard'],
-      topPrice: 'Metal: ₱48/kg'
-    }
+      topPrice: 'Metal: ₱48/kg',
+    },
+    {
+      id: 5,
+      name: 'Teresa Green Exchange',
+      lat: 14.5975,
+      lng: 121.0075,
+      distance: '1.5 km',
+      address: '555 V. Mapa St., Teresa, Sta. Mesa',
+      phone: '0956-789-0123',
+      hours: '8:00 AM - 5:00 PM',
+      status: 'Open',
+      rating: 4.9,
+      materials: ['Plastic', 'Metal', 'Paper', 'Glass', 'E-waste', 'Cardboard'],
+      topPrice: 'Best prices in Teresa!',
+    },
   ];
 
+  // ==============================
+  // MATERIAL FILTER OPTIONS
+  // ==============================
+  const materials = ['all', 'Plastic', 'Metal', 'Paper', 'Glass', 'E-waste', 'Cardboard'];
+
+  // ==============================
+  // FILTER LOGIC
+  // ==============================
+  const filteredShops = useMemo(() => {
+    return junkshops.filter((shop) => {
+      if (showOpenOnly && shop.status !== 'Open') return false;
+      if (filterMaterial !== 'all' && !shop.materials.includes(filterMaterial)) return false;
+      if (
+        searchQuery &&
+        !shop.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !shop.address.toLowerCase().includes(searchQuery.toLowerCase())
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [junkshops, showOpenOnly, filterMaterial, searchQuery]);
+
+  // ==============================
+  // MAP LOAD HANDLER
+  // ==============================
+  const onLoad = useCallback((mapInstance) => {
+    setMap(mapInstance);
+  }, []);
+
+  // ==============================
+  // FIT MAP TO MARKERS
+  // ==============================
+  const fitMapToMarkers = useCallback(
+    (shops, currentUserLocation = null) => {
+      if (!map || !window.google || shops.length === 0) return;
+
+      const bounds = new window.google.maps.LatLngBounds();
+
+      shops.forEach((shop) => {
+        bounds.extend({ lat: shop.lat, lng: shop.lng });
+      });
+
+      if (currentUserLocation) {
+        bounds.extend(currentUserLocation);
+      }
+
+      map.fitBounds(bounds);
+
+      setTimeout(() => {
+        if (map.getZoom() > 15) {
+          map.setZoom(15);
+        }
+      }, 200);
+    },
+    [map]
+  );
+
+  // ==============================
+  // GET USER LOCATION
+  // ==============================
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const currentPos = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+
+        setUserLocation(currentPos);
+
+        if (map) {
+          map.panTo(currentPos);
+          map.setZoom(15);
+        }
+      },
+      () => {
+        alert('Unable to get your location. Using default area instead.');
+      }
+    );
+  };
+
+  // ==============================
+  // DIRECTIONS FUNCTION
+  // ==============================
+  const handleDirections = (shop) => {
+    const destination = `${shop.lat},${shop.lng}`;
+    const origin = userLocation
+      ? `${userLocation.lat},${userLocation.lng}`
+      : '';
+
+    const url = origin
+      ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`
+      : `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+
+    window.open(url, '_blank');
+  };
+
+  // ==============================
+  // CALL FUNCTION
+  // ==============================
+  const handleCall = (phone) => {
+    window.location.href = `tel:${phone}`;
+  };
+
+  // ==============================
+  // MARKER ICONS (OPEN / CLOSED)
+  // ==============================
+  { /* svg icon */ };
+  const openMarkerIcon = {
+    url:
+      'data:image/svg+xml;charset=UTF-8,' +
+      encodeURIComponent(`
+        <svg width="36" height="48" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 0C8.06 0 0 8.06 0 18C0 31.5 18 48 18 48C18 48 36 31.5 36 18C36 8.06 27.94 0 18 0Z" fill="#3DA35D" stroke="white" stroke-width="2"/>
+          <circle cx="18" cy="18" r="6" fill="white"/>
+        </svg>
+      `),
+    scaledSize: isLoaded && window.google ? new window.google.maps.Size(36, 48) : undefined,
+  };
+
+  { /* svg icon */ };
+  const closedMarkerIcon = {
+    url:
+      'data:image/svg+xml;charset=UTF-8,' +
+      encodeURIComponent(`
+        <svg width="36" height="48" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 0C8.06 0 0 8.06 0 18C0 31.5 18 48 18 48C18 48 36 31.5 36 18C36 8.06 27.94 0 18 0Z" fill="#9CA3AF" stroke="white" stroke-width="2"/>
+          <circle cx="18" cy="18" r="6" fill="white"/>
+        </svg>
+      `),
+    scaledSize: isLoaded && window.google ? new window.google.maps.Size(36, 48) : undefined,
+  };
+
+  // ==============================
+  // ERROR STATE
+  // ==============================
+  if (loadError) {
+    return (
+      <div className="h-screen flex items-center justify-center text-red-500 font-semibold">
+        Failed to load Google Maps.
+      </div>
+    );
+  }
+
   return (
-    <div className="pt-20 min-h-screen bg-light-gray pb-20 lg:pb-0">
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-eco-green to-leaf-green text-white py-12 lg:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+    <div className="h-screen flex">
+
+  {/* ==============================
+        LEFT SIDEBAR: SEARCH & FILTER
+  ============================== */}
+  <div className="w-80 bg-white border-r border-gray-200 shadow-sm overflow-y-auto p-4">
+    {/* SEARCH + FILTER CONTENT */}
+    <div className="space-y-4">
+
+      {/* Search Input + Buttons */}
+      <div className="flex gap-3 mb-3">
+        <div className="relative flex-1">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            size={18}
+          />
+          <input
+            type="text"
+            placeholder="Search junkshops..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-13 pr-3 py-2.5 rounded-[12px] border border-gray-300 text-sm text-charcoal placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-eco-green focus:border-eco-green"
+          />
+        </div>
+
+        <motion.button
+          onClick={handleUseMyLocation}
+          className="flex items-center gap-2 px-4 py-2.5 bg-clean-blue text-white rounded-[12px] hover:bg-clean-blue/90 transition-colors text-sm whitespace-nowrap"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Navigation size={18} />
+          <span className="hidden sm:inline">My Location</span>
+        </motion.button>
+      </div>
+
+      {/* Open Now + Material Filter */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        <label className="flex items-center gap-2 px-3 py-1.5 bg-light-gray rounded-[10px] cursor-pointer hover:bg-gray-300 transition-colors text-sm whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={showOpenOnly}
+            onChange={(e) => setShowOpenOnly(e.target.checked)}
+            className="w-3.5 h-3.5 accent-eco-green"
+          />
+          <span>Open Now</span>
+        </label>
+
+        <select
+          value={filterMaterial}
+          onChange={(e) => setFilterMaterial(e.target.value)}
+          className="px-3 py-1.5 bg-light-gray rounded-[10px] text-charcoal text-sm border-0 focus:outline-none focus:ring-2 focus:ring-eco-green cursor-pointer"
+        >
+          {materials.map((material) => (
+            <option key={material} value={material}>
+              {material === 'all' ? 'All Materials' : material}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex items-center px-3 py-1.5 bg-eco-green/10 rounded-[10px]">
+          <span className="text-xs font-semibold text-eco-green">
+            {filteredShops.length} found
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+      {/* ==============================
+          GOOGLE MAP SECTION
+      ============================== */}
+      <div className="flex-1 relative overflow-hidden">
+        {!isLoaded ? (
+          <div className="h-full w-full flex items-center justify-center bg-gray-100">
+            <p className="text-gray-500 font-medium">Loading Google Maps...</p>
+          </div>
+        ) : (
+          <GoogleMap
+            mapContainerStyle={containerStyle}
+            center={userLocation || defaultCenter}
+            zoom={15}
+            options={mapOptions}
+            onLoad={onLoad}
           >
-            <h2 className="mb-4 text-white">Find Junkshops Near You</h2>
-            <p className="text-lg lg:text-xl text-white/90 mb-6 lg:mb-8">
-              Discover trusted junkshops in Teresa, Sta. Mesa, Manila
-            </p>
-
-            <div className="max-w-2xl">
-              <SearchBar
-                placeholder="Search by name, material, or location..."
-                value={searchQuery}
-                onChange={setSearchQuery}
-                showFilter={true}
+            {/* USER LOCATION MARKER */}
+            {userLocation && (
+              <Marker
+                position={userLocation}
+                icon={{
+                  path: window.google.maps.SymbolPath.CIRCLE,
+                  fillColor: '#3B82F6',
+                  fillOpacity: 1,
+                  strokeColor: '#FFFFFF',
+                  strokeWeight: 3,
+                  scale: 8,
+                }}
+                title="Your Location"
               />
-            </div>
-          </motion.div>
-        </div>
-      </section>
+            )}
 
-      {/* Filters */}
-      <section className="bg-white border-b border-gray-200 sticky top-20 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-4">
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <Filter className="text-gray-500 flex-shrink-0" size={20} />
-            {filters.map((filter) => (
-              <motion.button
-                key={filter.id}
-                className={`px-3 lg:px-4 py-2 rounded-[12px] whitespace-nowrap transition-colors text-sm lg:text-base ${selectedFilter === filter.id
-                    ? 'bg-eco-green text-white'
-                    : 'bg-light-gray text-charcoal hover:bg-gray-300'
-                  }`}
-                onClick={() => setSelectedFilter(filter.id)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                {filter.label}
-              </motion.button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-          {/* Map Section */}
-          <div className="lg:col-span-2 order-2 lg:order-1">
-            <motion.div
-              className="bg-white rounded-[16px] p-4 shadow-md h-[400px] lg:h-[600px] mb-6 lg:mb-8"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-            >
-              {/* Map mockup */}
-              <div className="relative h-full bg-gradient-to-br from-clean-blue/20 to-eco-green/20 rounded-[12px] overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center px-4">
-                    <MapPin className="text-eco-green mx-auto mb-4" size={48} />
-                    <p className="text-gray-600 text-sm lg:text-base">Interactive Map View</p>
-                    <p className="text-xs lg:text-sm text-gray-500 mt-2">
-                      Showing {junkshops.length} junkshops in Teresa, Sta. Mesa
-                    </p>
-                  </div>
-                </div>
-                {/* Mock pins */}
-                {junkshops.map((shop, i) => (
-                  <motion.div
-                    key={shop.id}
-                    className="absolute"
-                    style={{
-                      top: `${20 + i * 15}%`,
-                      left: `${30 + (i % 2) * 30}%`
-                    }}
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.2 + i * 0.1, type: 'spring' }}
-                    whileHover={{ scale: 1.3 }}
-                  >
-                    <div className="relative group cursor-pointer">
-                      <MapPin
-                        className={shop.status === 'Open' ? 'text-eco-green' : 'text-gray-400'}
-                        size={32}
-                        fill={shop.status === 'Open' ? '#3DA35D' : '#9CA3AF'}
-                      />
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-charcoal text-white text-xs lg:text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                        {shop.name}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-
-          {/* List Section */}
-          <div className="space-y-4 order-1 lg:order-2">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl lg:text-2xl">Nearby Junkshops</h3>
-              <span className="text-sm text-gray-600">{junkshops.length} results</span>
-            </div>
-
-            {junkshops.map((shop, index) => (
-              <motion.div
+            {/* JUNKSHOP MARKERS */}
+            {filteredShops.map((shop) => (
+              <Marker
                 key={shop.id}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
+                position={{ lat: shop.lat, lng: shop.lng }}
+                icon={shop.status === 'Open' ? openMarkerIcon : closedMarkerIcon}
+                onClick={() => setSelectedShop(shop)}
+                title={shop.name}
+              />
+            ))}
+
+            {/* INFO WINDOW (OPTIONAL HOVER) */}
+            {hoveredShop && (
+              <InfoWindow
+                position={{ lat: hoveredShop.lat, lng: hoveredShop.lng }}
+                onCloseClick={() => setHoveredShop(null)}
               >
-                <Card hover={true}>
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="mb-1">{shop.name}</h4>
-                      <div className="flex items-center gap-1 mb-2">
-                        <Star className="text-sunny-yellow fill-sunny-yellow" size={16} />
-                        <span className="text-sm font-semibold">{shop.rating}</span>
-                      </div>
+                <div className="max-w-[180px] text-xs">
+                  <h4 className="font-bold text-sm mb-1">{hoveredShop.name}</h4>
+                  <p className="text-xs text-gray-600 mb-1">{hoveredShop.address}</p>
+                  <p className="text-xs text-gray-600 mb-1">{hoveredShop.hours}</p>
+                  <p className="text-xs font-semibold text-eco-green">
+                    {hoveredShop.status}
+                  </p>
+                </div>
+              </InfoWindow>
+            )}
+          </GoogleMap>
+        )}
+
+        {/* EMPTY STATE */}
+        {isLoaded && filteredShops.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center bg-white rounded-[20px] shadow-xl p-8 max-w-sm mx-4 pointer-events-auto">
+              <MapPin className="mx-auto text-gray-400 mb-4" size={56} />
+              <h3 className="text-lg font-bold text-charcoal mb-2">No junkshops found</h3>
+              <p className="text-gray-600 mb-4">Try adjusting your filters</p>
+              <button
+                onClick={() => {
+                  setShowOpenOnly(false);
+                  setFilterMaterial('all');
+                  setSearchQuery('');
+                }}
+                className="text-eco-green font-semibold hover:underline"
+              >
+                Clear all filters
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ==============================
+            DETAILS MODAL (POPUP WHEN CLICKING A SHOP)
+          ============================== */}
+      <AnimatePresence>
+        {selectedShop && (
+          <>
+            {/* BACKDROP OVERLAY (dark background behind modal) */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedShop(null)} // click outside closes modal
+              className="fixed inset-0 bg-charcoal/60 backdrop-blur-sm z-50"
+            />
+
+            {/* CENTERED MODAL CONTAINER */}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+
+              {/* MODAL CARD */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ type: 'spring', damping: 25 }}
+                className="bg-white rounded-[24px] shadow-2xl max-w-lg w-full pointer-events-auto overflow-hidden"
+                onClick={(e) => e.stopPropagation()} // prevent closing when clicking inside modal
+              >
+
+                {/* ==============================
+                      HEADER SECTION (NAME + STATUS)
+                    ============================== */}
+                <div className="relative bg-gradient-to-br from-eco-green to-leaf-green text-white p-6">
+
+                  {/* CLOSE BUTTON */}
+                  <button
+                    onClick={() => setSelectedShop(null)}
+                    className="absolute top-4 right-4 w-8 h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+
+                  {/* SHOP NAME */}
+                  <h3 className="text-2xl font-bold mb-2">
+                    {selectedShop.name}
+                  </h3>
+
+                  {/* RATING + STATUS + DISTANCE */}
+                  <div className="flex items-center gap-3">
+
+                    {/* STAR RATING */}
+                    <div className="flex items-center gap-1">
+                      <Star className="text-sunny-yellow fill-sunny-yellow" size={18} />
+                      <span className="font-semibold">
+                        {selectedShop.rating}
+                      </span>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm ${shop.status === 'Open'
-                        ? 'bg-eco-green text-white'
-                        : 'bg-gray-300 text-gray-600'
-                      }`}>
-                      {shop.status}
+
+                    {/* OPEN / CLOSED STATUS */}
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-semibold ${selectedShop.status === 'Open'
+                        ? 'bg-white text-eco-green'
+                        : 'bg-white/20 text-white'
+                        }`}
+                    >
+                      {selectedShop.status}
+                    </span>
+
+                    {/* DISTANCE */}
+                    <span className="text-sm opacity-90">
+                      • {selectedShop.distance} away
                     </span>
                   </div>
+                </div>
 
-                  <div className="space-y-2 text-sm text-gray-600 mb-4">
-                    <div className="flex items-start gap-2">
-                      <MapPin size={16} className="mt-0.5 flex-shrink-0" />
-                      <span>{shop.address}</span>
+                {/* ==============================
+                      DETAILS SECTION (INFO CARDS)
+                    ============================== */}
+                <div className="p-6 space-y-4">
+
+                  {/* ADDRESS + HOURS + PHONE */}
+                  <div className="space-y-3">
+
+                    {/* ADDRESS */}
+                    <div className="flex items-start gap-3 p-3 bg-light-gray rounded-[12px]">
+                      <MapPin size={20} className="mt-0.5 flex-shrink-0 text-eco-green" />
+                      <div>
+                        <p className="text-sm font-semibold text-charcoal mb-1">Address</p>
+                        <p className="text-sm text-gray-600">
+                          {selectedShop.address}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Clock size={16} className="flex-shrink-0" />
-                      <span>{shop.hours}</span>
+
+                    {/* OPERATING HOURS */}
+                    <div className="flex items-center gap-3 p-3 bg-light-gray rounded-[12px]">
+                      <Clock size={20} className="flex-shrink-0 text-eco-green" />
+                      <div>
+                        <p className="text-sm font-semibold text-charcoal mb-1">Operating Hours</p>
+                        <p className="text-sm text-gray-600">
+                          {selectedShop.hours}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Phone size={16} className="flex-shrink-0" />
-                      <span>{shop.phone}</span>
+
+                    {/* CONTACT NUMBER */}
+                    <div className="flex items-center gap-3 p-3 bg-light-gray rounded-[12px]">
+                      <Phone size={20} className="flex-shrink-0 text-eco-green" />
+                      <div>
+                        <p className="text-sm font-semibold text-charcoal mb-1">Contact Number</p>
+                        <p className="text-sm text-gray-600">
+                          {selectedShop.phone}
+                        </p>
+                      </div>
                     </div>
+
                   </div>
 
-                  <div className="mb-4">
-                    <p className="text-sm font-semibold mb-2">Accepted Materials:</p>
+                  {/* ==============================
+                        MATERIALS SECTION
+                      ============================== */}
+                  <div>
+                    <p className="font-semibold mb-2 text-charcoal">
+                      Accepted Materials
+                    </p>
+
+                    {/* MATERIAL TAGS */}
                     <div className="flex flex-wrap gap-2">
-                      {shop.materials.map((material) => (
+                      {selectedShop.materials.map((material) => (
                         <span
                           key={material}
-                          className="px-2 py-1 bg-leaf-green/20 text-eco-green rounded-lg text-xs"
+                          className="px-3 py-1.5 bg-leaf-green/20 text-eco-green rounded-lg text-sm font-medium"
                         >
                           {material}
                         </span>
@@ -230,29 +576,46 @@ export default function FindJunkshopPage() {
                     </div>
                   </div>
 
-                  <div className="bg-sunny-yellow/20 px-3 py-2 rounded-lg mb-4">
-                    <p className="text-sm font-semibold text-charcoal">{shop.topPrice}</p>
+                  {/* ==============================
+                        PRICE HIGHLIGHT
+                      ============================== */}
+                  <div className="bg-sunny-yellow/20 border-l-4 border-sunny-yellow px-4 py-3 rounded-lg">
+                    <p className="text-sm font-bold text-charcoal">
+                      {selectedShop.topPrice}
+                    </p>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Button className="flex-1">
+                  {/* ==============================
+                        ACTION BUTTONS
+                      ============================== */}
+                  <div className="flex gap-3 pt-2">
+
+                    {/* DIRECTIONS BUTTON */}
+                    <Button
+                      className="flex-1"
+                      onClick={() => handleDirections(selectedShop)}
+                    >
+                      <Navigation size={18} className="mr-2" />
                       Get Directions
                     </Button>
-                    <Button variant="outline" className="flex-1">
+
+                    {/* CALL BUTTON */}
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleCall(selectedShop.phone)}
+                    >
+                      <Phone size={18} className="mr-2" />
                       Call Now
                     </Button>
-                  </div>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* Mobile Sticky CTA */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40">
-        <Button className="w-full">View Map</Button>
-      </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
