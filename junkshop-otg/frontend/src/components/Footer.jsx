@@ -13,7 +13,7 @@ export default function Footer({ onNavigate }) {
                 window.open('https://www.instagram.com/junkshop.otg', '_blank', 'noopener,noreferrer');
                 break;
             case 'email':
-                window.location.href = 'https://mail.google.com/';
+                window.location.href = 'mailto:hello@junkshop-otg.ph';
                 break;
         }
     };
@@ -64,13 +64,17 @@ export default function Footer({ onNavigate }) {
                     <div>
                         <h4 className="mb-4">Quick Links</h4>
                         <ul className="space-y-2">
-                            {['home', 'find', 'prices', 'guide', 'about', 'contact'].map((section) => (
-                                <li key={section}>
+                            {[
+                                { id: 'home', label: 'Home' },
+                                { id: 'about', label: 'About' },
+                                { id: 'contact', label: 'Contact' },
+                            ].map((section) => (
+                                <li key={section.id}>
                                     <button
-                                        onClick={() => onNavigate(section)}
-                                        className="text-gray-300 hover:text-eco-green transition-colors capitalize"
+                                        onClick={() => onNavigate(section.id)}
+                                        className="text-gray-300 hover:text-eco-green transition-colors"
                                     >
-                                        {section === 'find' ? 'Find Junkshop' : section === 'guide' ? 'Recycling Guide' : section}
+                                        {section.label}
                                     </button>
                                 </li>
                             ))}

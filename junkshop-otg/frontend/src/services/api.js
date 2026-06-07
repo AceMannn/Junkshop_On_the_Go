@@ -1,0 +1,258 @@
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
+async function request(path, options = {}) {
+  const token = localStorage.getItem('junkshop_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Something went wrong. Please try again.');
+  }
+
+  return data;
+}
+
+export const authApi = {
+  login(payload) {
+    return request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  register(payload) {
+    return request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  me() {
+    return request('/api/auth/me');
+  },
+  updateMe(payload) {
+    return request('/api/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+  changePassword(payload) {
+    return request('/api/auth/password', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+  deactivate() {
+    return request('/api/auth/deactivate', { method: 'PATCH' });
+  },
+  getFavorites() {
+    return request('/api/auth/favorites');
+  },
+  toggleFavorite(shopId) {
+    return request('/api/auth/favorites/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ shopId }),
+    });
+  },
+  forgotPassword(payload) {
+    return request('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  resetPassword(payload) {
+    return request('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
+export const contactApi = {
+  sendMessage(payload) {
+    return request('/api/contact', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
+export const domainApi = {
+  getJunkshops({ lat, lng, partnersOnly } = {}) {
+    const params = new URLSearchParams();
+    if (lat != null && lng != null) {
+      params.set('lat', String(lat));
+      params.set('lng', String(lng));
+    }
+    if (partnersOnly) params.set('partners', 'true');
+    const qs = params.toString();
+    return request(`/api/junkshops${qs ? `?${qs}` : ''}`);
+  },
+  getMyJunkshops() {
+    return request('/api/junkshops/mine');
+  },
+  createJunkshop(payload) {
+    return request('/api/junkshops', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  updateJunkshop(id, payload) {
+    return request(`/api/junkshops/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+  getCatalogMaterials() {
+    return request('/api/materials?catalog=true');
+  },
+  getMyMaterials() {
+    return request('/api/materials/mine');
+  },
+  createMaterial(payload) {
+    return request('/api/materials', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  updateMaterial(id, payload) {
+    return request(`/api/materials/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+  deleteMaterial(id) {
+    return request(`/api/materials/${id}`, { method: 'DELETE' });
+  },
+  getTransactions({ from, to } = {}) {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const qs = params.toString();
+    return request(`/api/transactions${qs ? `?${qs}` : ''}`);
+  },
+  createTransaction(payload) {
+    return request('/api/transactions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  logTrip(payload) {
+    return request('/api/transactions/log-trip', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  getNotes() {
+    return request('/api/notes');
+  },
+  createNote(payload) {
+    return request('/api/notes', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
+export const pickupApi = {
+  list() {
+    return request('/api/pickup-requests');
+  },
+  get(id) {
+    return request(`/api/pickup-requests/${id}`);
+  },
+  getRejectPresets() {
+    return request('/api/pickup-requests/reject-presets');
+  },
+  create(payload) {
+    return request('/api/pickup-requests', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  accept(id, payload = {}) {
+    return request(`/api/pickup-requests/${id}/accept`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+  reject(id, payload) {
+    return request(`/api/pickup-requests/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+  updateStatus(id, status) {
+    return request(`/api/pickup-requests/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
+  updateLocation(id, lat, lng) {
+    return request(`/api/pickup-requests/${id}/location`, {
+      method: 'PATCH',
+      body: JSON.stringify({ lat, lng }),
+    });
+  },
+  markServiceFeePaid(id) {
+    return request(`/api/pickup-requests/${id}/service-fee-paid`, { method: 'PATCH' });
+  },
+  rate(id, payload) {
+    return request(`/api/pickup-requests/${id}/rating`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
+export const mapApi = {
+  geocode(query) {
+    const params = new URLSearchParams({ q: query });
+    return request(`/api/maps/geocode?${params}`);
+  },
+  reverseGeocode(lat, lng) {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lng: String(lng),
+    });
+    return request(`/api/maps/reverse-geocode?${params}`);
+  },
+  route(fromLat, fromLng, toLat, toLng) {
+    const params = new URLSearchParams({
+      fromLat: String(fromLat),
+      fromLng: String(fromLng),
+      toLat: String(toLat),
+      toLng: String(toLng),
+    });
+    return request(`/api/maps/route?${params}`);
+  },
+};
+
+export const notificationApi = {
+  list() {
+    return request('/api/notifications');
+  },
+  markRead(id) {
+    return request(`/api/notifications/${id}/read`, { method: 'PATCH' });
+  },
+};
+
+export const authApiExtended = {
+  updateProviderProfile(payload) {
+    return request('/api/auth/provider-profile', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+};

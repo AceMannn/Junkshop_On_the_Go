@@ -2,6 +2,8 @@
 
 @theme {
   --color-eco-green: #3DA35D;
+  --color-dashboard-green: #154212;
+  --color-dashboard-mint: #c9e7cc;
   --color-leaf-green: #65C18C;
   --color-clean-blue: #4F9EFF;
   --color-sunny-yellow: #FFD34E;
@@ -24,30 +26,35 @@
 
 @layer base {
 
+  html {
+    overflow-x: clip;
+  }
+
   body {
     background-color: white;
     color: var(--color-charcoal);
     font-family: var(--font-family-base);
+    overflow-x: clip;
   }
 
   h1 {
     font-family: var(--font-family-base);
     font-weight: 700;
-    font-size: 3.5rem;
+    font-size: clamp(2.5rem, 8vw, 3.5rem);
     line-height: 1.2;
   }
 
   h2 {
     font-family: var(--font-family-base);
     font-weight: 700;
-    font-size: 2.5rem;
+    font-size: clamp(2rem, 6vw, 2.5rem);
     line-height: 1.3;
   }
 
   h3 {
     font-family: var(--font-family-base);
     font-weight: 600;
-    font-size: 1.75rem;
+    font-size: clamp(1.5rem, 4vw, 1.75rem);
     line-height: 1.4;
   }
 
@@ -72,6 +79,10 @@
 }
 
 @layer utilities {
+  .safe-area-pb {
+    padding-bottom: max(0.625rem, env(safe-area-inset-bottom, 0px));
+  }
+
   .grid-8 {
     gap: 8px;
   }
@@ -116,6 +127,22 @@
     color: var(--color-charcoal);
   }
 
+  .bg-dashboard-green {
+    background-color: var(--color-dashboard-green);
+  }
+
+  .bg-dashboard-mint {
+    background-color: var(--color-dashboard-mint);
+  }
+
+  .text-dashboard-green {
+    color: var(--color-dashboard-green);
+  }
+
+  .border-dashboard-mint {
+    border-color: var(--color-dashboard-mint);
+  }
+
   .border-border {
     border-color: rgba(0, 0, 0, 0.06);
   }
@@ -127,5 +154,83 @@
 
   .to-leaf-green {
     --tw-gradient-to: var(--color-leaf-green);
+  }
+
+  /* Horizontal lists (e.g. Nearby Junkshops) — no dark blocks on scrollbar arrows */
+  .scrollbar-clean-h {
+    scrollbar-width: thin;
+    scrollbar-color: #d4d4d8 transparent;
+  }
+
+  .scrollbar-clean-h::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .scrollbar-clean-h::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-clean-h::-webkit-scrollbar-thumb {
+    background: #d4d4d8;
+    border-radius: 9999px;
+  }
+
+  .scrollbar-clean-h::-webkit-scrollbar-button {
+    background: transparent;
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
+  /* Vertical lists (dropdowns, panels) — slim thumb, no track background */
+  .scrollbar-clean {
+    scrollbar-width: thin;
+    scrollbar-color: #d4d4d8 transparent;
+  }
+
+  .scrollbar-clean::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-clean::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-clean::-webkit-scrollbar-thumb {
+    background: #d4d4d8;
+    border-radius: 9999px;
+  }
+
+  .scrollbar-clean::-webkit-scrollbar-button {
+    background: transparent;
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
+  .scrollbar-clean::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .leaflet-container {
+    z-index: 0;
+    font-family: inherit;
+  }
+
+  .junkshop-pin {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  /* Hide native number spinners — custom steppers via NumberInput */
+  .number-input-field::-webkit-outer-spin-button,
+  .number-input-field::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .number-input-field {
+    -moz-appearance: textfield;
+    appearance: textfield;
   }
 }

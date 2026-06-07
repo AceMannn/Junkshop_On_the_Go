@@ -1,5 +1,5 @@
 import { Search, SlidersHorizontal } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion as Motion } from 'framer-motion';
 
 export function SearchBar({
     placeholder = 'Search...',
@@ -9,7 +9,7 @@ export function SearchBar({
     showFilter = false
 }) {
     return (
-        <motion.div
+        <Motion.div
             className="relative flex items-center gap-2"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -26,15 +26,15 @@ export function SearchBar({
                 />
             </div>
             {showFilter && (
-                <motion.button
+                <Motion.button
                     className="p-3 rounded-[12px] border-2 border-light-gray hover:border-eco-green transition-colors"
                     onClick={onFilterClick}
                     whileHover={{ scale: 1.04 }}
                     whileTap={{ scale: 0.96 }}
                 >
                     <SlidersHorizontal size={20} className="text-charcoal" />
-                </motion.button>
+                </Motion.button>
             )}
-        </motion.div>
+        </Motion.div>
     );
 }
