@@ -1,8 +1,14 @@
-import { motion } from 'framer-motion';
 import { Target, Lightbulb, Users, Heart, BookOpen, Recycle } from 'lucide-react';
-import { Card } from '../components/Card';
 
-export default function AboutPage() {
+function StaticCard({ children, className = '' }) {
+  return (
+    <div className={`bg-white rounded-[16px] p-6 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+export default function AboutPage({ onNavigate }) {
   const mission = {
     problem: {
       icon: Target,
@@ -84,20 +90,16 @@ export default function AboutPage() {
       {/* Hero */}
       <section className="bg-gradient-to-br from-eco-green via-leaf-green to-clean-blue text-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
+          <div>
             <h1 className="mb-6 text-white">Our Mission</h1>
             <p className="text-2xl text-white/90 mb-8">
               Empowering the Teresa, Sta. Mesa community through accessible recycling information and sustainable practices
             </p>
-            <div className="inline-flex items-center gap-3 bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full">
-              <Recycle className="text-white" size={24} />
-              <span className="text-xl">Community-Centered • Eco-Friendly • Accessible</span>
+            <div className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 bg-white/20 backdrop-blur-sm px-4 sm:px-6 py-3 rounded-2xl sm:rounded-full max-w-full">
+              <Recycle className="text-white shrink-0" size={24} />
+              <span className="text-sm sm:text-xl text-center">Community-Centered • Eco-Friendly • Accessible</span>
             </div>
-          </motion.div>
+          </div>
         </div>
       </section>
 
@@ -106,14 +108,10 @@ export default function AboutPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12">
             {/* Problem */}
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <Card className="h-full bg-red-50 border-2 border-red-200">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="bg-red-500 w-16 h-16 rounded-full flex items-center justify-center">
+            <div>
+              <StaticCard className="h-full bg-red-50 border-2 border-red-200">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6">
+                  <div className="bg-red-500 w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shrink-0">
                     <mission.problem.icon className="text-white" size={32} />
                   </div>
                   <h2 className="text-red-700">{mission.problem.title}</h2>
@@ -129,18 +127,14 @@ export default function AboutPage() {
                     </div>
                   ))}
                 </div>
-              </Card>
-            </motion.div>
+              </StaticCard>
+            </div>
 
             {/* Solution */}
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <Card className="h-full bg-eco-green/5 border-2 border-eco-green">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="bg-eco-green w-16 h-16 rounded-full flex items-center justify-center">
+            <div>
+              <StaticCard className="h-full bg-eco-green/5 border-2 border-eco-green">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6">
+                  <div className="bg-eco-green w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shrink-0">
                     <mission.solution.icon className="text-white" size={32} />
                   </div>
                   <h2 className="text-eco-green">{mission.solution.title}</h2>
@@ -156,8 +150,8 @@ export default function AboutPage() {
                     </div>
                   ))}
                 </div>
-              </Card>
-            </motion.div>
+              </StaticCard>
+            </div>
           </div>
         </div>
       </section>
@@ -165,29 +159,22 @@ export default function AboutPage() {
       {/* Community Benefits */}
       <section className="py-16 bg-light-gray">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            className="text-center mb-12"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
+          <div className="text-center mb-12">
             <h2 className="mb-4">Community Benefits</h2>
             <p className="text-xl text-gray-600">How we make a difference together</p>
-          </motion.div>
+          </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             {benefits.map((benefit, index) => (
-              <Card key={index} delay={index * 0.1}>
-                <motion.div
+              <StaticCard key={index}>
+                <div
                   className={`${benefit.color} w-16 h-16 rounded-full flex items-center justify-center mb-4`}
-                  whileHover={{ rotate: 360, scale: 1.1 }}
-                  transition={{ duration: 0.5 }}
                 >
                   <benefit.icon className="text-white" size={32} />
-                </motion.div>
+                </div>
                 <h3 className="mb-3">{benefit.title}</h3>
                 <p className="text-gray-600">{benefit.description}</p>
-              </Card>
+              </StaticCard>
             ))}
           </div>
         </div>
@@ -196,29 +183,18 @@ export default function AboutPage() {
       {/* Research Foundation */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            className="text-center mb-12"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
+          <div className="text-center mb-12">
             <BookOpen className="text-eco-green mx-auto mb-4" size={48} />
             <h2 className="mb-4">Research Foundation</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Our approach is grounded in established environmental and community development theories
             </p>
-          </motion.div>
+          </div>
 
           <div className="space-y-8">
             {theories.map((theory, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.2 }}
-              >
-                <Card className="bg-gradient-to-br from-clean-blue/5 to-eco-green/5 border-2 border-eco-green/30">
+              <div key={index}>
+                <StaticCard className="bg-gradient-to-br from-clean-blue/5 to-eco-green/5 border-2 border-eco-green/30">
                   <h3 className="mb-4 text-eco-green">{theory.title}</h3>
                   <p className="text-gray-700 mb-6">{theory.description}</p>
 
@@ -235,8 +211,8 @@ export default function AboutPage() {
                       ))}
                     </div>
                   </div>
-                </Card>
-              </motion.div>
+                </StaticCard>
+              </div>
             ))}
           </div>
         </div>
@@ -245,7 +221,7 @@ export default function AboutPage() {
       {/* Vision Section */}
       <section className="py-16 bg-gradient-to-br from-sunny-yellow/20 to-eco-green/20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Card className="text-center">
+          <StaticCard className="text-center">
             <h2 className="mb-6">Our Vision for Teresa, Sta. Mesa</h2>
             <p className="text-xl text-gray-700 mb-8">
               We envision a community where every resident has the knowledge, tools, and motivation
@@ -268,34 +244,29 @@ export default function AboutPage() {
                 <p className="text-gray-600">Positive Impact</p>
               </div>
             </div>
-          </Card>
+          </StaticCard>
         </div>
       </section>
 
       {/* Team Section */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            className="text-center mb-12"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
+          <div className="text-center mb-12">
             <h2 className="mb-4">Our Team</h2>
             <p className="text-xl text-gray-600">
               Dedicated individuals working for the community
             </p>
-          </motion.div>
+          </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {team.map((member, index) => (
-              <Card key={index} delay={index * 0.1} className="text-center">
+              <StaticCard key={index} className="text-center">
                 <div className="w-24 h-24 bg-gradient-to-br from-eco-green to-leaf-green rounded-full mx-auto mb-4 flex items-center justify-center">
                   <Users className="text-white" size={40} />
                 </div>
                 <h4 className="mb-2">{member.name}</h4>
                 <p className="text-gray-600">{member.role}</p>
-              </Card>
+              </StaticCard>
             ))}
           </div>
         </div>
@@ -304,34 +275,28 @@ export default function AboutPage() {
       {/* Call to Action */}
       <section className="py-16 bg-eco-green text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
+          <div>
             <h2 className="mb-6 text-white">Join Our Community Initiative</h2>
             <p className="text-xl text-white/90 mb-8">
               Together, we can create a more sustainable and prosperous Teresa, Sta. Mesa
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <motion.a
-                href="#contact"
+              <button
+                type="button"
+                onClick={() => onNavigate('contact')}
                 className="bg-white text-eco-green px-8 py-4 rounded-[12px] font-semibold hover:bg-light-gray transition-colors"
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.96 }}
               >
                 Get Involved
-              </motion.a>
-              <motion.a
-                href="#find"
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate('home')}
                 className="bg-white/20 backdrop-blur-sm text-white px-8 py-4 rounded-[12px] font-semibold hover:bg-white/30 transition-colors"
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.96 }}
               >
                 Start Recycling
-              </motion.a>
+              </button>
             </div>
-          </motion.div>
+          </div>
         </div>
       </section>
     </div>

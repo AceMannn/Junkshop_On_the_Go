@@ -2,60 +2,71 @@ import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
-import FindJunkshopPage from './pages/FindJunkshopPage';
-import PricesPage from './pages/PricesPage';
-import RecyclingGuidePage from './pages/RecyclingGuidePage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import LoginScreen from './components/LoginScreen';
 import SignUpModal from './components/SignUpModal';
 import ProviderDashboard from './components/ProviderDashboard';
 import CustomerDashboard from './components/CustomerDashboard';
+import { authApi } from './services/api';
 
 export default function App() {
   const [activeSection, setActiveSection] = useState('home');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isProviderMode, setIsProviderMode] = useState(false);
+  const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem('junkshop_user');
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
+  const [loginPrefill, setLoginPrefill] = useState({
+    email: '',
+    role: 'customer',
+    message: '',
+  });
 
-  // Initial materials data
-  const [materials, setMaterials] = useState([
-    { id: '1', name: 'PET Bottles (Clear)', category: 'plastic', price: 15, unit: 'kg', available: true },
-    { id: '2', name: 'Cardboard', category: 'paper', price: 8, unit: 'kg', available: true },
-    { id: '3', name: 'Aluminum Cans', category: 'metal', price: 45, unit: 'kg', available: true },
-    { id: '4', name: 'Newspapers', category: 'paper', price: 5, unit: 'kg', available: true },
-    { id: '5', name: 'Scrap Metal', category: 'metal', price: 20, unit: 'kg', available: true },
-    { id: '6', name: 'Glass Bottles', category: 'glass', price: 3, unit: 'kg', available: true },
-    { id: '7', name: 'Office Paper', category: 'paper', price: 7, unit: 'kg', available: true },
-    { id: '8', name: 'Plastic Bags (HDPE)', category: 'plastic', price: 10, unit: 'kg', available: true },
-  ]);
 
   const handleNavigate = (section) => {
-    setActiveSection(section);
+    const publicSections = ['home', 'about', 'contact'];
+    const nextSection = publicSections.includes(section) ? section : 'home';
+
+    setActiveSection(nextSection);
+    window.history.pushState(null, '', `#${nextSection}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleCustomerLogin = () => {
-    setIsAuthenticated(true);
-    setIsProviderMode(false);
+  const persistSession = ({ token, user: sessionUser }) => {
+    localStorage.setItem('junkshop_token', token);
+    localStorage.setItem('junkshop_user', JSON.stringify(sessionUser));
+    setUser(sessionUser);
     setShowLoginModal(false);
+    setShowSignUpModal(false);
   };
 
-  const handleProviderLogin = () => {
-    setIsAuthenticated(true);
-    setIsProviderMode(true);
+  const handleAuthSuccess = (session) => {
+    persistSession(session);
+    setLoginPrefill({ email: '', role: 'customer', message: '' });
+  };
+
+  const handleSignUpComplete = ({ email, role }) => {
+    setShowSignUpModal(false);
+    setLoginPrefill({
+      email,
+      role,
+      message: 'Account created! Please log in.',
+    });
+    setShowLoginModal(true);
+  };
+
+  const handleCloseLogin = () => {
     setShowLoginModal(false);
+    setLoginPrefill({ email: '', role: 'customer', message: '' });
   };
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
-    setIsProviderMode(false);
+    localStorage.removeItem('junkshop_token');
+    localStorage.removeItem('junkshop_user');
+    setUser(null);
     setActiveSection('home');
-  };
-
-  const handleUpdateMaterials = (updatedMaterials) => {
-    setMaterials(updatedMaterials);
   };
 
   // Handle browser back/forward buttons
@@ -69,12 +80,25 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Update URL when section changes
   useEffect(() => {
-    if (isAuthenticated && !isProviderMode) {
-      window.history.pushState(null, '', `#${activeSection}`);
-    }
-  }, [activeSection, isAuthenticated, isProviderMode]);
+    const token = localStorage.getItem('junkshop_token');
+
+    if (!token) return;
+
+    authApi.me()
+      .then(({ user: currentUser }) => {
+        setUser(currentUser);
+        localStorage.setItem('junkshop_user', JSON.stringify(currentUser));
+      })
+      .catch(() => {
+        localStorage.removeItem('junkshop_token');
+        localStorage.removeItem('junkshop_user');
+        setUser(null);
+      });
+  }, []);
+
+  const isAuthenticated = Boolean(user);
+  const isProviderMode = user?.role === 'provider';
 
   // Disable body scroll when login modal is open
   useEffect(() => {
@@ -93,8 +117,11 @@ export default function App() {
     return (
       <ProviderDashboard
         onLogout={handleLogout}
-        materials={materials}
-        onUpdateMaterials={handleUpdateMaterials}
+        user={user}
+        onUserUpdate={(updatedUser) => {
+          setUser(updatedUser);
+          localStorage.setItem('junkshop_user', JSON.stringify(updatedUser));
+        }}
       />
     );
   }
@@ -104,6 +131,11 @@ export default function App() {
     return (
       <CustomerDashboard
         onLogout={handleLogout}
+        user={user}
+        onUserUpdate={(updatedUser) => {
+          setUser(updatedUser);
+          localStorage.setItem('junkshop_user', JSON.stringify(updatedUser));
+        }}
       />
     );
   }
@@ -112,19 +144,13 @@ export default function App() {
   const renderPage = () => {
     switch (activeSection) {
       case 'home':
-        return <HomePage onNavigate={handleNavigate} />;
-      case 'find':
-        return <FindJunkshopPage />;
-      case 'prices':
-        return <PricesPage materials={materials} />;
-      case 'guide':
-        return <RecyclingGuidePage />;
+        return <HomePage />;
       case 'about':
-        return <AboutPage />;
+        return <AboutPage onNavigate={handleNavigate} />;
       case 'contact':
         return <ContactPage />;
       default:
-        return <HomePage onNavigate={handleNavigate} />;
+        return <HomePage />;
     }
   };
 
@@ -135,7 +161,10 @@ export default function App() {
         onNavigate={handleNavigate}
         onLogout={handleLogout}
         isAuthenticated={isAuthenticated}
-        onShowLogin={() => setShowLoginModal(true)}
+        onShowLogin={() => {
+          setLoginPrefill({ email: '', role: 'customer', message: '' });
+          setShowLoginModal(true);
+        }}
         onShowSignUp={() => setShowSignUpModal(true)}
       />
       <main>
@@ -145,45 +174,32 @@ export default function App() {
 
       {/* Login Modal */}
       {showLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop - no blur */}
-          <div
-            className="absolute inset-0 bg-transparent"
-            onClick={() => setShowLoginModal(false)}
-          />
-          {/* Modal Content */}
-          <div className="relative z-10">
-            <LoginScreen
-              onCustomerLogin={handleCustomerLogin}
-              onProviderLogin={handleProviderLogin}
-              onClose={() => setShowLoginModal(false)}
-              onShowSignUp={() => {
-                setShowLoginModal(false);
-                setShowSignUpModal(true);
-              }}
-            />
-          </div>
-        </div>
+        <LoginScreen
+          onLoginSuccess={handleAuthSuccess}
+          onClose={handleCloseLogin}
+          initialEmail={loginPrefill.email}
+          initialRole={loginPrefill.role}
+          successMessage={loginPrefill.message}
+          onShowSignUp={() => {
+            setShowLoginModal(false);
+            setLoginPrefill({ email: '', role: 'customer', message: '' });
+            setShowSignUpModal(true);
+          }}
+        />
       )}
 
       {/* Sign Up Modal */}
       {showSignUpModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-transparent"
-            onClick={() => setShowSignUpModal(false)}
-          />
-          <div className="relative z-10">
-            <SignUpModal
-              isOpen={showSignUpModal}
-              onClose={() => setShowSignUpModal(false)}
-              onShowLogin={() => {
-                setShowSignUpModal(false);
-                setShowLoginModal(true);
-              }}
-            />
-          </div>
-        </div>
+        <SignUpModal
+          isOpen={showSignUpModal}
+          onClose={() => setShowSignUpModal(false)}
+          onSignUpComplete={handleSignUpComplete}
+          onShowLogin={() => {
+            setShowSignUpModal(false);
+            setLoginPrefill({ email: '', role: 'customer', message: '' });
+            setShowLoginModal(true);
+          }}
+        />
       )}
 
     </div>

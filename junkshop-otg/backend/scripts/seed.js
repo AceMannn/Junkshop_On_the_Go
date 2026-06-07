@@ -1,0 +1,86 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+const bcrypt = require('bcryptjs');
+const connectDB = require('../config/db');
+const User = require('../models/User');
+const Junkshop = require('../models/Junkshop');
+const Material = require('../models/Material');
+const {
+  junkshopSeed,
+  materialSeed,
+  parsePriceMid,
+  CATALOG_PROVIDER_EMAIL,
+} = require('./seedData');
+
+const seed = async () => {
+  await connectDB();
+
+  const catalogProvider = await User.findOneAndUpdate(
+    { email: CATALOG_PROVIDER_EMAIL },
+    {
+      firstName: 'JunkShop',
+      lastName: 'Catalog',
+      email: CATALOG_PROVIDER_EMAIL,
+      password: await bcrypt.hash('catalog-seed-not-for-login', 10),
+      role: 'provider',
+      junkshopName: 'JunkShop Catalog',
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  let junkshopCount = 0;
+  for (const shop of junkshopSeed) {
+    await Junkshop.findOneAndUpdate(
+      { slug: shop.slug },
+      {
+        name: shop.name,
+        address: shop.address,
+        phone: shop.phone,
+        hours: shop.hours,
+        status: shop.status,
+        rating: shop.rating,
+        materials: shop.materials,
+        distance: shop.distance,
+        topPrice: shop.topPrice,
+        slug: shop.slug,
+        isCatalog: true,
+        location: { lat: shop.lat, lng: shop.lng },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    junkshopCount += 1;
+  }
+
+  let materialCount = 0;
+  for (const item of materialSeed) {
+    const mid = parsePriceMid(item.perKgPrice);
+    await Material.findOneAndUpdate(
+      { slug: item.slug },
+      {
+        provider: catalogProvider._id,
+        name: item.name,
+        category: item.category,
+        price: mid,
+        previousPrice: mid,
+        priceLabel: item.perKgPrice,
+        examples: item.examples,
+        notes: item.notes,
+        slug: item.slug,
+        isCatalog: true,
+        unit: 'kg',
+        available: true,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    materialCount += 1;
+  }
+
+  console.log(`Seeded ${junkshopCount} junkshops and ${materialCount} catalog materials.`);
+  process.exit(0);
+};
+
+seed().catch((err) => {
+  console.error('Seed failed:', err.message);
+  process.exit(1);
+});

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Menu, X, User, LogIn } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import logoImage from '../assets/junkshop-logo.png';
 import { AccountPanel } from './AccountPanel';
 
@@ -15,8 +15,6 @@ export default function Header({
     onShowLogin,
     onShowSignUp,
 }) {
-    // Track scroll for header style changes
-    const [isScrolled, setIsScrolled] = useState(false);
     // Mobile menu toggle
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     // Account panel overlay toggle
@@ -41,8 +39,6 @@ export default function Header({
 
             setLastScrollY(currentScrollY);
 
-            // Optional: original scroll effect
-            setIsScrolled(currentScrollY > 80);
         };
 
         window.addEventListener('scroll', handleScroll);
@@ -52,10 +48,7 @@ export default function Header({
     // Navigation items
     const navItems = [
         { id: 'home', label: 'Home' },
-        { id: 'prices', label: 'Prices' },
-        { id: 'guide', label: 'Recycling Guide' },
-        { id: 'find', label: 'Find Junkshop' },
-        { id: 'about', label: 'About' },
+        { id: 'about', label: 'About Us' },
         { id: 'contact', label: 'Contact' },
     ];
 
@@ -70,17 +63,17 @@ export default function Header({
             {/* ==========================
                 HEADER BAR - ANIMATED WITH SCROLL HIDE/REVEAL
                 ========================== */}
-            <motion.header
+            <Motion.header
                 className="fixed top-0 left-0 right-0 z-50 bg-white/30 backdrop-blur-md transition-all duration-300"
                 initial={{ y: -100 }}
                 animate={{ y: headerVisible ? 0 : -120 }} // smart hide/reveal
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             >
-                <div className="max-w-7xl mx-auto px-4 sm:px- lg:px-0">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
 
                         {/* Logo Section */}
-                        <motion.div
+                        <Motion.div
                             className="flex items-center cursor-pointer"
                             onClick={() => onNavigate('home')}
                             whileHover={{ scale: 1.05 }}
@@ -89,9 +82,9 @@ export default function Header({
                             <img
                                 src={logoImage}
                                 alt="JunkShop On-The-Go"
-                                className="h-15 w-auto"
+                                className="h-10 sm:h-12 w-auto max-w-[10rem] sm:max-w-none"
                             />
-                        </motion.div>
+                        </Motion.div>
 
                         {/* Desktop Navigation */}
                         <nav className="hidden lg:flex items-center gap-8">
@@ -108,7 +101,7 @@ export default function Header({
                         {/* Desktop Action Buttons */}
                         <div className="hidden lg:flex items-center gap-3">
                             {isAuthenticated && (
-                                <motion.button
+                                <Motion.button
                                     onClick={handleAccountClick}
                                     className="p-2.5 text-charcoal hover:bg-eco-green/10 hover:text-eco-green rounded-lg transition-all"
                                     whileHover={{ scale: 1.05 }}
@@ -116,29 +109,29 @@ export default function Header({
                                     title="Account"
                                 >
                                     <User size={24} />
-                                </motion.button>
+                                </Motion.button>
                             )}
                             {!isAuthenticated && onShowLogin && (
-                                <motion.button
+                                <Motion.button
                                     onClick={onShowLogin}
-                                    className="flex items-center gap-2 px-3 py-2.5 bg-[#9BCF53] text-charcoal rounded-full hover:bg-[#8bc34a] transition-all"
+                                    className="flex items-center gap-2 px-4 py-2.5 text-charcoal rounded-full hover:bg-eco-green/10 hover:text-eco-green transition-all"
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                 >
                                     Login
                                     <LogIn size={18} />
-                                </motion.button>
+                                </Motion.button>
                             )}
                             {!isAuthenticated && onShowSignUp && (
-                                <motion.button
+                                <Motion.button
                                     onClick={onShowSignUp}
-                                    className="flex items-center gap-2 px-3 py-2.5 bg-[#9BCF53] text-charcoal rounded-full hover:bg-[#8bc34a] transition-all shadow-sm"
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-eco-green text-white rounded-full hover:bg-[#358F52] transition-all shadow-sm"
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                 >
                                     Sign Up
                                     <User size={18} />
-                                </motion.button>
+                                </Motion.button>
                             )}
                         </div>
 
@@ -146,6 +139,7 @@ export default function Header({
                         <button
                             className="lg:hidden p-2 text-charcoal"
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            aria-label="Toggle navigation menu"
                         >
                             {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
                         </button>
@@ -157,7 +151,7 @@ export default function Header({
                     ========================== */}
                 <AnimatePresence>
                     {isMobileMenuOpen && (
-                        <motion.div
+                        <Motion.div
                             className="lg:hidden bg-white border-t border-light-gray"
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
@@ -212,10 +206,10 @@ export default function Header({
                                     </button>
                                 )}
                             </nav>
-                        </motion.div>
+                        </Motion.div>
                     )}
                 </AnimatePresence>
-            </motion.header>
+            </Motion.header>
 
             {/* ==========================
                 ACCOUNT PANEL OVERLAY

@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import {
     User,
     Mail,
@@ -65,7 +65,7 @@ export function AccountPanel({ isOpen, onClose, onLogout, role }) {
             {isOpen && (
                 <>
                     {/* Backdrop */}
-                    <motion.div
+                    <Motion.div
                         className="fixed inset-0 bg-black/40 z-[100]"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -75,7 +75,7 @@ export function AccountPanel({ isOpen, onClose, onLogout, role }) {
                     />
 
                     {/* Panel */}
-                    <motion.div
+                    <Motion.div
                         className="fixed right-0 top-0 bottom-0 w-full sm:w-96 bg-white shadow-2xl z-[101] flex flex-col"
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
@@ -129,7 +129,7 @@ export function AccountPanel({ isOpen, onClose, onLogout, role }) {
                         <nav className="flex-1 p-4 overflow-y-auto">
                             <div className="space-y-1">
                                 {menuItems.map((item, index) => (
-                                    <motion.button
+                                    <Motion.button
                                         key={item.action}
                                         onClick={() => handleMenuClick(item.action)}
                                         className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-charcoal hover:bg-eco-green/10 hover:text-eco-green transition-all group"
@@ -140,14 +140,14 @@ export function AccountPanel({ isOpen, onClose, onLogout, role }) {
                                     >
                                         <item.icon className="w-5 h-5 text-charcoal/60 group-hover:text-eco-green transition-colors" />
                                         <span className="font-medium">{item.label}</span>
-                                    </motion.button>
+                                    </Motion.button>
                                 ))}
                             </div>
                         </nav>
 
                         {/* Footer - Sign Out */}
                         <div className="p-4 border-t border-gray-200 bg-gray-50">
-                            <motion.button
+                            <Motion.button
                                 onClick={onLogout}
                                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-all font-medium group"
                                 whileHover={{ scale: 1.02 }}
@@ -155,9 +155,9 @@ export function AccountPanel({ isOpen, onClose, onLogout, role }) {
                             >
                                 <LogOut className="w-5 h-5" />
                                 <span>Sign Out</span>
-                            </motion.button>
+                            </Motion.button>
                         </div>
-                    </motion.div>
+                    </Motion.div>
                 </>
             )}
         </AnimatePresence>

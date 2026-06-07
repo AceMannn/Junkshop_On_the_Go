@@ -1,0 +1,148 @@
+const User = require('../models/User');
+const Junkshop = require('../models/Junkshop');
+const Material = require('../models/Material');
+const { syncJunkshopMaterialTags } = require('./syncJunkshopTags');
+
+const PH_PHONE_PATTERN = /^09\d{9}$/;
+
+function normalizePhone(phone) {
+  const raw = String(phone || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('+63')) {
+    return `0${raw.slice(3).replace(/\D/g, '')}`.slice(0, 11);
+  }
+  return raw.replace(/\D/g, '').slice(0, 11);
+}
+
+function hasValidPhone(phone) {
+  return PH_PHONE_PATTERN.test(normalizePhone(phone));
+}
+
+function buildChecklist(items) {
+  const doneCount = items.filter((item) => item.done).length;
+  return {
+    complete: doneCount === items.length,
+    percent: items.length ? Math.round((doneCount / items.length) * 100) : 0,
+    missing: items.filter((item) => !item.done).map((item) => item.id),
+    checklist: items,
+  };
+}
+
+async function evaluateCustomerProfile(user) {
+  const phone = normalizePhone(user.phone);
+
+  return buildChecklist([
+    {
+      id: 'phone',
+      label: 'Mobile number (for pickups & recovery)',
+      done: hasValidPhone(phone),
+    },
+  ]);
+}
+
+async function evaluateProviderProfile(user) {
+  const shop = await Junkshop.findOne({
+    provider: user._id,
+    isCatalog: { $ne: true },
+  }).sort({ createdAt: 1 });
+
+  const materialCount = await Material.countDocuments({
+    provider: user._id,
+    isCatalog: { $ne: true },
+    available: { $ne: false },
+  });
+
+  const hasShopLocation =
+    shop &&
+    Number.isFinite(Number(shop.location?.lat)) &&
+    Number.isFinite(Number(shop.location?.lng));
+
+  const gcashNumber = normalizePhone(user.gcashNumber);
+
+  return buildChecklist([
+    {
+      id: 'junkshopName',
+      label: 'Junkshop name',
+      done: Boolean(String(user.junkshopName || shop?.name || '').trim()),
+    },
+    {
+      id: 'address',
+      label: 'Junkshop address',
+      done: Boolean(String(user.address || shop?.address || '').trim()),
+    },
+    {
+      id: 'phone',
+      label: 'Shop contact number',
+      done: hasValidPhone(user.phone || shop?.phone),
+    },
+    {
+      id: 'mapPin',
+      label: 'Map location (latitude & longitude)',
+      done: Boolean(hasShopLocation),
+    },
+    {
+      id: 'material',
+      label: 'At least one available material',
+      done: materialCount > 0,
+    },
+    {
+      id: 'gcashNumber',
+      label: 'GCash mobile number',
+      done: hasValidPhone(gcashNumber),
+    },
+    {
+      id: 'serviceFee',
+      label: 'Pickup service fee set',
+      done: user.pickupServiceFee != null && Number(user.pickupServiceFee) >= 0,
+    },
+  ]);
+}
+
+async function evaluateProfile(user) {
+  if (!user) {
+    return buildChecklist([]);
+  }
+
+  if (user.role === 'provider') {
+    return evaluateProviderProfile(user);
+  }
+
+  if (user.role === 'customer') {
+    return evaluateCustomerProfile(user);
+  }
+
+  return buildChecklist([]);
+}
+
+async function syncProfileComplete(userId) {
+  const user = await User.findById(userId);
+  if (!user) return null;
+
+  const status = await evaluateProfile(user);
+  user.profileComplete = status.complete;
+  await user.save();
+
+  if (user.role === 'provider') {
+    const shop = await Junkshop.findOne({
+      provider: user._id,
+      isCatalog: { $ne: true },
+    }).sort({ createdAt: 1 });
+
+    if (shop) {
+      shop.isPublished = status.complete;
+      await shop.save();
+    }
+
+    await syncJunkshopMaterialTags(userId);
+  }
+
+  return status;
+}
+
+module.exports = {
+  evaluateProfile,
+  syncProfileComplete,
+  hasValidPhone,
+  normalizePhone,
+  PH_PHONE_PATTERN,
+};
