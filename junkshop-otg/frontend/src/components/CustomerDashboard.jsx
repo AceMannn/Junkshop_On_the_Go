@@ -991,6 +991,10 @@ function HistoryTab({
         }, 0);
     }, [filteredRows]);
 
+    const totalWeightKg = useMemo(() => {
+        return filteredRows.reduce((sum, row) => sum + (row.weightKg || 0), 0);
+    }, [filteredRows]);
+
     const handleExport = () => {
         const header = ["Date", "Material", "Weight", "Amount", "Shop", "Status"];
         const lines = filteredRows.map((row) =>
@@ -1108,19 +1112,29 @@ function HistoryTab({
                 </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-                <div className="bg-white p-4 sm:p-5 rounded-xl border shadow-sm">
-                    <p className="text-xs text-[#72796e]">Showing</p>
-                    <h3 className="text-xl font-bold text-emerald-700">
+            <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white px-3 py-2.5 rounded-xl border shadow-sm">
+                    <p className="text-[11px] text-[#72796e] leading-tight">Trips</p>
+                    <p className="text-[10px] text-[#72796e]/80 leading-tight mb-0.5">matching filters</p>
+                    <p className="text-lg font-bold text-emerald-700 leading-tight">
                         {filteredRows.length} / {historyRows.length}
-                    </h3>
+                    </p>
                 </div>
 
-                <div className="bg-white p-4 sm:p-5 rounded-xl border shadow-sm col-span-2 md:col-span-2">
-                    <p className="text-xs text-[#72796e]">Filtered earnings</p>
-                    <h3 className="text-xl font-bold text-emerald-700">
+                <div className="bg-white px-3 py-2.5 rounded-xl border shadow-sm">
+                    <p className="text-[11px] text-[#72796e] leading-tight">Earned</p>
+                    <p className="text-[10px] text-[#72796e]/80 leading-tight mb-0.5">from filtered trips</p>
+                    <p className="text-lg font-bold text-emerald-700 leading-tight">
                         ₱{totalEarnings.toFixed(2)}
-                    </h3>
+                    </p>
+                </div>
+
+                <div className="bg-white px-3 py-2.5 rounded-xl border shadow-sm">
+                    <p className="text-[11px] text-[#72796e] leading-tight">Weight recycled</p>
+                    <p className="text-[10px] text-[#72796e]/80 leading-tight mb-0.5">from filtered trips</p>
+                    <p className="text-lg font-bold text-emerald-700 leading-tight">
+                        {totalWeightKg.toFixed(1)} kg
+                    </p>
                 </div>
             </div>
 
