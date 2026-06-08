@@ -114,6 +114,8 @@ export function normalizeTransaction(row) {
       year: 'numeric',
     }),
     material: row.material,
+    weightKg: Number(row.weight) || 0,
+    weightUnit: row.unit || 'kg',
     weight: `${row.weight} ${row.unit || 'kg'}`,
     amount: `₱${Number(row.totalAmount).toFixed(2)}`,
     shop: shopLabel,
