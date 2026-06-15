@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./scrollbars.css";
 
 @theme {
   --color-eco-green: #3DA35D;
@@ -28,6 +29,7 @@
 
   html {
     overflow-x: clip;
+    scrollbar-gutter: stable;
   }
 
   body {
@@ -154,62 +156,6 @@
 
   .to-leaf-green {
     --tw-gradient-to: var(--color-leaf-green);
-  }
-
-  /* Horizontal lists (e.g. Nearby Junkshops) — no dark blocks on scrollbar arrows */
-  .scrollbar-clean-h {
-    scrollbar-width: thin;
-    scrollbar-color: #d4d4d8 transparent;
-  }
-
-  .scrollbar-clean-h::-webkit-scrollbar {
-    height: 6px;
-  }
-
-  .scrollbar-clean-h::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scrollbar-clean-h::-webkit-scrollbar-thumb {
-    background: #d4d4d8;
-    border-radius: 9999px;
-  }
-
-  .scrollbar-clean-h::-webkit-scrollbar-button {
-    background: transparent;
-    width: 0;
-    height: 0;
-    display: none;
-  }
-
-  /* Vertical lists (dropdowns, panels) — slim thumb, no track background */
-  .scrollbar-clean {
-    scrollbar-width: thin;
-    scrollbar-color: #d4d4d8 transparent;
-  }
-
-  .scrollbar-clean::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .scrollbar-clean::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scrollbar-clean::-webkit-scrollbar-thumb {
-    background: #d4d4d8;
-    border-radius: 9999px;
-  }
-
-  .scrollbar-clean::-webkit-scrollbar-button {
-    background: transparent;
-    width: 0;
-    height: 0;
-    display: none;
-  }
-
-  .scrollbar-clean::-webkit-scrollbar-corner {
-    background: transparent;
   }
 
   .leaflet-container {

@@ -4,6 +4,16 @@ import { notificationApi } from "../../services/api";
 import { REFRESH_INTERVAL_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { getUserInitials, getUserFullName } from "../../utils/userDisplay";
 import logoImage from "../../assets/junkshop-logo.png";
+import {
+    dashboardAvatarClass,
+    dashboardIconButtonClass,
+    dashboardProfileNameClass,
+    dashboardProfileTriggerClass,
+    dashboardTopbarActionsClass,
+    dashboardTopbarInnerClass,
+    dashboardTopbarLogoClass,
+    dashboardTopbarShellClass,
+} from "../dashboard/dashboardTopbarUi";
 
 export default function ProviderTopbar({
     user,
@@ -66,22 +76,22 @@ export default function ProviderTopbar({
     };
 
     return (
-        <header className="bg-white/90 backdrop-blur-md fixed top-0 left-0 right-0 z-40 border-b border-zinc-200 shadow-sm h-16 overflow-visible">
-            <div className="h-full w-full px-4 sm:px-6 flex items-center justify-between gap-4">
+        <header className={dashboardTopbarShellClass}>
+            <div className={dashboardTopbarInnerClass}>
                 <div className="flex items-center min-w-0 shrink-0">
                     <img
                         src={logoImage}
                         alt="JunkShop On-The-Go"
-                        className="h-10 sm:h-11 w-auto"
+                        className={dashboardTopbarLogoClass}
                     />
                 </div>
 
-                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <div className={dashboardTopbarActionsClass}>
                     <div className="relative" ref={notifRef}>
                         <button
                             type="button"
                             onClick={() => setShowNotifs((o) => !o)}
-                            className="relative p-2 rounded-full hover:bg-zinc-100 transition-colors"
+                            className={`relative ${dashboardIconButtonClass}`}
                             aria-label="Notifications"
                         >
                             <Bell size={20} className="text-emerald-900" />
@@ -122,7 +132,7 @@ export default function ProviderTopbar({
                     <button
                         type="button"
                         onClick={onHelp}
-                        className="p-2 rounded-full hover:bg-zinc-100 transition-colors inline-flex"
+                        className={dashboardIconButtonClass}
                         aria-label="Help"
                     >
                         <HelpCircle size={20} className="text-emerald-900" />
@@ -132,13 +142,17 @@ export default function ProviderTopbar({
                         <button
                             type="button"
                             onClick={() => setShowProfileMenu((open) => !open)}
-                            className="flex h-10 items-center gap-2 rounded-full border border-zinc-200 bg-white pl-0.5 pr-2.5 sm:pr-3 hover:bg-zinc-50 transition-colors"
+                            className={dashboardProfileTriggerClass}
                             aria-expanded={showProfileMenu}
+                            aria-label={`Profile menu for ${displayName}`}
                         >
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#154212] text-xs font-bold text-white ring-2 ring-white">
+                            <span
+                                className={`flex items-center justify-center bg-[#154212] text-xs font-bold text-white ${dashboardAvatarClass}`}
+                                aria-hidden
+                            >
                                 {initials}
                             </span>
-                            <span className="hidden sm:inline text-sm font-semibold text-[#191c1c] max-w-[6rem] truncate leading-none">
+                            <span className={dashboardProfileNameClass}>
                                 {displayName}
                             </span>
                         </button>

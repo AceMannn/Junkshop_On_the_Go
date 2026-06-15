@@ -12,6 +12,7 @@ import ProviderAvailabilityTab from "./provider-dashboard/ProviderAvailabilityTa
 import ProviderSettingsTab from "./provider-dashboard/ProviderSettingsTab";
 import ProviderTransactionsTab from "./provider-dashboard/ProviderTransactionsTab";
 import ProfileCompletionBanner from "./ui/ProfileCompletionBanner";
+import { dashboardMainPaddingClass } from "./dashboard/dashboardTopbarUi";
 
 export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -66,7 +67,7 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
             />
 
             <main className="lg:pl-56 pt-16 min-h-screen pb-24 lg:pb-8">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
+                <div className={dashboardMainPaddingClass}>
                     {showToast && (
                         <div className="fixed top-20 right-4 left-4 sm:left-auto z-50 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 sm:px-5 rounded-xl shadow-lg max-w-md sm:ml-auto">
                             <CheckCircle size={20} className="text-emerald-600 shrink-0" />
@@ -78,7 +79,7 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                         user={user}
                         role="provider"
                         onGoSettings={() => handleNavigate("settings")}
-                        className="mb-6"
+                        className="mb-5 sm:mb-6"
                     />
 
                     {activeTab === "dashboard" && (

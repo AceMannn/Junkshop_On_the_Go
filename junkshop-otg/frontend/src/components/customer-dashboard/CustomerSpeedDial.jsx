@@ -60,18 +60,18 @@ export default function CustomerSpeedDial({ open, onToggle, onClose, onSelect })
     return (
         <div
             ref={rootRef}
-            className="fixed bottom-24 right-4 sm:right-6 lg:bottom-8 lg:right-8 z-40 flex flex-col items-end"
+            className="fixed bottom-24 right-4 sm:right-6 lg:bottom-8 lg:right-8 z-30 flex flex-col items-end pointer-events-none"
         >
             {open && (
                 <div
-                    className="fixed inset-0 bg-black/20 z-[-1] lg:hidden"
+                    className="fixed inset-0 bg-black/20 z-[-1] lg:hidden pointer-events-auto"
                     aria-hidden="true"
                     onClick={onClose}
                 />
             )}
 
             <ul
-                className={`flex flex-col-reverse items-end gap-3 mb-3 transition-all duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                className={`flex flex-col-reverse items-end gap-3 mb-3 transition-all duration-200 pointer-events-none ${open ? "opacity-100" : "opacity-0"}`}
                 aria-hidden={!open}
             >
                 {ACTIONS.map((action, index) => {
@@ -93,7 +93,7 @@ export default function CustomerSpeedDial({ open, onToggle, onClose, onSelect })
                             <button
                                 type="button"
                                 onClick={() => handlePick(action.id)}
-                                className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white border border-zinc-200 text-[#154212] shadow-md flex items-center justify-center hover:bg-emerald-50 hover:border-emerald-200 transition-colors"
+                                className="pointer-events-auto w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white border border-zinc-200 text-[#154212] shadow-md flex items-center justify-center hover:bg-emerald-50 hover:border-emerald-200 transition-colors"
                                 title={action.hint}
                                 aria-label={action.label}
                             >
@@ -107,7 +107,7 @@ export default function CustomerSpeedDial({ open, onToggle, onClose, onSelect })
             <button
                 type="button"
                 onClick={onToggle}
-                className={`w-12 h-12 sm:w-14 sm:h-14 bg-[#154212] text-white rounded-full shadow-lg flex items-center justify-center hover:bg-emerald-900 active:scale-95 transition-all duration-300 ${open ? "rotate-180" : "rotate-0"}`}
+                className={`pointer-events-auto w-12 h-12 sm:w-14 sm:h-14 bg-[#154212] text-white rounded-full shadow-lg flex items-center justify-center hover:bg-emerald-900 active:scale-95 transition-all duration-300 ${open ? "rotate-180" : "rotate-0"}`}
                 aria-expanded={open}
                 aria-label={open ? "Close quick actions" : "Open quick actions"}
             >

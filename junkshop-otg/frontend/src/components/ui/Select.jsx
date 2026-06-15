@@ -67,7 +67,7 @@ export default function Select({
                 <ul
                     role="listbox"
                     aria-label={ariaLabel}
-                    className="scrollbar-clean absolute z-[60] mt-1.5 max-h-56 w-full overflow-auto rounded-xl border border-[#c2c9bb] bg-white py-1 shadow-[0_8px_24px_rgba(20,66,18,0.12)]"
+                    className="scroll-y-clean absolute z-[60] mt-1.5 max-h-56 w-full rounded-xl border border-[#c2c9bb] bg-white py-1 shadow-[0_8px_24px_rgba(20,66,18,0.12)]"
                 >
                     {options.map((option) => {
                         const active = option.value === value;

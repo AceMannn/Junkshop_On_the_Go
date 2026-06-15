@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Truck,
     Plus,
@@ -42,21 +42,20 @@ export default function CustomerPickupsTab({
     const [wizardOpen, setWizardOpen] = useState(openWizardOnMount);
     const [selectedId, setSelectedId] = useState(null);
     const { shops } = useCatalogJunkshops({ partnersOnly: true });
+    const onNotifyRef = useRef(onNotify);
+    onNotifyRef.current = onNotify;
 
-    const load = useCallback(
-        async (silent = false) => {
-            try {
-                if (!silent) setLoading(true);
-                const { requests: rows } = await pickupApi.list();
-                setRequests(rows || []);
-            } catch (err) {
-                if (!silent) onNotify?.(err.message);
-            } finally {
-                if (!silent) setLoading(false);
-            }
-        },
-        [onNotify]
-    );
+    const load = useCallback(async (silent = false) => {
+        try {
+            if (!silent) setLoading(true);
+            const { requests: rows } = await pickupApi.list();
+            setRequests(rows || []);
+        } catch (err) {
+            if (!silent) onNotifyRef.current?.(err.message);
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
         load(false);
@@ -128,7 +127,7 @@ export default function CustomerPickupsTab({
                 ))}
             </div>
 
-            {loading ? (
+            {loading && requests.length === 0 ? (
                 <p className="text-sm text-[#72796e] animate-pulse">Loading pickups…</p>
             ) : filtered.length === 0 ? (
                 <div className="bg-white border border-zinc-200 rounded-2xl p-10 text-center">
