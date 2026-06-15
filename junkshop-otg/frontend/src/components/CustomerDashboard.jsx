@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import CustomerPickupsTab from "./customer-dashboard/CustomerPickupsTab";
 import ProfileCompletionBanner from "./ui/ProfileCompletionBanner";
+import { dashboardMainPaddingClass } from "./dashboard/dashboardTopbarUi";
 import { useCatalogJunkshops } from "../hooks/useCatalogData";
 import { useFavorites } from "../hooks/useFavorites";
 import { domainApi } from "../services/api";
@@ -72,6 +73,15 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
     const [showHelp, setShowHelp] = useState(false);
+    const [pickupsTabMounted, setPickupsTabMounted] = useState(
+        () => activeTab === "pickups"
+    );
+
+    useEffect(() => {
+        if (activeTab === "pickups") {
+            setPickupsTabMounted(true);
+        }
+    }, [activeTab]);
 
     const openOverviewPanel = (panelId, shopId = null) => {
         setAccountView(null);
@@ -251,7 +261,7 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
                     className={
                         isOverviewPanelOpen
                             ? "flex flex-1 flex-col min-h-0 w-full"
-                            : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7"
+                            : dashboardMainPaddingClass
                     }
                 >
                     {showToast && (
@@ -266,7 +276,7 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
                             user={user}
                             role="customer"
                             onGoSettings={() => openAccountView("profile")}
-                            className="mb-6"
+                            className="mb-5 sm:mb-6"
                         />
                     )}
 
@@ -311,13 +321,18 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
                             onToggleFavorite={handleToggleFavorite}
                         />
                     )}
-                    {!accountView && activeTab === "pickups" && (
-                        <CustomerPickupsTab
-                            user={user}
-                            onNotify={showNotification}
-                            onGoProfile={() => openAccountView("profile")}
-                            openWizardOnMount={openPickupWizard}
-                        />
+                    {!accountView && pickupsTabMounted && (
+                        <div
+                            className={activeTab === "pickups" ? "" : "hidden"}
+                            aria-hidden={activeTab !== "pickups"}
+                        >
+                            <CustomerPickupsTab
+                                user={user}
+                                onNotify={showNotification}
+                                onGoProfile={() => openAccountView("profile")}
+                                openWizardOnMount={openPickupWizard}
+                            />
+                        </div>
                     )}
                     {!accountView && activeTab === "history" && (
                         <HistoryTab
@@ -578,9 +593,9 @@ function OverviewTab({
     }
 
     return (
-        <div className="space-y-6 sm:space-y-8">
+        <div className="space-y-5 sm:space-y-7 md:space-y-8">
             <section>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#191c1c]">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-[#191c1c]">
                     Welcome back, {welcomeName}!
                 </h1>
                 <p className="mt-1.5 text-sm sm:text-base text-[#72796e]">
@@ -672,7 +687,7 @@ function OverviewTab({
                         </button>
                     </div>
 
-                    <div className="scrollbar-clean-h flex gap-4 sm:gap-6 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
+                    <div className="scroll-x-clean flex gap-4 sm:gap-6 pb-2 -mx-1 px-1 snap-x snap-mandatory">
                         {nearbyShops.length === 0 ? (
                             <EmptyState
                                 compact

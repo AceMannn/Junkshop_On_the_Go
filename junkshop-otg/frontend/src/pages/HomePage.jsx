@@ -32,7 +32,6 @@ export default function HomePage() {
   const { materials, loading: materialsLoading } = useCatalogMaterials({ autoRefresh: false });
 
   const previewShops = useMemo(() => shops.slice(0, 3), [shops]);
-  const openCount = shops.filter((s) => String(s.status).toLowerCase() === 'open').length;
 
   const previewMaterialCards = useMemo(() => materials.slice(0, 6), [materials]);
   const catalogMaterials = materials;
@@ -40,12 +39,12 @@ export default function HomePage() {
   const closeModal = () => setActiveModal(null);
 
   return (
-    <div className="pt-20">
+    <div>
       <section className="relative overflow-hidden bg-gradient-to-br from-[#f3fbf4] via-white to-[#e8f7ec] bg-[radial-gradient(circle_at_10px_10px,rgba(61,163,93,0.08)_3px,transparent_0)] bg-[size:24px_24px]">
         <div className="absolute top-10 right-10 w-32 h-32 bg-leaf-green/10 rounded-full blur-3xl" />
         <div className="absolute bottom-10 left-10 w-40 h-40 bg-eco-green/10 rounded-full blur-3xl" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16 sm:pt-32 sm:pb-20 lg:pt-36 lg:pb-24">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <h1 className="mb-6">
@@ -149,19 +148,21 @@ export default function HomePage() {
                   )}
                 </div>
               </div>
-              <div className="relative min-h-[320px] lg:min-h-full bg-[#eef5ef] p-4">
-                <JunkshopsMap shops={previewShops} className="h-full" />
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white rounded-[20px] shadow-xl px-5 py-4 w-[88%] max-w-[340px] border border-gray-100">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-eco-green/10 flex items-center justify-center shrink-0">
-                      <MapPin className="text-eco-green" size={20} />
-                    </div>
-                    <div>
-                      <h4 className="text-base sm:text-lg font-semibold text-charcoal leading-snug">Teresa, Sta. Mesa</h4>
-                      <p className="text-sm text-gray-600">{openCount} open junkshops nearby</p>
-                    </div>
-                  </div>
-                </div>
+              <div className="relative min-h-[320px] lg:min-h-full bg-eco-green p-6 sm:p-8 flex items-center justify-center">
+                {shopsLoading ? (
+                  <p className="text-sm text-white/80 animate-pulse">Loading map…</p>
+                ) : previewShops.length === 0 ? (
+                  <EmptyState
+                    compact
+                    inverted
+                    icon={MapPin}
+                    title="No shop locations yet"
+                    description="Partner shops appear here on the map after providers complete setup."
+                    className="w-full"
+                  />
+                ) : (
+                  <JunkshopsMap shops={previewShops} className="h-full w-full" />
+                )}
               </div>
             </div>
           </div>
@@ -176,10 +177,21 @@ export default function HomePage() {
           <SectionHeader title="Quick Recycling Tips" description="Follow these simple steps to prepare your recyclables properly before bringing them to a junkshop." />
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {previewRecyclingSteps.map((step) => (
-              <article key={step.number} className="bg-white rounded-[24px] p-8 text-center shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
-                <div className="text-5xl mb-5">{step.icon}</div>
-                <h4 className="mb-3 text-charcoal">{step.title}</h4>
-                <p className="text-gray-600 leading-relaxed">{step.description}</p>
+              <article
+                key={step.number}
+                className="bg-white rounded-[24px] overflow-hidden text-center shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-2"
+              >
+                <div className="h-40 sm:h-44 bg-zinc-100 overflow-hidden">
+                  <ImageWithFallback
+                    src={step.previewImage}
+                    alt={step.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="p-6 sm:p-8">
+                  <h4 className="mb-3 text-charcoal">{step.title}</h4>
+                  <p className="text-gray-600 leading-relaxed">{step.description}</p>
+                </div>
               </article>
             ))}
           </div>

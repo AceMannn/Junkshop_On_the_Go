@@ -1,8 +1,14 @@
+import tipSeparateImg from '../assets/recycling/tip-separate.jpg';
+import tipCleanImg from '../assets/recycling/tip-clean.jpg';
+import tipCapsImg from '../assets/recycling/tip-caps.jpg';
+import tipSortImg from '../assets/recycling/tip-sort.jpg';
+
 export const recyclingSteps = [
   {
     number: 1,
     title: 'Separate Materials',
     icon: '📦',
+    previewImage: tipSeparateImg,
     description: 'Sort recyclables by type: plastic, paper, metal, glass, and e-waste.',
     tips: ['Keep different materials in separate bags', 'Label containers for easy identification'],
     preview: true,
@@ -11,6 +17,7 @@ export const recyclingSteps = [
     number: 2,
     title: 'Clean Bottles',
     icon: '🧼',
+    previewImage: tipCleanImg,
     description: 'Rinse containers first to remove dirt, liquid, and leftover residue.',
     tips: ['Use minimal water when cleaning', 'Let items dry completely before storing'],
     preview: true,
@@ -19,6 +26,7 @@ export const recyclingSteps = [
     number: 3,
     title: 'Remove Caps',
     icon: '🔓',
+    previewImage: tipCapsImg,
     description: 'Take off lids, caps, labels, and other non-recyclable parts.',
     tips: ['Caps are often different plastic types', 'Labels can contaminate the recycling process'],
     preview: true,
@@ -27,6 +35,7 @@ export const recyclingSteps = [
     number: 4,
     title: 'Sort by Type',
     icon: '♻️',
+    previewImage: tipSortImg,
     description: 'Group similar materials together so junkshops can price them faster.',
     tips: ['Bundle cardboard and flatten boxes', 'Keep metals separated by type'],
     preview: true,

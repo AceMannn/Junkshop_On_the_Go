@@ -26,9 +26,9 @@ export default function ProfileCompletionBanner({
 
     return (
         <div
-            className={`rounded-xl border border-amber-200 bg-amber-50/80 p-4 sm:p-5 ${className}`}
+            className={`rounded-xl border border-amber-200 bg-amber-50/80 p-4 sm:p-5 md:p-6 ${className}`}
         >
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
                 <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-amber-950 text-sm sm:text-base">
                         {title}
@@ -81,7 +81,7 @@ export default function ProfileCompletionBanner({
                 <button
                     type="button"
                     onClick={onGoSettings}
-                    className="shrink-0 rounded-xl bg-[#154212] px-4 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-900 transition-colors"
+                    className="w-full sm:w-auto shrink-0 rounded-xl bg-[#154212] px-4 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-900 transition-colors"
                 >
                     {role === "provider" ? "Go to Settings" : "Add phone in Settings"}
                 </button>
