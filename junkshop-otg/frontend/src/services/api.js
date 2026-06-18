@@ -1,7 +1,18 @@
+import { getToken } from '../utils/authStorage';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
+export class ApiError extends Error {
+  constructor(message, { status, isNetworkError = false } = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.isNetworkError = isNetworkError;
+  }
+}
+
 async function request(path, options = {}) {
-  const token = localStorage.getItem('junkshop_token');
+  const token = getToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -18,15 +29,18 @@ async function request(path, options = {}) {
       headers,
     });
   } catch {
-    throw new Error(
-      `Cannot reach the API at ${API_BASE_URL}. Make sure the backend is running (npm run dev in junkshop-otg).`
+    throw new ApiError(
+      `Cannot reach the API at ${API_BASE_URL}. Make sure the backend is running (npm run dev in junkshop-otg).`,
+      { isNetworkError: true }
     );
   }
 
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.message || 'Something went wrong. Please try again.');
+    throw new ApiError(data.message || 'Something went wrong. Please try again.', {
+      status: response.status,
+    });
   }
 
   return data;

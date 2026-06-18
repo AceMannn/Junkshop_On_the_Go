@@ -912,7 +912,13 @@ function NearbyShopCard({
                         </p>
                     </div>
 
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-1 rounded-full font-bold uppercase">
+                    <span
+                        className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
+                            shop.status === "Open"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-red-100 text-red-700"
+                        }`}
+                    >
                         {shop.status}
                     </span>
                 </div>
