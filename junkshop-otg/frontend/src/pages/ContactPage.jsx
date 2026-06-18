@@ -5,6 +5,7 @@ import { contactApi } from '../services/api';
 import JunkshopsMap from '../components/maps/JunkshopsMap';
 import { useCatalogJunkshops } from '../hooks/useCatalogData';
 import EmptyState from '../components/ui/EmptyState';
+import ShopRating from '../components/ui/ShopRating';
 
 function StaticCard({ children, className = '' }) {
   return (
@@ -125,6 +126,62 @@ export default function ContactPage() {
               </a>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="py-12 bg-light-gray">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-8">
+            <h2 className="mb-2">Verified Partner Directory</h2>
+            <p className="text-gray-600">
+              Browse active partner junkshops with ratings and recent customer feedback.
+            </p>
+          </div>
+          {shopsLoading ? (
+            <p className="text-gray-500">Loading verified partners...</p>
+          ) : shops.length === 0 ? (
+            <EmptyState
+              icon={MapPin}
+              title="No verified partners yet"
+              description="Partner listings appear once providers complete setup and publish their shop."
+            />
+          ) : (
+            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              {shops.map((shop) => (
+                <StaticCard key={shop.id} className="border border-gray-100 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="mb-1">{shop.name}</h4>
+                      <p className="text-xs text-gray-600">{shop.address}</p>
+                    </div>
+                    <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-800">
+                      Verified
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <ShopRating shop={shop} />
+                    <span className={`text-xs ${shop.status === 'Open' ? 'text-emerald-700' : 'text-gray-500'}`}>
+                      {shop.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-700">{shop.phone || 'No contact number yet'}</p>
+                  {shop.latestReview && (
+                    <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+                      <p className="text-xs font-semibold text-gray-700">
+                        ★ {shop.latestReview.score} - {shop.latestReview.customerName}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(shop.latestReview.createdAt).toLocaleDateString('en-PH')}
+                      </p>
+                      <p className="text-sm text-gray-700 mt-1">
+                        {shop.latestReview.comment || 'No written comment.'}
+                      </p>
+                    </div>
+                  )}
+                </StaticCard>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

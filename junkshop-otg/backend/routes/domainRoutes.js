@@ -2,6 +2,7 @@ const express = require('express');
 const ContactMessage = require('../models/ContactMessage');
 const Junkshop = require('../models/Junkshop');
 const Material = require('../models/Material');
+const PickupRequest = require('../models/PickupRequest');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const CustomerNote = require('../models/CustomerNote');
@@ -122,12 +123,93 @@ router.get('/junkshops', async (req, res) => {
     };
   });
 
+  const junkshopIds = junkshops.map((shop) => shop._id).filter(Boolean);
+  let latestReviewByShopId = {};
+  if (junkshopIds.length > 0) {
+    const reviewRows = await PickupRequest.find({
+      junkshop: { $in: junkshopIds },
+      status: 'completed',
+      'rating.score': { $gte: 1 },
+    })
+      .select('junkshop rating customer updatedAt')
+      .populate('customer', 'firstName lastName')
+      .sort({ 'rating.createdAt': -1, updatedAt: -1 })
+      .lean();
+
+    latestReviewByShopId = reviewRows.reduce((acc, row) => {
+      const key = String(row.junkshop);
+      if (acc[key]) return acc;
+      const firstName = row.customer?.firstName || '';
+      const lastName = row.customer?.lastName || '';
+      const customerName = [firstName, lastName].filter(Boolean).join(' ') || 'Customer';
+      acc[key] = {
+        score: Number(row.rating?.score) || 0,
+        comment: String(row.rating?.comment || '').trim(),
+        createdAt: row.rating?.createdAt || row.updatedAt,
+        customerName,
+      };
+      return acc;
+    }, {});
+  }
+
+  junkshops = junkshops.map((shop) => ({
+    ...shop,
+    latestReview: latestReviewByShopId[String(shop._id)] || null,
+  }));
+
   res.json({ junkshops });
 });
 
 router.get('/junkshops/mine', protect, requireProvider, async (req, res) => {
   const junkshops = await Junkshop.find({ provider: req.user._id }).sort({ createdAt: -1 });
   res.json({ junkshops });
+});
+
+router.get('/junkshops/:id/reviews', async (req, res) => {
+  const shopQuery = String(req.params.id).match(/^[a-f\d]{24}$/i)
+    ? { _id: req.params.id }
+    : { slug: req.params.id };
+  const shop = await Junkshop.findOne(shopQuery).select('_id name rating reviewCount isPublished provider isCatalog');
+
+  if (!shop || (!shop.isCatalog && shop.provider && shop.isPublished === false)) {
+    return res.status(404).json({ message: 'Junkshop not found.' });
+  }
+
+  const limitRaw = Number(req.query.limit);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 20) : 5;
+
+  const requests = await PickupRequest.find({
+    junkshop: shop._id,
+    status: 'completed',
+    'rating.score': { $gte: 1 },
+  })
+    .select('rating customer')
+    .populate('customer', 'firstName lastName')
+    .sort({ 'rating.createdAt': -1, updatedAt: -1 })
+    .limit(limit);
+
+  const reviews = requests.map((row) => {
+    const firstName = row.customer?.firstName || '';
+    const lastName = row.customer?.lastName || '';
+    const customerName = [firstName, lastName].filter(Boolean).join(' ') || 'Customer';
+    return {
+      id: String(row._id),
+      score: Number(row.rating?.score) || 0,
+      comment: String(row.rating?.comment || '').trim(),
+      createdAt: row.rating?.createdAt || row.updatedAt,
+      customerName,
+    };
+  });
+
+  res.json({
+    shop: {
+      id: String(shop._id),
+      name: shop.name,
+      rating: shop.rating ?? 0,
+      reviewCount: shop.reviewCount ?? 0,
+    },
+    reviews,
+  });
 });
 
 router.post('/junkshops', protect, requireProvider, async (req, res) => {
@@ -171,6 +253,55 @@ router.delete('/junkshops/:id', protect, requireProvider, async (req, res) => {
 });
 
 router.get('/materials', async (req, res) => {
+  if (req.query.featured === 'true') {
+    const completeProviders = await User.find({
+      role: 'provider',
+      profileComplete: true,
+    })
+      .select('_id')
+      .lean();
+    const providerIds = completeProviders.map((user) => user._id);
+
+    const partnerMaterials = providerIds.length
+      ? await Material.find({
+          provider: { $in: providerIds },
+          isCatalog: { $ne: true },
+          available: { $ne: false },
+        })
+          .sort({ updatedAt: -1 })
+          .lean()
+      : [];
+
+    const catalogMaterials = await Material.find({ isCatalog: true })
+      .sort({ category: 1, name: 1 })
+      .lean();
+
+    const materialKey = (item) =>
+      item.slug || `${String(item.category || '').toLowerCase()}:${String(item.name || '').toLowerCase()}`;
+
+    const merged = new Map();
+    partnerMaterials.forEach((item) => {
+      merged.set(materialKey(item), { ...item, source: 'partner' });
+    });
+    catalogMaterials.forEach((item) => {
+      const key = materialKey(item);
+      if (!merged.has(key)) {
+        merged.set(key, { ...item, source: 'catalog' });
+      }
+    });
+
+    const materials = [...merged.values()].sort((a, b) => {
+      if (a.source !== b.source) {
+        return a.source === 'partner' ? -1 : 1;
+      }
+      const categoryCompare = String(a.category || '').localeCompare(String(b.category || ''));
+      if (categoryCompare !== 0) return categoryCompare;
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+
+    return res.json({ materials });
+  }
+
   const query = {};
 
   if (req.query.catalog === 'true') {

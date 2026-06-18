@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import {
     LayoutDashboard,
     History,
@@ -12,7 +12,6 @@ import {
     Leaf,
     Recycle,
     TreePine,
-    Star,
     MapPin,
     Navigation,
     Info,
@@ -40,6 +39,7 @@ import { QuickAddPanel, ScanPhotoPanel } from "./customer-dashboard/CustomerFabP
 import CustomerTopbar from "./customer-dashboard/CustomerTopbar";
 import HelpModal from "./ui/HelpModal";
 import EmptyState from "./ui/EmptyState";
+import ShopRating from "./ui/ShopRating";
 import {
     ViewProfilePage,
     AccountSettingsPage,
@@ -917,10 +917,12 @@ function NearbyShopCard({
                     </span>
                 </div>
 
-                <div className="flex items-center gap-1 text-emerald-600">
-                    <Star size={16} fill="currentColor" />
-                    <span className="text-sm font-bold">{shop.rating}</span>
-                </div>
+                <ShopRating shop={shop} className="mb-1" />
+                {shop.latestReview && (
+                    <p className="text-xs text-[#72796e] line-clamp-2">
+                        "{shop.latestReview.comment || "No written comment."}" - {shop.latestReview.customerName}
+                    </p>
+                )}
 
                 <div className="flex flex-wrap gap-1.5 mb-4">
                     {shop.materials.length > 0 ? (
@@ -973,6 +975,11 @@ function HistoryTab({
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [showDateFilter, setShowDateFilter] = useState(false);
+    const [expandedRowId, setExpandedRowId] = useState(null);
+
+    const toggleRow = (rowId) => {
+        setExpandedRowId((current) => (current === rowId ? null : rowId));
+    };
 
     const filteredRows = useMemo(() => {
         const query = search.trim().toLowerCase();
@@ -1026,6 +1033,30 @@ function HistoryTab({
         link.click();
         URL.revokeObjectURL(url);
     };
+
+    const renderExpandedDetails = (row) => (
+        <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 text-sm space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Shop</p>
+                    <p className="font-medium text-[#191c1c]">{row.shop}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Status</p>
+                    <p className="font-medium text-[#191c1c]">{row.status}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Weight</p>
+                    <p className="font-medium text-[#191c1c]">{row.weight}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Amount</p>
+                    <p className="font-semibold text-emerald-700">{row.amount}</p>
+                </div>
+            </div>
+            <p className="text-xs text-[#72796e]">Recorded on {row.date}</p>
+        </div>
+    );
 
     return (
         <div className="space-y-8 pb-24 lg:pb-8">
@@ -1173,7 +1204,10 @@ function HistoryTab({
             ) : (
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                     <div className="md:hidden divide-y divide-zinc-100">
-                        {filteredRows.map((row) => (
+                        {filteredRows.map((row) => {
+                            const isExpanded = expandedRowId === row.id;
+
+                            return (
                             <div key={row.id} className="p-4 space-y-2">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
@@ -1189,27 +1223,32 @@ function HistoryTab({
                                         {row.status}
                                     </span>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div>
-                                        <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Weight</p>
-                                        <p>{row.weight}</p>
+                                {!isExpanded && (
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                        <div>
+                                            <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Weight</p>
+                                            <p>{row.weight}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Amount</p>
+                                            <p className="text-emerald-700 font-semibold">{row.amount}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Amount</p>
-                                        <p className="text-emerald-700 font-semibold">{row.amount}</p>
-                                    </div>
-                                </div>
+                                )}
+                                {isExpanded && renderExpandedDetails(row)}
                                 <div className="flex items-center justify-between gap-3 text-sm">
                                     <p className="text-[#72796e] truncate">{row.shop}</p>
                                     <button
                                         type="button"
-                                        className="text-[#154212] hover:underline text-sm shrink-0"
+                                        onClick={() => toggleRow(row.id)}
+                                        className="text-[#154212] hover:underline text-sm shrink-0 font-semibold"
                                     >
-                                        View
+                                        {isExpanded ? "Hide" : "View"}
                                     </button>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     <div className="hidden md:block overflow-x-auto">
@@ -1227,8 +1266,12 @@ function HistoryTab({
                             </thead>
 
                             <tbody className="divide-y">
-                                {filteredRows.map((row) => (
-                                    <tr key={row.id} className="hover:bg-zinc-50">
+                                {filteredRows.map((row) => {
+                                    const isExpanded = expandedRowId === row.id;
+
+                                    return (
+                                    <Fragment key={row.id}>
+                                        <tr className="hover:bg-zinc-50">
                                         <td className="p-3 sm:p-4">{row.date}</td>
                                         <td className="p-3 sm:p-4 font-medium">{row.material}</td>
                                         <td className="p-3 sm:p-4">{row.weight}</td>
@@ -1251,13 +1294,23 @@ function HistoryTab({
                                         <td className="p-3 sm:p-4 text-right">
                                             <button
                                                 type="button"
-                                                className="text-[#154212] hover:underline text-sm"
+                                                onClick={() => toggleRow(row.id)}
+                                                className="text-[#154212] hover:underline text-sm font-semibold"
                                             >
-                                                View
+                                                {isExpanded ? "Hide" : "View"}
                                             </button>
                                         </td>
                                     </tr>
-                                ))}
+                                    {isExpanded && (
+                                        <tr key={`${row.id}-details`} className="bg-emerald-50/40">
+                                            <td colSpan={7} className="p-3 sm:p-4">
+                                                {renderExpandedDetails(row)}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </Fragment>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -1367,10 +1420,7 @@ function FavoriteShopCard({ shop, onRemove, onViewDetails, onRoute }) {
                 <div className="flex justify-between items-start mb-2">
                     <h3 className="text-lg font-bold text-[#154212]">{shop.name}</h3>
 
-                    <div className="flex items-center gap-1 text-[#4e6953] bg-[#c9e7cc] px-2 py-0.5 rounded-full text-xs font-semibold">
-                        <Star size={13} fill="currentColor" />
-                        {shop.rating}
-                    </div>
+                    <ShopRating shop={shop} showCount={false} />
                 </div>
 
                 <div className="space-y-2 mb-6">
@@ -1378,6 +1428,11 @@ function FavoriteShopCard({ shop, onRemove, onViewDetails, onRoute }) {
                         <MapPin size={16} />
                         {shop.distance} · {shop.address}
                     </div>
+                    {shop.latestReview && (
+                        <p className="text-xs text-[#72796e] line-clamp-2">
+                            "{shop.latestReview.comment || "No written comment."}" - {shop.latestReview.customerName}
+                        </p>
+                    )}
 
                     <div className="flex flex-wrap gap-1">
                         {(shop.materials || []).slice(0, 3).map((m) => (

@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const Transaction = require('../models/Transaction');
 const { evaluateProfile } = require('../utils/profileCompletion');
+const { syncJunkshopRating } = require('../utils/shopRatings');
 
 const POPULATE_FIELDS =
   'firstName lastName email phone junkshopName name address pickupServiceFee gcashNumber gcashQrUrl pickupEnabled';
@@ -540,6 +541,10 @@ exports.ratePickupRequest = async (req, res) => {
 
     request.rating = { score: rating, comment: comment.trim(), createdAt: new Date() };
     await request.save();
+
+    if (request.junkshop) {
+      await syncJunkshopRating(request.junkshop);
+    }
 
     res.json({ request: serializeRequest(request) });
   } catch (error) {

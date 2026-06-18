@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ArrowLeft,
     MapPin,
@@ -17,10 +17,12 @@ import {
 import { Heart } from "lucide-react";
 import JunkshopsMap from "../maps/JunkshopsMap";
 import EmptyState from "../ui/EmptyState";
+import ShopRating from "../ui/ShopRating";
 import NumberInput from "../ui/NumberInput";
 import { isFavoriteShopId } from "../../utils/favorites";
 import { priceCategories } from "../../data/prices";
 import { useCatalogJunkshops, useCatalogMaterials } from "../../hooks/useCatalogData";
+import { domainApi } from "../../services/api";
 import {
     formatUpdatedDate,
     getMaterialTrend,
@@ -118,6 +120,9 @@ export function JunkshopsPanel({
     const [locationFilter, setLocationFilter] = useState("all");
     const [expandedId, setExpandedId] = useState(initialShopId);
     const [pendingRouteId, setPendingRouteId] = useState(null);
+    const [reviewsByShopId, setReviewsByShopId] = useState({});
+    const [reviewsLoadingId, setReviewsLoadingId] = useState("");
+    const [reviewsErrorByShopId, setReviewsErrorByShopId] = useState({});
     const effectiveRouteId = autoRouteShopId || pendingRouteId;
 
     useEffect(() => {
@@ -125,6 +130,31 @@ export function JunkshopsPanel({
             setExpandedId(initialShopId);
         }
     }, [initialShopId]);
+
+    const loadShopReviews = useCallback(
+        async (shopId) => {
+            if (!shopId || reviewsByShopId[shopId]) return;
+            setReviewsLoadingId(shopId);
+            setReviewsErrorByShopId((prev) => ({ ...prev, [shopId]: "" }));
+            try {
+                const { reviews } = await domainApi.getJunkshopReviews(shopId, { limit: 5 });
+                setReviewsByShopId((prev) => ({ ...prev, [shopId]: reviews || [] }));
+            } catch (err) {
+                setReviewsErrorByShopId((prev) => ({
+                    ...prev,
+                    [shopId]: err.message || "Could not load reviews.",
+                }));
+            } finally {
+                setReviewsLoadingId("");
+            }
+        },
+        [reviewsByShopId]
+    );
+
+    useEffect(() => {
+        if (!expandedId) return;
+        loadShopReviews(expandedId);
+    }, [expandedId, loadShopReviews]);
 
     const filteredShops = useMemo(() => {
         return shops.filter((shop) => {
@@ -179,7 +209,9 @@ export function JunkshopsPanel({
                 </select>
             </div>
 
+            {!loading && (
             <JunkshopsMap
+                key={`junkshops-map-${filteredShops.length}`}
                 shops={filteredShops}
                 selectedId={expandedId}
                 onSelectShop={setExpandedId}
@@ -190,6 +222,12 @@ export function JunkshopsPanel({
                     onRouteDrawn?.();
                 }}
             />
+            )}
+            {loading && (
+                <div className="rounded-xl border border-emerald-200 bg-zinc-50 h-[280px] sm:h-[320px] flex items-center justify-center text-sm text-[#72796e]">
+                    Loading map…
+                </div>
+            )}
 
             <div className="space-y-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-[#72796e]">
@@ -211,6 +249,9 @@ export function JunkshopsPanel({
                         {filteredShops.map((shop) => {
                             const isOpen = shop.status === "Open";
                             const isExpanded = expandedId === shop.id;
+                            const reviews = reviewsByShopId[shop.id] || [];
+                            const reviewsError = reviewsErrorByShopId[shop.id];
+                            const isLoadingReviews = reviewsLoadingId === shop.id;
 
                             return (
                                 <article
@@ -281,9 +322,7 @@ export function JunkshopsPanel({
                                         <span className="text-[#72796e]">•</span>
                                         <span className="text-[#72796e]">{shop.hours}</span>
                                         <span className="text-[#72796e]">•</span>
-                                        <span className="text-[#72796e]">
-                                            ★ {shop.rating}
-                                        </span>
+                                        <ShopRating shop={shop} />
                                     </div>
 
                                     <div className="flex flex-wrap gap-1.5 mb-4">
@@ -338,6 +377,41 @@ export function JunkshopsPanel({
                                                     </ul>
                                                 </div>
                                             )}
+                                            <div className="pt-1">
+                                                <p className="font-semibold mb-1">Customer reviews:</p>
+                                                {isLoadingReviews ? (
+                                                    <p className="text-xs text-[#72796e]">Loading reviews…</p>
+                                                ) : reviewsError ? (
+                                                    <p className="text-xs text-red-700">{reviewsError}</p>
+                                                ) : reviews.length === 0 ? (
+                                                    <p className="text-xs text-[#72796e]">No reviews yet.</p>
+                                                ) : (
+                                                    <ul className="space-y-2 text-xs">
+                                                        {reviews.map((review) => (
+                                                            <li
+                                                                key={review.id}
+                                                                className="bg-zinc-50 border border-zinc-100 rounded-md px-2.5 py-2"
+                                                            >
+                                                                <p className="font-semibold text-[#191c1c]">
+                                                                    ★ {review.score} · {review.customerName}
+                                                                </p>
+                                                                <p className="text-[#72796e]">
+                                                                    {new Date(review.createdAt).toLocaleDateString("en-PH")}
+                                                                </p>
+                                                                {review.comment ? (
+                                                                    <p className="text-[#42493e] mt-1">
+                                                                        {review.comment}
+                                                                    </p>
+                                                                ) : (
+                                                                    <p className="text-[#72796e] italic mt-1">
+                                                                        No written comment.
+                                                                    </p>
+                                                                )}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
 
