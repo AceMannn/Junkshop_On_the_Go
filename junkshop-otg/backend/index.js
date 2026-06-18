@@ -46,9 +46,21 @@ const isLocalDevOrigin = (origin) => {
   }
 };
 
+const isVercelOrigin = (origin) => {
+  if (!origin) return false;
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return protocol === 'https:' && hostname.endsWith('.vercel.app');
+  } catch {
+    return false;
+  }
+};
+
 const isOriginAllowed = (origin) => {
   if (!origin) return true;
   if (clientOrigins.includes(origin)) return true;
+  // Production + preview deploys on Vercel (branch URLs change per push)
+  if (isVercelOrigin(origin)) return true;
   // Vite picks 5174, 5175, … when 5173 is already in use
   if (process.env.NODE_ENV !== 'production' && isLocalDevOrigin(origin)) return true;
   return false;
@@ -65,7 +77,7 @@ app.use(
       if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS blocked origin: ${origin}`));
+        callback(null, false);
       }
     },
     credentials: true,
