@@ -307,7 +307,7 @@ export function JunkshopsPanel({
                                             <span
                                                 className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${isOpen
                                                     ? "bg-emerald-100 text-emerald-800"
-                                                    : "bg-zinc-200 text-zinc-600"
+                                                    : "bg-red-100 text-red-700"
                                                     }`}
                                             >
                                                 {shop.status}

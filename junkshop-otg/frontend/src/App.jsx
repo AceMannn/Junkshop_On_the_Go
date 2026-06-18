@@ -9,13 +9,17 @@ import SignUpModal from './components/SignUpModal';
 import ProviderDashboard from './components/ProviderDashboard';
 import CustomerDashboard from './components/CustomerDashboard';
 import { authApi } from './services/api';
+import {
+  clearSession,
+  getStoredUser,
+  getToken,
+  persistSession as saveSession,
+  setStoredUser,
+} from './utils/authStorage';
 
 export default function App() {
   const [activeSection, setActiveSection] = useState('home');
-  const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem('junkshop_user');
-    return storedUser ? JSON.parse(storedUser) : null;
-  });
+  const [user, setUser] = useState(() => getStoredUser());
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [loginPrefill, setLoginPrefill] = useState({
@@ -35,8 +39,7 @@ export default function App() {
   };
 
   const persistSession = ({ token, user: sessionUser }) => {
-    localStorage.setItem('junkshop_token', token);
-    localStorage.setItem('junkshop_user', JSON.stringify(sessionUser));
+    saveSession({ token, user: sessionUser });
     setUser(sessionUser);
     setShowLoginModal(false);
     setShowSignUpModal(false);
@@ -63,8 +66,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('junkshop_token');
-    localStorage.removeItem('junkshop_user');
+    clearSession();
     setUser(null);
     setActiveSection('home');
   };
@@ -81,19 +83,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('junkshop_token');
+    const token = getToken();
 
     if (!token) return;
 
     authApi.me()
       .then(({ user: currentUser }) => {
         setUser(currentUser);
-        localStorage.setItem('junkshop_user', JSON.stringify(currentUser));
+        setStoredUser(currentUser);
       })
-      .catch(() => {
-        localStorage.removeItem('junkshop_token');
-        localStorage.removeItem('junkshop_user');
-        setUser(null);
+      .catch((error) => {
+        // Only clear session when the token is actually invalid — not on Render cold start / network blips
+        if (error.status === 401) {
+          clearSession();
+          setUser(null);
+        }
       });
   }, []);
 
@@ -120,7 +124,7 @@ export default function App() {
         user={user}
         onUserUpdate={(updatedUser) => {
           setUser(updatedUser);
-          localStorage.setItem('junkshop_user', JSON.stringify(updatedUser));
+          setStoredUser(updatedUser);
         }}
       />
     );
@@ -134,7 +138,7 @@ export default function App() {
         user={user}
         onUserUpdate={(updatedUser) => {
           setUser(updatedUser);
-          localStorage.setItem('junkshop_user', JSON.stringify(updatedUser));
+          setStoredUser(updatedUser);
         }}
       />
     );
