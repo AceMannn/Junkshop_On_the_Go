@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { ExternalLink, LocateFixed, MapPin, Navigation, Search } from "lucide-react";
 import { mapApi } from "../../services/api";
+import { formatShopRating } from "../../utils/shopRating";
 
 /** Teresa / Sta. Mesa default; map pans across Metro Manila. */
 export const JUNKSHOP_MAP_CENTER = { lat: 14.5995, lng: 121.0055 };
@@ -53,11 +54,15 @@ function originPinIcon() {
 function popupHtml(shop) {
     const lat = Number(shop.lat);
     const lng = Number(shop.lng);
+    const ratingInfo = formatShopRating(shop);
+    const ratingLine = ratingInfo.hasReviews
+        ? ` · ${ratingInfo.fullLabel}`
+        : " · No reviews yet";
     return `
       <div style="min-width:180px;font-family:system-ui,sans-serif">
         <p style="margin:0;font-weight:700;font-size:14px;color:#191c1c">${shop.name}</p>
         <p style="margin:6px 0 0;font-size:12px;color:#72796e;line-height:1.4">${shop.address}</p>
-        <p style="margin:6px 0 0;font-size:12px;font-weight:600;color:#154212">${shop.status}${shop.rating ? ` · ★ ${shop.rating}` : ""}</p>
+        <p style="margin:6px 0 0;font-size:12px;font-weight:600;color:#154212">${shop.status}${ratingLine}</p>
         <a href="${directionsUrl(null, null, lat, lng)}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:8px;font-size:12px;font-weight:600;color:#154212">Open in Google Maps →</a>
       </div>
     `;
@@ -134,10 +139,34 @@ export default function JunkshopsMap({
         requestGpsOrigin();
     }, [routingEnabled, requestGpsOrigin]);
 
-    useEffect(() => {
-        if (!containerRef.current || mapRef.current) return;
+    const hasMappableShops = mappableShops.length > 0;
 
-        const map = L.map(containerRef.current, {
+    const refreshMapSize = useCallback(() => {
+        const map = mapRef.current;
+        if (!map) return;
+        window.requestAnimationFrame(() => {
+            map.invalidateSize({ pan: false });
+        });
+    }, []);
+
+    // Init only after shop pins exist — container is not mounted while shops are still loading.
+    useLayoutEffect(() => {
+        if (!hasMappableShops) {
+            if (mapRef.current) {
+                mapRef.current.remove();
+                mapRef.current = null;
+                markersRef.current = [];
+                originMarkerRef.current = null;
+                routeLayerRef.current = null;
+                setMapReady(false);
+            }
+            return;
+        }
+
+        const container = containerRef.current;
+        if (!container || mapRef.current) return;
+
+        const map = L.map(container, {
             center: [JUNKSHOP_MAP_CENTER.lat, JUNKSHOP_MAP_CENTER.lng],
             zoom: JUNKSHOP_MAP_ZOOM,
             scrollWheelZoom: true,
@@ -152,7 +181,13 @@ export default function JunkshopsMap({
         mapRef.current = map;
         setMapReady(true);
 
+        refreshMapSize();
+        const t1 = window.setTimeout(refreshMapSize, 100);
+        const t2 = window.setTimeout(refreshMapSize, 400);
+
         return () => {
+            window.clearTimeout(t1);
+            window.clearTimeout(t2);
             map.remove();
             mapRef.current = null;
             markersRef.current = [];
@@ -160,7 +195,24 @@ export default function JunkshopsMap({
             routeLayerRef.current = null;
             setMapReady(false);
         };
-    }, []);
+    }, [hasMappableShops, refreshMapSize]);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        const container = containerRef.current;
+        if (!map || !container || !mapReady) return;
+
+        refreshMapSize();
+        const timeout = window.setTimeout(refreshMapSize, 250);
+
+        const observer = new ResizeObserver(refreshMapSize);
+        observer.observe(container);
+
+        return () => {
+            window.clearTimeout(timeout);
+            observer.disconnect();
+        };
+    }, [mapReady, refreshMapSize]);
 
     useEffect(() => {
         const map = mapRef.current;
@@ -186,7 +238,7 @@ export default function JunkshopsMap({
             markersRef.current.push(marker);
         });
 
-        if (!routeLayerRef.current && mappableShops.length > 0 && !routingEnabled) {
+        if (mappableShops.length > 0 && !routeLayerRef.current) {
             if (mappableShops.length > 1) {
                 const bounds = L.latLngBounds(
                     mappableShops.map((s) => [Number(s.lat), Number(s.lng)])
@@ -196,8 +248,9 @@ export default function JunkshopsMap({
                 const s = mappableShops[0];
                 map.setView([Number(s.lat), Number(s.lng)], 15);
             }
+            refreshMapSize();
         }
-    }, [mappableShops, selectedId, mapReady, onSelectShop, routingEnabled]);
+    }, [mappableShops, selectedId, mapReady, onSelectShop, refreshMapSize]);
 
     useEffect(() => {
         const map = mapRef.current;
@@ -323,7 +376,7 @@ export default function JunkshopsMap({
         setGpsStatus("idle");
     };
 
-    if (mappableShops.length === 0) {
+    if (!hasMappableShops) {
         return (
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 min-h-[200px] flex items-center justify-center text-sm text-[#72796e] p-6 text-center">
                 No shop locations to show. Partner shops appear here after providers complete setup.
@@ -400,10 +453,10 @@ export default function JunkshopsMap({
                 {routingEnabled && " · Routes via OSRM (free)."}
             </p>
 
-            <div className="rounded-xl border border-emerald-200 overflow-hidden shadow-sm z-0">
+            <div className="rounded-xl border border-emerald-200 overflow-hidden shadow-sm relative z-0">
                 <div
                     ref={containerRef}
-                    className="aspect-[16/9] min-h-[280px] sm:min-h-[320px] w-full z-0 [&_.leaflet-control-attribution]:text-[10px]"
+                    className="h-[280px] sm:h-[320px] w-full z-0 bg-zinc-100 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]"
                     aria-label="Junkshop locations map"
                 />
             </div>

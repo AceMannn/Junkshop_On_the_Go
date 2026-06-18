@@ -28,6 +28,7 @@ export function normalizeJunkshop(shop) {
           ? 'Closed'
           : shop.status || 'Open',
     rating: shop.rating ?? 0,
+    reviewCount: shop.reviewCount ?? 0,
     materials: shop.materials || [],
     listingPrices: shop.listingPrices || [],
     topPrice: shop.topPrice || '',
@@ -35,6 +36,7 @@ export function normalizeJunkshop(shop) {
     lng: shop.location?.lng,
     isPartner: Boolean(shop.isPartner),
     distanceKm: shop.distanceKm,
+    latestReview: shop.latestReview || null,
   };
 }
 

@@ -5,7 +5,8 @@ import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { Modal } from '../components/ui/Modal';
 import EmptyState from '../components/ui/EmptyState';
 import JunkshopsMap from '../components/maps/JunkshopsMap';
-import { useCatalogJunkshops, useCatalogMaterials } from '../hooks/useCatalogData';
+import ShopRating from '../components/ui/ShopRating';
+import { useCatalogJunkshops, useFeaturedMaterials } from '../hooks/useCatalogData';
 import { priceCategories } from '../data/prices';
 import {
   materialGuides,
@@ -29,7 +30,7 @@ export default function HomePage() {
     autoRefresh: false,
     partnersOnly: true,
   });
-  const { materials, loading: materialsLoading } = useCatalogMaterials({ autoRefresh: false });
+  const { materials, loading: materialsLoading } = useFeaturedMaterials({ autoRefresh: false });
 
   const previewShops = useMemo(() => shops.slice(0, 3), [shops]);
 
@@ -75,7 +76,7 @@ export default function HomePage() {
             <EmptyState
               icon={Package}
               title="No price data yet"
-              description="Reference material prices appear here after seeding the database (npm run seed) or when partner shops publish rates."
+              description="Live partner prices appear when verified shops publish materials. Run npm run seed for reference catalog prices in areas still onboarding."
             />
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -135,13 +136,18 @@ export default function HomePage() {
                             {shop.address}, <span className="text-gray-700">{shop.distance}</span>
                           </p>
                           <div className="flex flex-wrap items-center gap-2 text-sm">
-                            <span className="text-yellow-500 tracking-wide">★ {shop.rating}</span>
+                            <ShopRating shop={shop} />
                             <span className={shop.status === 'Open' ? 'text-eco-green' : 'text-gray-500'}>{shop.status}</span>
                             <span className="text-gray-600">{shop.topPrice}</span>
                             {shop.isPartner && (
                               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Partner</span>
                             )}
                           </div>
+                          {shop.latestReview && (
+                            <p className="text-xs text-gray-600 mt-2 line-clamp-2">
+                              "{shop.latestReview.comment || 'No written comment.'}" - {shop.latestReview.customerName}
+                            </p>
+                          )}
                         </div>
                       </article>
                     ))
@@ -286,10 +292,17 @@ function MapModal({ isOpen, onClose, shops }) {
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${shop.status === 'Open' ? 'bg-eco-green/10 text-eco-green' : 'bg-gray-100 text-gray-500'}`}>{shop.status}</span>
               </div>
               <div className="mt-3 space-y-1 text-sm text-gray-600">
-                <p>{shop.distance} away · ★ {shop.rating}</p>
+                <p className="flex items-center gap-2">
+                  {shop.distance} away · <ShopRating shop={shop} />
+                </p>
                 <p>{shop.hours}</p>
                 <p>{shop.phone}</p>
                 <p className="font-semibold text-charcoal">{shop.topPrice}</p>
+                {shop.latestReview && (
+                  <p className="text-xs text-gray-600">
+                    Latest: "{shop.latestReview.comment || 'No written comment.'}" - {shop.latestReview.customerName}
+                  </p>
+                )}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {(shop.materials || []).map((material) => (

@@ -26,10 +26,33 @@ if (missing.length > 0) {
 }
 
 const PORT = process.env.PORT || 5000;
-const defaultOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const defaultOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+];
 const clientOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN.split(',').map((origin) => origin.trim())
   : defaultOrigins;
+
+const isLocalDevOrigin = (origin) => {
+  if (!origin) return false;
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return protocol === 'http:' && (hostname === 'localhost' || hostname === '127.0.0.1');
+  } catch {
+    return false;
+  }
+};
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  if (clientOrigins.includes(origin)) return true;
+  // Vite picks 5174, 5175, … when 5173 is already in use
+  if (process.env.NODE_ENV !== 'production' && isLocalDevOrigin(origin)) return true;
+  return false;
+};
 
 // =====================
 // Express setup
@@ -38,7 +61,13 @@ const app = express();
 
 app.use(
   cors({
-    origin: clientOrigins,
+    origin(origin, callback) {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked origin: ${origin}`));
+      }
+    },
     credentials: true,
   })
 );
@@ -71,6 +100,9 @@ const startServer = async () => {
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`CORS allowed for: ${clientOrigins.join(', ')}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('CORS also allows any http://localhost / 127.0.0.1 port in development');
+    }
   });
 };
 

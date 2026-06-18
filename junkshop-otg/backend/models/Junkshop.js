@@ -37,6 +37,11 @@ const junkshopSchema = new mongoose.Schema(
       max: 5,
       default: 0,
     },
+    reviewCount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     materials: {
       type: [String],
       default: [],

@@ -11,10 +11,17 @@ async function request(path, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach the API at ${API_BASE_URL}. Make sure the backend is running (npm run dev in junkshop-otg).`
+    );
+  }
 
   const data = await response.json().catch(() => ({}));
 
@@ -114,8 +121,17 @@ export const domainApi = {
       body: JSON.stringify(payload),
     });
   },
+  getJunkshopReviews(id, { limit = 5 } = {}) {
+    const params = new URLSearchParams();
+    if (limit) params.set('limit', String(limit));
+    const qs = params.toString();
+    return request(`/api/junkshops/${id}/reviews${qs ? `?${qs}` : ''}`);
+  },
   getCatalogMaterials() {
     return request('/api/materials?catalog=true');
+  },
+  getFeaturedMaterials() {
+    return request('/api/materials?featured=true');
   },
   getMyMaterials() {
     return request('/api/materials/mine');
