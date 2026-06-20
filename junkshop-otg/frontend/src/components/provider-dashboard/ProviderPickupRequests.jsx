@@ -6,9 +6,11 @@ import {
     Clock3,
     Eye,
     MapPin,
+    Star,
+    X,
 } from "lucide-react";
 import { pickupApi } from "../../services/api";
-import { REFRESH_INTERVAL_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
+import { REFRESH_INTERVAL_MS, REFRESH_INTERVAL_FAST_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
 import {
     STATUS_LABELS,
     STATUS_STYLES,
@@ -16,6 +18,34 @@ import {
     materialsSummary,
     getCustomerDisplayName,
 } from "../../utils/pickupHelpers";
+import PickupTrackingMap, { formatLastUpdated } from "../maps/PickupTrackingMap";
+import NumberInput from "../ui/NumberInput";
+import {
+    estimateDropOffPoints,
+    formatPoints,
+    POINTS_PER_KG,
+} from "../../utils/pickupPoints";
+import PickupDetailDrawerShell from "../ui/PickupDetailDrawerShell";
+
+function formatWeightKg(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    return n.toFixed(2);
+}
+
+function PickupCustomerRating({ rating }) {
+    const score = Number(rating?.score);
+    if (!score || score < 1) {
+        return <span className="text-xs text-[#72796e]">Not rated</span>;
+    }
+
+    return (
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+            <Star size={14} className="fill-amber-400 text-amber-400" />
+            {score}/5
+        </span>
+    );
+}
 
 function normalizeRow(req) {
     const customer = req.customer;
@@ -53,7 +83,10 @@ function toApiStatus(label) {
     return map[label];
 }
 
-export default function ProviderPickupRequests() {
+export default function ProviderPickupRequests({
+    focusRequestId = null,
+    onFocusHandled,
+}) {
     const [activeRequestTab, setActiveRequestTab] = useState("All");
     const [toast, setToast] = useState("");
     const [requests, setRequests] = useState([]);
@@ -63,6 +96,9 @@ export default function ProviderPickupRequests() {
     const [rejectReason, setRejectReason] = useState("");
     const [rejectMessage, setRejectMessage] = useState("");
     const [trackingId, setTrackingId] = useState(null);
+    const [detailId, setDetailId] = useState(null);
+    const [detailLive, setDetailLive] = useState(null);
+    const [liveGps, setLiveGps] = useState(null);
 
     const load = useCallback(async (silent = false) => {
         try {
@@ -88,6 +124,71 @@ export default function ProviderPickupRequests() {
     }, [load]);
 
     useAutoRefresh(() => load(true), { intervalMs: REFRESH_INTERVAL_MS });
+
+    const refreshDetail = useCallback(async () => {
+        if (!detailId) return;
+        try {
+            const { request } = await pickupApi.get(detailId);
+            setDetailLive(request);
+        } catch {
+            /* ignore poll errors */
+        }
+    }, [detailId]);
+
+    useEffect(() => {
+        if (detailId) {
+            refreshDetail();
+        }
+    }, [detailId, refreshDetail]);
+
+    useAutoRefresh(refreshDetail, {
+        enabled: Boolean(detailId && detailLive?.status === "in_transit"),
+        intervalMs: REFRESH_INTERVAL_FAST_MS,
+    });
+
+    useEffect(() => {
+        if (!detailId || detailLive?.status !== "in_transit") {
+            setLiveGps(null);
+            return undefined;
+        }
+        if (!navigator.geolocation) return undefined;
+
+        const watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                setLiveGps({
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                });
+            },
+            () => {},
+            { enableHighAccuracy: true, maximumAge: 15000 }
+        );
+
+        return () => navigator.geolocation.clearWatch(watchId);
+    }, [detailId, detailLive?.status]);
+
+    const openDetail = async (id) => {
+        setDetailId(id);
+        try {
+            const { request } = await pickupApi.get(id);
+            setDetailLive(request);
+        } catch (err) {
+            showToast(err.message);
+            setDetailId(null);
+        }
+    };
+
+    useEffect(() => {
+        if (!focusRequestId) return;
+        openDetail(focusRequestId);
+        onFocusHandled?.();
+    }, [focusRequestId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const closeDetail = () => {
+        setDetailId(null);
+        setDetailLive(null);
+        setLiveGps(null);
+    };
 
     const showToast = (message) => {
         setToast(message);
@@ -119,7 +220,41 @@ export default function ProviderPickupRequests() {
         }
     };
 
-    const handleStatus = async (id, label) => {
+    const handleConfirmPayment = async (id) => {
+        try {
+            await pickupApi.confirmPayment(id);
+            showToast("Payment confirmed. You can start the pickup.");
+            load();
+            await refreshDetail();
+        } catch (err) {
+            showToast(err.message);
+        }
+    };
+
+    const handleRejectPayment = async (id, note) => {
+        try {
+            await pickupApi.rejectPayment(id, { note });
+            showToast("Payment marked as not verified.");
+            load();
+            await refreshDetail();
+        } catch (err) {
+            showToast(err.message);
+        }
+    };
+
+    const handleCompleteDropOff = async (id, actualWeight) => {
+        try {
+            await pickupApi.updateStatus(id, "completed", { actualWeight });
+            showToast("Drop-off completed. Points awarded to the customer.");
+            setTrackingId(null);
+            load();
+            closeDetail();
+        } catch (err) {
+            showToast(err.message);
+        }
+    };
+
+    const handleStatus = async (id, label, extra = {}) => {
         const status = toApiStatus(label);
         if (!status) return;
 
@@ -127,14 +262,14 @@ export default function ProviderPickupRequests() {
             if (label === "In Transit") {
                 setTrackingId(id);
                 if (!navigator.geolocation) {
-                    await pickupApi.updateStatus(id, status);
+                    await pickupApi.updateStatus(id, status, extra);
                     showToast("Marked in transit.");
                     load();
                     return;
                 }
                 navigator.geolocation.getCurrentPosition(
                     async (pos) => {
-                        await pickupApi.updateStatus(id, status);
+                        await pickupApi.updateStatus(id, status, extra);
                         await pickupApi.updateLocation(
                             id,
                             pos.coords.latitude,
@@ -144,7 +279,7 @@ export default function ProviderPickupRequests() {
                         load();
                     },
                     async () => {
-                        await pickupApi.updateStatus(id, status);
+                        await pickupApi.updateStatus(id, status, extra);
                         showToast("In transit (location unavailable).");
                         load();
                     }
@@ -152,7 +287,10 @@ export default function ProviderPickupRequests() {
                 return;
             }
 
-            await pickupApi.updateStatus(id, status);
+            await pickupApi.updateStatus(id, status, extra);
+            if (label === "Completed") {
+                setTrackingId(null);
+            }
             showToast(`Updated to ${label}.`);
             load();
         } catch (err) {
@@ -188,10 +326,11 @@ export default function ProviderPickupRequests() {
     const pendingCount = requests.filter((r) => r.status === "Pending").length;
     const inTransitCount = requests.filter((r) => r.status === "In Transit").length;
     const completedTodayCount = requests.filter((r) => r.status === "Completed").length;
-    const totalVolume = requests.reduce((sum, r) => sum + (r.weight || 0), 0);
+    const totalVolume = requests.reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
+    const totalVolumeLabel = formatWeightKg(totalVolume);
 
     return (
-        <div className="space-y-6 sm:space-y-8 pb-24 lg:pb-8">
+        <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
             {toast && (
                 <div className="fixed top-20 right-4 left-4 sm:left-auto z-50 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl shadow-lg max-w-md sm:ml-auto text-sm font-semibold">
                     {toast}
@@ -211,7 +350,7 @@ export default function ProviderPickupRequests() {
                 <RequestStatCard title="Pending" value={pendingCount} unit="requests" />
                 <RequestStatCard title="In Transit" value={inTransitCount} unit="requests" />
                 <RequestStatCard title="Completed" value={completedTodayCount} unit="requests" />
-                <RequestStatCard title="Total Volume" value={totalVolume} unit="kg" />
+                <RequestStatCard title="Total Volume" value={totalVolumeLabel} unit="kg" />
             </section>
 
             <section className="rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
@@ -266,9 +405,15 @@ export default function ProviderPickupRequests() {
                                         </div>
                                         <div>
                                             <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Weight</p>
-                                            <p className="font-semibold text-[#154212]">{request.weight} kg</p>
+                                            <p className="font-semibold text-[#154212]">{formatWeightKg(request.weight)} kg</p>
                                         </div>
                                     </div>
+                                    {request.status === "Completed" && (
+                                        <div>
+                                            <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Rating</p>
+                                            <PickupCustomerRating rating={request.raw.rating} />
+                                        </div>
+                                    )}
                                     <div className="flex items-start gap-2 text-sm text-[#42493e]">
                                         <MapPin size={16} className="mt-0.5 shrink-0 text-[#72796e]" />
                                         <span className="break-words">{request.location}</span>
@@ -278,6 +423,7 @@ export default function ProviderPickupRequests() {
                                         onAccept={handleAccept}
                                         onReject={() => setRejectingId(request.id)}
                                         onUpdateStatus={handleStatus}
+                                        onViewDetails={openDetail}
                                     />
                                 </div>
                             ))}
@@ -293,6 +439,7 @@ export default function ProviderPickupRequests() {
                                         <th className="px-6 py-4 font-semibold">Location</th>
                                         <th className="px-6 py-4 font-semibold">Date & Time</th>
                                         <th className="px-6 py-4 font-semibold">Status</th>
+                                        <th className="px-6 py-4 font-semibold">Rating</th>
                                         <th className="px-6 py-4 text-right font-semibold">Actions</th>
                                     </tr>
                                 </thead>
@@ -307,7 +454,7 @@ export default function ProviderPickupRequests() {
                                             </td>
                                             <td className="px-6 py-4 text-[#42493e]">{request.materials}</td>
                                             <td className="px-6 py-4 font-semibold text-[#154212]">
-                                                {request.weight} kg
+                                                {formatWeightKg(request.weight)} kg
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-start gap-2 text-[#42493e]">
@@ -320,11 +467,19 @@ export default function ProviderPickupRequests() {
                                                 <ProviderStatusBadge status={request.status} />
                                             </td>
                                             <td className="px-6 py-4">
+                                                {request.status === "Completed" ? (
+                                                    <PickupCustomerRating rating={request.raw.rating} />
+                                                ) : (
+                                                    <span className="text-xs text-[#72796e]">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
                                                 <ProviderRequestActions
                                                     request={request}
                                                     onAccept={handleAccept}
                                                     onReject={() => setRejectingId(request.id)}
                                                     onUpdateStatus={handleStatus}
+                                                    onViewDetails={openDetail}
                                                 />
                                             </td>
                                         </tr>
@@ -335,6 +490,25 @@ export default function ProviderPickupRequests() {
                     </>
                 )}
             </section>
+
+            {detailId && detailLive && (
+                <ProviderPickupDetailDrawer
+                    request={detailLive}
+                    liveGps={liveGps}
+                    isSharingLocation={trackingId === detailId}
+                    onClose={closeDetail}
+                    onRefresh={refreshDetail}
+                    onAccept={handleAccept}
+                    onReject={() => {
+                        closeDetail();
+                        setRejectingId(detailId);
+                    }}
+                    onUpdateStatus={handleStatus}
+                    onConfirmPayment={handleConfirmPayment}
+                    onRejectPayment={handleRejectPayment}
+                    onCompleteDropOff={handleCompleteDropOff}
+                />
+            )}
 
             {rejectingId && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -417,10 +591,27 @@ function ProviderStatusBadge({ status }) {
     );
 }
 
-function ProviderRequestActions({ request, onAccept, onReject, onUpdateStatus }) {
+function ProviderRequestActions({ request, onAccept, onReject, onUpdateStatus, onViewDetails }) {
+    const isDropOff = request.raw?.requestType === "drop_off";
+    const paymentStatus = request.raw?.serviceFeePaymentStatus || "none";
+    const paymentConfirmed = paymentStatus === "confirmed";
+    const paymentPending = paymentStatus === "submitted";
+
+    const detailsBtn = (
+        <button
+            type="button"
+            onClick={() => onViewDetails(request.id)}
+            className="inline-flex items-center gap-1 rounded-xl bg-zinc-100 px-3 py-2 text-xs font-semibold text-[#42493e] hover:bg-zinc-200"
+        >
+            <Eye size={14} />
+            Details
+        </button>
+    );
+
     if (request.status === "Pending") {
         return (
             <div className="flex flex-wrap justify-start md:justify-end gap-2">
+                {detailsBtn}
                 <button
                     type="button"
                     onClick={() => onAccept(request.id)}
@@ -442,8 +633,31 @@ function ProviderRequestActions({ request, onAccept, onReject, onUpdateStatus })
     }
 
     if (request.status === "Accepted") {
+        if (isDropOff || paymentPending) {
+            return (
+                <div className="flex flex-wrap justify-start md:justify-end gap-2">
+                    {detailsBtn}
+                    <span className="inline-flex items-center text-xs font-semibold text-amber-700">
+                        {isDropOff ? "Complete in details" : "Review payment in details"}
+                    </span>
+                </div>
+            );
+        }
+
+        if (!paymentConfirmed) {
+            return (
+                <div className="flex flex-wrap justify-start md:justify-end gap-2">
+                    {detailsBtn}
+                    <span className="inline-flex items-center text-xs text-[#72796e]">
+                        Awaiting customer payment
+                    </span>
+                </div>
+            );
+        }
+
         return (
-            <div className="flex justify-start md:justify-end">
+            <div className="flex flex-wrap justify-start md:justify-end gap-2">
+                {detailsBtn}
                 <button
                     type="button"
                     onClick={() => onUpdateStatus(request.id, "In Transit")}
@@ -458,7 +672,8 @@ function ProviderRequestActions({ request, onAccept, onReject, onUpdateStatus })
 
     if (request.status === "In Transit") {
         return (
-            <div className="flex justify-start md:justify-end">
+            <div className="flex flex-wrap justify-start md:justify-end gap-2">
+                {detailsBtn}
                 <button
                     type="button"
                     onClick={() => onUpdateStatus(request.id, "Completed")}
@@ -472,11 +687,294 @@ function ProviderRequestActions({ request, onAccept, onReject, onUpdateStatus })
     }
 
     return (
-        <div className="flex justify-start md:justify-end">
+        <div className="flex justify-start md:justify-end gap-2">
+            {detailsBtn}
             <span className="inline-flex items-center gap-1 text-xs text-[#72796e]">
                 <Eye size={14} />
                 {STATUS_LABELS[request.raw?.status] || request.status}
             </span>
         </div>
+    );
+}
+
+function ProviderPickupDetailDrawer({
+    request,
+    liveGps,
+    isSharingLocation,
+    onClose,
+    onRefresh,
+    onAccept,
+    onReject,
+    onUpdateStatus,
+    onConfirmPayment,
+    onRejectPayment,
+    onCompleteDropOff,
+}) {
+    const [rejectNote, setRejectNote] = useState("");
+    const [actualWeight, setActualWeight] = useState(
+        String(request.estimatedWeightKg || "")
+    );
+    const [completingDropOff, setCompletingDropOff] = useState(false);
+
+    const statusKey = request.status;
+    const statusLabel = STATUS_LABELS[statusKey] || statusKey;
+    const isHomePickup = request.requestType !== "drop_off";
+    const isDropOff = !isHomePickup;
+    const serviceFee = Number(request.serviceFee || 0);
+    const isZeroFee = serviceFee <= 0;
+    const paymentStatus = request.serviceFeePaymentStatus || "none";
+    const paymentConfirmed = paymentStatus === "confirmed";
+    const paymentPending = paymentStatus === "submitted";
+    const estimatedPoints = estimateDropOffPoints(actualWeight || request.estimatedWeightKg);
+
+    const showMap = isHomePickup && ["accepted", "in_transit"].includes(statusKey);
+    const showDropOffMap = isDropOff && statusKey === "accepted";
+    const showRoute =
+        statusKey === "in_transit" &&
+        (request.providerLocation?.lat != null || liveGps?.lat != null);
+
+    const customerName = getCustomerDisplayName(request.customer);
+
+    const handleCompleteDropOff = async () => {
+        const weight = Number(actualWeight);
+        if (!weight || weight < 0.1) return;
+        setCompletingDropOff(true);
+        try {
+            await onCompleteDropOff(request.id, weight);
+        } finally {
+            setCompletingDropOff(false);
+        }
+    };
+
+    return (
+        <PickupDetailDrawerShell onClose={onClose}>
+            <div className="md:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+                <div className="h-1 w-10 rounded-full bg-zinc-300" aria-hidden="true" />
+            </div>
+            <div className="shrink-0 border-b bg-white px-5 py-4 flex justify-between items-center">
+                <h2 className="font-bold">Pickup details</h2>
+                <button type="button" onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-full">
+                    <X size={20} />
+                </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-5">
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[statusKey] || "bg-zinc-100"}`}>
+                        {statusLabel}
+                    </span>
+
+                    {isSharingLocation && statusKey === "in_transit" && (
+                        <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800 flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                            Sharing live location with customer
+                        </div>
+                    )}
+
+                    <div className="space-y-1 text-sm">
+                        <p className="font-semibold text-lg">{customerName}</p>
+                        <p className="text-[#72796e]">{formatPickupSchedule(request)}</p>
+                        <p>
+                            {materialsSummary(request.materials)} · {formatWeightKg(request.estimatedWeightKg)} kg
+                        </p>
+                        <p className="flex items-start gap-1 text-[#42493e]">
+                            <MapPin size={14} className="shrink-0 mt-0.5" />
+                            {request.address}
+                        </p>
+                        {request.contactPhone && (
+                            <p className="text-[#72796e]">Phone: {request.contactPhone}</p>
+                        )}
+                    </div>
+
+                    {showMap && (
+                        <div className="rounded-xl border border-zinc-200 bg-[#f9f9f8] p-3 space-y-2">
+                            <p className="text-sm font-semibold text-[#191c1c]">
+                                {statusKey === "in_transit" ? "Navigate to customer" : "Customer location"}
+                            </p>
+                            {statusKey === "accepted" && (
+                                <p className="text-xs text-[#72796e]">
+                                    Mark in transit to start live tracking for the customer.
+                                </p>
+                            )}
+                            {request.providerLocation?.updatedAt && (
+                                <p className="text-xs text-[#72796e]">
+                                    {formatLastUpdated(request.providerLocation.updatedAt)}
+                                </p>
+                            )}
+                            {request.rating?.score && (
+                                <p className="text-xs font-semibold text-amber-700 flex items-center gap-1">
+                                    <Star size={12} className="fill-amber-400 text-amber-400" />
+                                    Customer rated {request.rating.score}/5
+                                </p>
+                            )}
+                            <PickupTrackingMap
+                                address={request.address}
+                                destination={request.pickupLocation}
+                                provider={request.providerLocation}
+                                liveProvider={liveGps}
+                                showRoute={showRoute}
+                                minHeight="260px"
+                            />
+                        </div>
+                    )}
+
+                    {showDropOffMap && (
+                        <div className="rounded-xl border border-zinc-200 bg-[#f9f9f8] p-3 space-y-2">
+                            <p className="text-sm font-semibold text-[#191c1c]">Shop drop-off location</p>
+                            <p className="text-xs text-[#72796e]">
+                                Customer will bring items to this address during their scheduled slot.
+                            </p>
+                            <PickupTrackingMap
+                                address={request.address}
+                                destination={request.pickupLocation}
+                                minHeight="220px"
+                            />
+                        </div>
+                    )}
+
+                    {isHomePickup && paymentPending && statusKey === "accepted" && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                            <p className="text-sm font-semibold text-amber-900">
+                                {isZeroFee ? "Customer ready confirmation" : "Service fee payment"}
+                            </p>
+                            {!isZeroFee && (
+                                <>
+                                    <p className="text-sm">
+                                        Amount: <strong>₱{serviceFee}</strong>
+                                    </p>
+                                    <p className="text-sm">
+                                        Reference: <strong>{request.paymentReference}</strong>
+                                    </p>
+                                    {request.paymentProofUrl && (
+                                        <img
+                                            src={request.paymentProofUrl}
+                                            alt="Payment proof"
+                                            className="max-w-full max-h-48 rounded-lg border"
+                                        />
+                                    )}
+                                </>
+                            )}
+                            {isZeroFee && (
+                                <p className="text-sm text-amber-900">
+                                    Customer confirmed they are ready for this free pickup.
+                                </p>
+                            )}
+                            <textarea
+                                rows={2}
+                                value={rejectNote}
+                                onChange={(e) => setRejectNote(e.target.value)}
+                                placeholder="Optional note if rejecting"
+                                className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
+                            />
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onConfirmPayment(request.id);
+                                        onRefresh();
+                                    }}
+                                    className="flex-1 py-2.5 rounded-xl bg-[#154212] text-white text-sm font-semibold"
+                                >
+                                    {isZeroFee ? "Confirm ready" : "Confirm payment"}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onRejectPayment(request.id, rejectNote);
+                                        setRejectNote("");
+                                        onRefresh();
+                                    }}
+                                    className="flex-1 py-2.5 rounded-xl bg-red-100 text-red-700 text-sm font-semibold"
+                                >
+                                    Reject
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {isDropOff && statusKey === "accepted" && (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
+                            <p className="text-sm font-semibold text-emerald-900">Complete drop-off</p>
+                            <p className="text-xs text-[#72796e]">
+                                Weigh the customer&apos;s items and award recycling points ({POINTS_PER_KG} pts/kg).
+                            </p>
+                            <div className="space-y-1">
+                                <label className="block text-xs font-semibold text-[#42493e]">
+                                    Actual weight (kg)
+                                </label>
+                                <NumberInput
+                                    value={actualWeight}
+                                    onChange={setActualWeight}
+                                    min={0.1}
+                                    step={0.1}
+                                />
+                            </div>
+                            <p className="text-sm font-semibold text-[#154212]">
+                                Points to award: {formatPoints(estimatedPoints)} pts
+                            </p>
+                            <button
+                                type="button"
+                                disabled={completingDropOff}
+                                onClick={handleCompleteDropOff}
+                                className="w-full py-2.5 rounded-xl bg-[#154212] text-white text-sm font-semibold disabled:opacity-50"
+                            >
+                                {completingDropOff ? "Completing…" : "Complete & award points"}
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-2">
+                        {statusKey === "pending" && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onAccept(request.id);
+                                        onRefresh();
+                                    }}
+                                    className="flex-1 py-2.5 rounded-xl bg-emerald-100 text-emerald-800 text-sm font-semibold"
+                                >
+                                    Accept
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onReject}
+                                    className="flex-1 py-2.5 rounded-xl bg-red-100 text-red-700 text-sm font-semibold"
+                                >
+                                    Decline
+                                </button>
+                            </>
+                        )}
+                        {statusKey === "accepted" && isHomePickup && paymentConfirmed && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onUpdateStatus(request.id, "In Transit");
+                                    onRefresh();
+                                }}
+                                className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold"
+                            >
+                                Mark In Transit
+                            </button>
+                        )}
+                        {statusKey === "accepted" && isHomePickup && !paymentConfirmed && !paymentPending && (
+                            <p className="w-full text-xs text-center text-[#72796e] py-2">
+                                Waiting for customer to submit payment proof.
+                            </p>
+                        )}
+                        {statusKey === "in_transit" && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onUpdateStatus(request.id, "Completed");
+                                    onClose();
+                                }}
+                                className="w-full py-2.5 rounded-xl bg-[#154212] text-white text-sm font-semibold"
+                            >
+                                Mark Completed
+                            </button>
+                        )}
+                    </div>
+                </div>
+        </PickupDetailDrawerShell>
     );
 }

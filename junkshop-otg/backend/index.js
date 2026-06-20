@@ -4,12 +4,15 @@
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const connectDB = require('./config/db');
+const { getDatabaseHealth } = connectDB;
 const authRoutes = require('./routes/authRoutes');
 const domainRoutes = require('./routes/domainRoutes');
 const mapRoutes = require('./routes/mapRoutes');
+const { mapsLimiter } = require('./middlewares/rateLimiters');
 
 // =====================
 // Required environment
@@ -70,7 +73,13 @@ const isOriginAllowed = (origin) => {
 // Express setup
 // =====================
 const app = express();
+const isProduction = process.env.NODE_ENV === 'production';
 
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
+
+app.use(helmet());
 app.use(
   cors({
     origin(origin, callback) {
@@ -83,7 +92,7 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // =====================
 // Routes
@@ -95,13 +104,39 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', database: 'connected' });
+app.get('/api/health', async (req, res) => {
+  const database = await getDatabaseHealth();
+
+  res.status(database.ok ? 200 : 503).json({
+    status: database.ok ? 'ok' : 'degraded',
+    database: database.state,
+  });
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/maps', mapRoutes);
+app.use('/api/maps', mapsLimiter, mapRoutes);
 app.use('/api', domainRoutes);
+
+app.use((req, res) => {
+  res.status(404).json({ message: 'Not found.' });
+});
+
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ message: 'Request body too large.' });
+  }
+
+  if (err.status === 429) {
+    return res.status(429).json({ message: 'Too many requests. Please try again later.' });
+  }
+
+  console.error(err);
+
+  res.status(err.status || 500).json({
+    message: isProduction ? 'Something went wrong.' : err.message || 'Something went wrong.',
+    ...(isProduction ? {} : { stack: err.stack }),
+  });
+});
 
 // =====================
 // Start

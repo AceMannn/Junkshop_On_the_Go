@@ -6,7 +6,9 @@ import { Modal } from '../components/ui/Modal';
 import EmptyState from '../components/ui/EmptyState';
 import JunkshopsMap from '../components/maps/JunkshopsMap';
 import ShopRating from '../components/ui/ShopRating';
+import ReviewSnippet from '../components/ui/ReviewSnippet';
 import { useCatalogJunkshops, useFeaturedMaterials } from '../hooks/useCatalogData';
+import LoadErrorBanner from '../components/ui/LoadErrorBanner';
 import { priceCategories } from '../data/prices';
 import {
   materialGuides,
@@ -26,11 +28,16 @@ const categoryIcons = {
 
 export default function HomePage() {
   const [activeModal, setActiveModal] = useState(null);
-  const { shops, loading: shopsLoading } = useCatalogJunkshops({
+  const { shops, loading: shopsLoading, error: shopsError, refresh: refreshShops } = useCatalogJunkshops({
     autoRefresh: false,
     partnersOnly: true,
   });
-  const { materials, loading: materialsLoading } = useFeaturedMaterials({ autoRefresh: false });
+  const {
+    materials,
+    loading: materialsLoading,
+    error: materialsError,
+    refresh: refreshMaterials,
+  } = useFeaturedMaterials({ autoRefresh: false });
 
   const previewShops = useMemo(() => shops.slice(0, 3), [shops]);
 
@@ -70,6 +77,13 @@ export default function HomePage() {
       <section className="py-16 bg-gradient-to-br from-[#f8fcf8] via-white to-[#f2faf4]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <SectionHeader title="What Can You Recycle?" description="Popular recyclable materials in your area" />
+          {materialsError && (
+            <LoadErrorBanner
+              message={materialsError}
+              onRetry={refreshMaterials}
+              className="mb-4"
+            />
+          )}
           {materialsLoading ? (
             <p className="text-center text-gray-500">Loading prices...</p>
           ) : previewMaterialCards.length === 0 ? (
@@ -108,6 +122,13 @@ export default function HomePage() {
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <SectionHeader title="Find Junkshops Near You" description="Discover trusted junkshops in Teresa, Sta. Mesa with local pricing and community ratings." />
+          {shopsError && (
+            <LoadErrorBanner
+              message={shopsError}
+              onRetry={refreshShops}
+              className="mb-4"
+            />
+          )}
           <div className="bg-[#f9faf9] rounded-[28px] shadow-lg overflow-hidden border border-gray-100">
             <div className="grid lg:grid-cols-2">
               <div className="p-6 sm:p-8 bg-white">
@@ -144,9 +165,7 @@ export default function HomePage() {
                             )}
                           </div>
                           {shop.latestReview && (
-                            <p className="text-xs text-gray-600 mt-2 line-clamp-2">
-                              "{shop.latestReview.comment || 'No written comment.'}" - {shop.latestReview.customerName}
-                            </p>
+                            <ReviewSnippet review={shop.latestReview} className="mt-2" />
                           )}
                         </div>
                       </article>
@@ -154,20 +173,24 @@ export default function HomePage() {
                   )}
                 </div>
               </div>
-              <div className="relative min-h-[320px] lg:min-h-full bg-eco-green p-6 sm:p-8 flex items-center justify-center">
+              <div className="relative min-h-[320px] overflow-hidden bg-eco-green">
                 {shopsLoading ? (
-                  <p className="text-sm text-white/80 animate-pulse">Loading map…</p>
+                  <div className="flex min-h-[320px] h-full items-center justify-center p-6 sm:p-8">
+                    <p className="text-sm text-white/80 animate-pulse">Loading map…</p>
+                  </div>
                 ) : previewShops.length === 0 ? (
-                  <EmptyState
-                    compact
-                    inverted
-                    icon={MapPin}
-                    title="No shop locations yet"
-                    description="Partner shops appear here on the map after providers complete setup."
-                    className="w-full"
-                  />
+                  <div className="flex min-h-[320px] h-full items-center justify-center p-6 sm:p-8">
+                    <EmptyState
+                      compact
+                      inverted
+                      icon={MapPin}
+                      title="No shop locations yet"
+                      description="Partner shops appear here on the map after providers complete setup."
+                      className="w-full"
+                    />
+                  </div>
                 ) : (
-                  <JunkshopsMap shops={previewShops} className="h-full w-full" />
+                  <JunkshopsMap shops={previewShops} className="h-full w-full" fillContainer />
                 )}
               </div>
             </div>
@@ -247,22 +270,22 @@ function PricesModal({ isOpen, onClose, materials }) {
             <section key={category.id}>
               <h3 className="mb-4 capitalize text-eco-green">{category.label}</h3>
               <div className="overflow-x-auto rounded-[16px] border border-gray-100">
-                <table className="w-full min-w-[720px] text-left">
-                  <thead className="bg-light-gray text-sm text-charcoal">
+                <table className="w-full min-w-[480px] sm:min-w-[560px] text-left text-xs sm:text-sm">
+                  <thead className="bg-light-gray text-charcoal">
                     <tr>
-                      <th className="px-4 py-3">Material</th>
-                      <th className="px-4 py-3">Examples</th>
-                      <th className="px-4 py-3">Per kg</th>
-                      <th className="px-4 py-3">Notes</th>
+                      <th className="px-2 py-2 sm:px-4 sm:py-3">Material</th>
+                      <th className="hidden sm:table-cell px-2 py-2 sm:px-4 sm:py-3">Examples</th>
+                      <th className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">Per kg</th>
+                      <th className="hidden md:table-cell px-2 py-2 sm:px-4 sm:py-3">Notes</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {categoryPrices.map((item) => (
                       <tr key={item.id} className="align-top">
-                        <td className="px-4 py-3 font-semibold text-charcoal">{item.material}</td>
-                        <td className="px-4 py-3 text-gray-600">{item.examples || '—'}</td>
-                        <td className="px-4 py-3 font-semibold text-eco-green">{item.perKgPrice}</td>
-                        <td className="px-4 py-3 text-gray-600">{item.notes || '—'}</td>
+                        <td className="px-2 py-2 sm:px-4 sm:py-3 font-semibold text-charcoal">{item.material}</td>
+                        <td className="hidden sm:table-cell px-2 py-2 sm:px-4 sm:py-3 text-gray-600">{item.examples || '—'}</td>
+                        <td className="px-2 py-2 sm:px-4 sm:py-3 font-semibold text-eco-green whitespace-nowrap">{item.perKgPrice}</td>
+                        <td className="hidden md:table-cell px-2 py-2 sm:px-4 sm:py-3 text-gray-600">{item.notes || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -279,9 +302,9 @@ function PricesModal({ isOpen, onClose, materials }) {
 function MapModal({ isOpen, onClose, shops }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Junkshops in Teresa, Sta. Mesa" description="Live junkshop pins from our database. Partner shops support in-app pickups." size="fullscreen">
-      <div className="grid h-full gap-5 lg:grid-cols-[1fr_22rem]">
-        <JunkshopsMap shops={shops} className="min-h-[420px]" />
-        <div className="space-y-4 overflow-y-auto pr-1">
+      <div className="grid h-full gap-4 md:grid-cols-[1fr_16rem] lg:grid-cols-[1fr_22rem]">
+        <JunkshopsMap shops={shops} className="min-h-[240px] sm:min-h-[300px] md:min-h-[360px]" />
+        <div className="space-y-3 overflow-y-auto max-h-[38vh] md:max-h-none pr-1">
           {shops.map((shop) => (
             <article key={shop.id} className="rounded-[18px] border border-gray-100 bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
@@ -299,9 +322,7 @@ function MapModal({ isOpen, onClose, shops }) {
                 <p>{shop.phone}</p>
                 <p className="font-semibold text-charcoal">{shop.topPrice}</p>
                 {shop.latestReview && (
-                  <p className="text-xs text-gray-600">
-                    Latest: "{shop.latestReview.comment || 'No written comment.'}" - {shop.latestReview.customerName}
-                  </p>
+                  <ReviewSnippet review={shop.latestReview} className="mt-2" />
                 )}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">

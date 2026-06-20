@@ -93,7 +93,7 @@ async function evaluateProviderProfile(user) {
     {
       id: 'serviceFee',
       label: 'Pickup service fee set',
-      done: user.pickupServiceFee != null && Number(user.pickupServiceFee) >= 0,
+      done: user.pickupServiceFee != null && Number(user.pickupServiceFee) > 0,
     },
   ]);
 }

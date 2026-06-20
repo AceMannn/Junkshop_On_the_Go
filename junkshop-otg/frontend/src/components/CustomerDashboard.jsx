@@ -6,10 +6,8 @@ import {
     Search,
     Map,
     Store,
-    TrendingUp,
     DollarSign,
     BookOpen,
-    Leaf,
     Recycle,
     TreePine,
     MapPin,
@@ -26,7 +24,7 @@ import ProfileCompletionBanner from "./ui/ProfileCompletionBanner";
 import { dashboardMainPaddingClass } from "./dashboard/dashboardTopbarUi";
 import { useCatalogJunkshops } from "../hooks/useCatalogData";
 import { useFavorites } from "../hooks/useFavorites";
-import { domainApi } from "../services/api";
+import { authApi, domainApi } from "../services/api";
 import { normalizeTransaction } from "../utils/catalogMappers";
 import { isFavoriteShopId } from "../utils/favorites";
 import {
@@ -40,6 +38,7 @@ import CustomerTopbar from "./customer-dashboard/CustomerTopbar";
 import HelpModal from "./ui/HelpModal";
 import EmptyState from "./ui/EmptyState";
 import ShopRating from "./ui/ShopRating";
+import ReviewSnippet from "./ui/ReviewSnippet";
 import {
     ViewProfilePage,
     AccountSettingsPage,
@@ -52,6 +51,14 @@ const navTabs = [
     { id: "history", label: "History", icon: History },
     { id: "favorites", label: "Favorites", icon: Heart },
 ];
+
+const sidebarToolItems = [
+    { id: "prices", label: "Material Prices", icon: DollarSign },
+    { id: "guide", label: "Recycling Guide", icon: BookOpen },
+];
+
+const primarySidebarButtonClass =
+    "w-full flex items-center justify-center gap-2.5 rounded-2xl border border-emerald-200/70 bg-emerald-100/80 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-sm hover:bg-emerald-100 hover:shadow transition-colors";
 
 const SHOP_IMAGE =
     "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?q=80&w=1000&auto=format&fit=crop";
@@ -70,6 +77,7 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
     const [historyLoading, setHistoryLoading] = useState(true);
     const [fabOpen, setFabOpen] = useState(false);
     const [openPickupWizard, setOpenPickupWizard] = useState(false);
+    const [focusPickupId, setFocusPickupId] = useState(null);
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
     const [showHelp, setShowHelp] = useState(false);
@@ -85,7 +93,6 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
 
     const openOverviewPanel = (panelId, shopId = null) => {
         setAccountView(null);
-        setActiveTab("overview");
         setOverviewPanel(panelId);
         setJunkshopFocusId(shopId || null);
         setFabOpen(false);
@@ -102,9 +109,9 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
         setAccountView(null);
         setShowProfileMenu(false);
         setOpenPickupWizard(false);
-        if (tabId !== "overview") {
-            setOverviewPanel(null);
-        }
+        setOverviewPanel(null);
+        setJunkshopFocusId(null);
+        setRouteToShopId(null);
     };
 
     const openPickupsTab = (withWizard = false) => {
@@ -119,6 +126,18 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
         }
     };
 
+    const handleNotificationNavigate = (pickupId) => {
+        setAccountView(null);
+        setShowProfileMenu(false);
+        setOverviewPanel(null);
+        setJunkshopFocusId(null);
+        setRouteToShopId(null);
+        setOpenPickupWizard(false);
+        setActiveTab("pickups");
+        setPickupsTabMounted(true);
+        setFocusPickupId(pickupId);
+    };
+
     const openAccountView = (view) => {
         setAccountView(view);
         setOverviewPanel(null);
@@ -130,6 +149,15 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3200);
     };
+
+    const refreshUser = useCallback(async () => {
+        try {
+            const { user: fresh } = await authApi.me();
+            onUserUpdate?.(fresh);
+        } catch {
+            /* ignore */
+        }
+    }, [onUserUpdate]);
 
     const handleDeactivateConfirm = () => {
         setShowDeactivateModal(false);
@@ -216,8 +244,7 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
     const showFab =
         activeTab === "overview" && !overviewPanel && !accountView;
 
-    const isOverviewPanelOpen =
-        !accountView && activeTab === "overview" && overviewPanel !== null;
+    const isSidePanelOpen = !accountView && overviewPanel !== null;
 
     return (
         <div className="min-h-screen bg-[#f9f9f8] text-[#191c1c] font-sans overflow-x-hidden">
@@ -233,6 +260,7 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
                     setShowProfileMenu(false);
                     setShowDeactivateModal(true);
                 }}
+                onNotificationNavigate={handleNotificationNavigate}
             />
 
             <HelpModal
@@ -246,20 +274,20 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
             <Sidebar
                 activeTab={activeTab}
                 setActiveTab={handleTabChange}
-                user={user}
-                onFindShop={() => openOverviewPanel("junkshops")}
+                overviewPanel={overviewPanel}
+                onOpenPanel={openOverviewPanel}
             />
 
             <main
-                className={`lg:pl-56 pt-16 min-h-screen ${
-                    isOverviewPanelOpen
+                className={`md:pl-56 pt-16 min-h-screen ${
+                    isSidePanelOpen
                         ? "flex flex-col h-screen overflow-hidden bg-white"
-                        : "pb-28 lg:pb-8"
+                        : "pb-28 md:pb-8"
                 }`}
             >
                 <div
                     className={
-                        isOverviewPanelOpen
+                        isSidePanelOpen
                             ? "flex flex-1 flex-col min-h-0 w-full"
                             : dashboardMainPaddingClass
                     }
@@ -300,28 +328,36 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
                         />
                     )}
 
-                    {!accountView && activeTab === "overview" && (
+                    {!accountView && overviewPanel && (
+                        <CustomerSidePanel
+                            panelId={overviewPanel}
+                            shops={shops}
+                            favoriteIds={favoriteIds}
+                            junkshopFocusId={junkshopFocusId}
+                            routeToShopId={routeToShopId}
+                            onRouteDrawn={() => setRouteToShopId(null)}
+                            onClose={closeOverviewPanel}
+                            onToggleFavorite={handleToggleFavorite}
+                            onLogTrip={handleLogTrip}
+                            onQuickAdd={handleQuickAdd}
+                            onScanPhoto={handleScanPhoto}
+                            onNotify={showNotification}
+                        />
+                    )}
+
+                    {!accountView && !overviewPanel && activeTab === "overview" && (
                         <OverviewTab
                             user={user}
                             shops={shops}
                             favoriteIds={favoriteIds}
                             historyRows={historyRows}
-                            activePanel={overviewPanel}
-                            junkshopFocusId={junkshopFocusId}
-                            routeToShopId={routeToShopId}
-                            onRouteDrawn={() => setRouteToShopId(null)}
                             onOpenPanel={openOverviewPanel}
-                            onClosePanel={closeOverviewPanel}
                             onGoToHistory={() => handleTabChange("history")}
-                            onLogTrip={handleLogTrip}
-                            onQuickAdd={handleQuickAdd}
-                            onScanPhoto={handleScanPhoto}
                             onOpenShopRoute={openShopRoute}
-                            onNotify={showNotification}
                             onToggleFavorite={handleToggleFavorite}
                         />
                     )}
-                    {!accountView && pickupsTabMounted && (
+                    {!accountView && !overviewPanel && pickupsTabMounted && (
                         <div
                             className={activeTab === "pickups" ? "" : "hidden"}
                             aria-hidden={activeTab !== "pickups"}
@@ -331,10 +367,13 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
                                 onNotify={showNotification}
                                 onGoProfile={() => openAccountView("profile")}
                                 openWizardOnMount={openPickupWizard}
+                                focusPickupId={focusPickupId}
+                                onFocusHandled={() => setFocusPickupId(null)}
+                                onUserUpdate={refreshUser}
                             />
                         </div>
                     )}
-                    {!accountView && activeTab === "history" && (
+                    {!accountView && !overviewPanel && activeTab === "history" && (
                         <HistoryTab
                             historyRows={historyRows}
                             loading={historyLoading}
@@ -345,7 +384,7 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
                             onRefresh={loadHistory}
                         />
                     )}
-                    {!accountView && activeTab === "favorites" && (
+                    {!accountView && !overviewPanel && activeTab === "favorites" && (
                         <FavoritesTab
                             shops={shops}
                             favoriteIds={favoriteIds}
@@ -384,13 +423,24 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
     );
 }
 
-function Sidebar({ activeTab, setActiveTab, user, onFindShop }) {
+function Sidebar({ activeTab, setActiveTab, overviewPanel, onOpenPanel }) {
     return (
-        <aside className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-56 border-r border-zinc-200 bg-zinc-50 hidden lg:flex flex-col z-30">
-            <nav className="flex flex-col gap-0.5 p-3 flex-1">
+        <aside className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-56 border-r border-zinc-200 bg-zinc-50 hidden md:flex flex-col z-30">
+            <div className="p-3 pb-2">
+                <button
+                    type="button"
+                    onClick={() => onOpenPanel("junkshops")}
+                    className={primarySidebarButtonClass}
+                >
+                    <MapPin size={20} />
+                    Find a Shop
+                </button>
+            </div>
+
+            <nav className="flex flex-col gap-0.5 px-3 flex-1 overflow-y-auto">
                 {navTabs.map((tab) => {
                     const Icon = tab.icon;
-                    const isActive = activeTab === tab.id;
+                    const isActive = activeTab === tab.id && !overviewPanel;
 
                     return (
                         <button
@@ -406,24 +456,39 @@ function Sidebar({ activeTab, setActiveTab, user, onFindShop }) {
                         </button>
                     );
                 })}
-            </nav>
 
-            <div className="p-3 border-t border-zinc-200/80">
-                <button
-                    type="button"
-                    onClick={onFindShop}
-                    className="w-full bg-[#154212] text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-900 transition-colors"
-                >
-                    Find a Shop
-                </button>
-            </div>
+                <div className="my-2 border-t border-zinc-200/80" />
+
+                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#72796e]">
+                    Resources
+                </p>
+                {sidebarToolItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = overviewPanel === item.id;
+
+                    return (
+                        <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => onOpenPanel(item.id)}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors text-left rounded-lg ${isActive
+                                ? "text-emerald-800 bg-emerald-100/80"
+                                : "text-zinc-600 hover:bg-zinc-100"
+                                }`}
+                        >
+                            <Icon size={20} />
+                            {item.label}
+                        </button>
+                    );
+                })}
+            </nav>
         </aside>
     );
 }
 
 function MobileNav({ activeTab, setActiveTab }) {
     return (
-        <nav className="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-2.5 bg-white border-t border-zinc-200 shadow-[0_-4px_12px_rgba(141,170,145,0.15)] z-50 rounded-t-2xl safe-area-pb">
+        <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-1 py-2.5 bg-white border-t border-zinc-200 shadow-[0_-4px_12px_rgba(141,170,145,0.15)] z-50 rounded-t-2xl safe-area-pb max-w-lg mx-auto sm:max-w-none sm:mx-0">
             {navTabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -432,13 +497,13 @@ function MobileNav({ activeTab, setActiveTab }) {
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex flex-col items-center justify-center min-w-[4.5rem] px-3 py-1.5 rounded-xl active:scale-95 transition-transform ${isActive
+                        className={`flex flex-1 flex-col items-center justify-center min-w-0 px-1 py-1.5 rounded-xl active:scale-95 transition-transform ${isActive
                             ? "bg-emerald-100 text-emerald-800"
                             : "text-zinc-500 hover:text-emerald-600"
                             }`}
                     >
                         <Icon size={20} />
-                        <span className="text-[10px] font-medium mt-0.5">{tab.label}</span>
+                        <span className="text-[10px] font-medium mt-0.5 truncate max-w-full px-0.5">{tab.label}</span>
                     </button>
                 );
             })}
@@ -488,23 +553,69 @@ const FAB_PANEL_CONFIG = {
     },
 };
 
+function CustomerSidePanel({
+    panelId,
+    shops,
+    favoriteIds,
+    junkshopFocusId,
+    routeToShopId,
+    onRouteDrawn,
+    onClose,
+    onToggleFavorite,
+    onLogTrip,
+    onQuickAdd,
+    onScanPhoto,
+    onNotify,
+}) {
+    const fabPanel = FAB_PANEL_CONFIG[panelId];
+    if (fabPanel) {
+        return (
+            <DashboardPanelShell title={fabPanel.title} onClose={onClose}>
+                {fabPanel.render({
+                    shops,
+                    favoriteIds,
+                    onToggleFavorite,
+                    onLogTrip,
+                    onQuickAdd,
+                    onScanPhoto,
+                    onNotify,
+                    onClosePanel: onClose,
+                })}
+            </DashboardPanelShell>
+        );
+    }
+
+    if (OVERVIEW_PANELS[panelId]) {
+        const { title, Component } = OVERVIEW_PANELS[panelId];
+
+        return (
+            <DashboardPanelShell title={title} onClose={onClose}>
+                <Component
+                    favoriteIds={favoriteIds}
+                    onToggleFavorite={onToggleFavorite}
+                    {...(panelId === "junkshops"
+                        ? {
+                            initialShopId: junkshopFocusId,
+                            autoRouteShopId: routeToShopId,
+                            onRouteDrawn,
+                        }
+                        : {})}
+                />
+            </DashboardPanelShell>
+        );
+    }
+
+    return null;
+}
+
 function OverviewTab({
     user,
     shops,
     favoriteIds,
     historyRows,
-    activePanel,
-    junkshopFocusId,
-    routeToShopId,
-    onRouteDrawn,
     onOpenPanel,
-    onClosePanel,
     onGoToHistory,
-    onLogTrip,
-    onQuickAdd,
-    onScanPhoto,
     onOpenShopRoute,
-    onNotify,
     onToggleFavorite,
 }) {
     const handleViewAllShops = () => onOpenPanel("junkshops");
@@ -554,46 +665,19 @@ function OverviewTab({
         [historyRows]
     );
 
-    const fabPanel = activePanel && FAB_PANEL_CONFIG[activePanel];
-    if (fabPanel) {
-        return (
-            <DashboardPanelShell title={fabPanel.title} onClose={onClosePanel}>
-                {fabPanel.render({
-                    shops,
-                    favoriteIds,
-                    onToggleFavorite,
-                    onLogTrip,
-                    onQuickAdd,
-                    onScanPhoto,
-                    onNotify,
-                    onClosePanel,
-                })}
-            </DashboardPanelShell>
-        );
-    }
-
-    if (activePanel && OVERVIEW_PANELS[activePanel]) {
-        const { title, Component } = OVERVIEW_PANELS[activePanel];
-
-        return (
-            <DashboardPanelShell title={title} onClose={onClosePanel}>
-                <Component
-                    favoriteIds={favoriteIds}
-                    onToggleFavorite={onToggleFavorite}
-                    {...(activePanel === "junkshops"
-                        ? {
-                            initialShopId: junkshopFocusId,
-                            autoRouteShopId: routeToShopId,
-                            onRouteDrawn,
-                        }
-                        : {})}
-                />
-            </DashboardPanelShell>
-        );
-    }
-
     return (
         <div className="space-y-5 sm:space-y-7 md:space-y-8">
+            <section className="md:hidden">
+                <button
+                    type="button"
+                    onClick={() => onOpenPanel("junkshops")}
+                    className={primarySidebarButtonClass}
+                >
+                    <MapPin size={20} />
+                    Find a Shop
+                </button>
+            </section>
+
             <section>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-[#191c1c]">
                     Welcome back, {welcomeName}!
@@ -604,42 +688,6 @@ function OverviewTab({
             </section>
 
             <OverviewQuickAccess onOpenPanel={onOpenPanel} />
-
-            {/* Primary Action Cards */}
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-                <ActionCard
-                    title="Find Nearby Junkshops"
-                    subtitle="Locate recycling centers near you"
-                    icon={Map}
-                    bg="bg-[#2d5a27]"
-                    text="text-white"
-                    iconBg="bg-[#154212]/30"
-                    largeIcon={MapPin}
-                    onClick={() => onOpenPanel("junkshops")}
-                />
-
-                <ActionCard
-                    title="View Material Prices"
-                    subtitle="Check current market rates"
-                    icon={DollarSign}
-                    bg="bg-[#c9e7cc]"
-                    text="text-[#062010]"
-                    iconBg="bg-[#4a654f]/20"
-                    largeIcon={TrendingUp}
-                    onClick={() => onOpenPanel("prices")}
-                />
-
-                <ActionCard
-                    title="Open Recycling Guide"
-                    subtitle="Learn how to sort materials"
-                    icon={BookOpen}
-                    bg="bg-[#e1e3e2]"
-                    text="text-[#191c1c]"
-                    iconBg="bg-[#2e3d34]/10"
-                    largeIcon={Leaf}
-                    onClick={() => onOpenPanel("guide")}
-                />
-            </section>
 
             {/* Stats */}
             <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -772,17 +820,16 @@ function OverviewTab({
 
 function OverviewQuickAccess({ onOpenPanel }) {
     const items = [
-        { id: "junkshops", label: "Shops", icon: Map },
         { id: "prices", label: "Prices", icon: DollarSign },
         { id: "guide", label: "Guide", icon: BookOpen },
     ];
 
     return (
-        <section className="lg:hidden" aria-label="Quick access">
+        <section className="md:hidden" aria-label="Quick access">
             <p className="text-xs font-bold uppercase tracking-wider text-[#72796e] mb-3">
                 Quick access
             </p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
                 {items.map(({ id, label, icon: Icon }) => (
                     <button
                         key={id}
@@ -798,47 +845,6 @@ function OverviewQuickAccess({ onOpenPanel }) {
                 ))}
             </div>
         </section>
-    );
-}
-
-function ActionCard({
-    title,
-    subtitle,
-    icon,
-    bg,
-    text,
-    iconBg,
-    largeIcon,
-    onClick,
-}) {
-    const Icon = icon;
-    const LargeIcon = largeIcon;
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`group relative overflow-hidden ${bg} ${text} p-5 sm:p-6 rounded-2xl flex flex-col justify-between min-h-[10.5rem] sm:min-h-[11.5rem] cursor-pointer shadow-[0_4px_12px_rgba(141,170,145,0.15)] hover:shadow-md transition-shadow text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700`}
-        >
-            <div className="flex justify-between items-start">
-                <div className={`${iconBg} p-2.5 rounded-lg`}>
-                    <Icon size={28} />
-                </div>
-            </div>
-
-            <div>
-                <h3 className="text-xl sm:text-2xl font-bold leading-tight">
-                    {title}
-                </h3>
-                <p className="text-sm opacity-80 mt-1">
-                    {subtitle}
-                </p>
-            </div>
-
-            <div className="absolute -right-5 -bottom-5 opacity-10 group-hover:scale-110 transition-transform">
-                <LargeIcon size={120} />
-            </div>
-        </button>
     );
 }
 
@@ -925,9 +931,7 @@ function NearbyShopCard({
 
                 <ShopRating shop={shop} className="mb-1" />
                 {shop.latestReview && (
-                    <p className="text-xs text-[#72796e] line-clamp-2">
-                        "{shop.latestReview.comment || "No written comment."}" - {shop.latestReview.customerName}
-                    </p>
+                    <ReviewSnippet review={shop.latestReview} maxLength={80} />
                 )}
 
                 <div className="flex flex-wrap gap-1.5 mb-4">
@@ -1065,7 +1069,7 @@ function HistoryTab({
     );
 
     return (
-        <div className="space-y-8 pb-24 lg:pb-8">
+        <div className="space-y-8 pb-24 md:pb-8">
             <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-[#191c1c]">
                     Recycling History
@@ -1077,7 +1081,7 @@ function HistoryTab({
 
             <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
                 <div className="flex flex-col sm:flex-row flex-wrap gap-3 flex-1">
-                    <div className="flex items-center bg-white border border-zinc-200 px-3 py-2 rounded-lg flex-1 min-w-[200px] max-w-md">
+                    <div className="flex items-center bg-white border border-zinc-200 px-3 py-2 rounded-lg w-full sm:flex-1 sm:min-w-0 sm:max-w-md">
                         <Search size={18} className="text-[#72796e] mr-2 shrink-0" />
                         <input
                             type="search"
@@ -1101,7 +1105,7 @@ function HistoryTab({
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="flex items-center gap-2 px-4 py-2 border border-zinc-200 rounded-lg text-sm bg-white min-w-[140px]"
+                        className="w-full sm:w-auto flex items-center gap-2 px-4 py-2 border border-zinc-200 rounded-lg text-sm bg-white sm:min-w-[140px]"
                         aria-label="Filter by status"
                     >
                         <option value="all">All statuses</option>
@@ -1164,7 +1168,7 @@ function HistoryTab({
                 </div>
             )}
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-white px-3 py-2.5 rounded-xl border shadow-sm">
                     <p className="text-[11px] text-[#72796e] leading-tight">Trips</p>
                     <p className="text-[10px] text-[#72796e]/80 leading-tight mb-0.5">matching filters</p>
@@ -1340,7 +1344,7 @@ function FavoritesTab({
     );
 
     return (
-        <div className="space-y-8 pb-24 lg:pb-8">
+        <div className="space-y-8 pb-24 md:pb-8">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#191c1c]">
@@ -1435,9 +1439,7 @@ function FavoriteShopCard({ shop, onRemove, onViewDetails, onRoute }) {
                         {shop.distance} · {shop.address}
                     </div>
                     {shop.latestReview && (
-                        <p className="text-xs text-[#72796e] line-clamp-2">
-                            "{shop.latestReview.comment || "No written comment."}" - {shop.latestReview.customerName}
-                        </p>
+                        <ReviewSnippet review={shop.latestReview} maxLength={80} />
                     )}
 
                     <div className="flex flex-wrap gap-1">

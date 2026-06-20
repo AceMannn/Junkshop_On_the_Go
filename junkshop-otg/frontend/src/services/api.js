@@ -1,18 +1,43 @@
-import { getToken } from '../utils/authStorage';
+import { getToken, clearSession } from '../utils/authStorage';
+import {
+  getAccountStatusUserMessage,
+  isAccountStatusMessage,
+  notifyAccountSuspended,
+  notifySessionExpired,
+} from '../utils/authEvents';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
+const AUTH_LOCAL_ERROR_PATHS = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+  '/api/auth/password',
+];
+
+function isAuthLocalErrorPath(path) {
+  return AUTH_LOCAL_ERROR_PATHS.some((prefix) => path.startsWith(prefix));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export class ApiError extends Error {
-  constructor(message, { status, isNetworkError = false } = {}) {
+  constructor(message, { status, isNetworkError = false, sessionExpired = false, accountSuspended = false } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.isNetworkError = isNetworkError;
+    this.sessionExpired = sessionExpired;
+    this.accountSuspended = accountSuspended;
   }
 }
 
-async function request(path, options = {}) {
+async function request(path, options = {}, attempt = 0) {
   const token = getToken();
+  const method = (options.method || 'GET').toUpperCase();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -29,6 +54,11 @@ async function request(path, options = {}) {
       headers,
     });
   } catch {
+    if (method === 'GET' && attempt === 0) {
+      await sleep(800);
+      return request(path, options, 1);
+    }
+
     throw new ApiError(
       `Cannot reach the API at ${API_BASE_URL}. Make sure the backend is running (npm run dev in junkshop-otg).`,
       { isNetworkError: true }
@@ -38,9 +68,22 @@ async function request(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new ApiError(data.message || 'Something went wrong. Please try again.', {
-      status: response.status,
-    });
+    const message = data.message || 'Something went wrong. Please try again.';
+
+    if (response.status === 401 && token && !isAuthLocalErrorPath(path)) {
+      clearSession();
+      notifySessionExpired(message || 'Session expired. Please log in again.');
+      throw new ApiError(message, { status: 401, sessionExpired: true });
+    }
+
+    if (response.status === 403 && token && isAccountStatusMessage(message)) {
+      clearSession();
+      const userMessage = getAccountStatusUserMessage();
+      notifyAccountSuspended(userMessage);
+      throw new ApiError(userMessage, { status: 403, accountSuspended: true });
+    }
+
+    throw new ApiError(message, { status: response.status });
   }
 
   return data;
@@ -99,6 +142,7 @@ export const authApi = {
     });
   },
 };
+
 
 export const contactApi = {
   sendMessage(payload) {
@@ -223,10 +267,10 @@ export const pickupApi = {
       body: JSON.stringify(payload),
     });
   },
-  updateStatus(id, status) {
+  updateStatus(id, status, extra = {}) {
     return request(`/api/pickup-requests/${id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...extra }),
     });
   },
   updateLocation(id, lat, lng) {
@@ -237,6 +281,24 @@ export const pickupApi = {
   },
   markServiceFeePaid(id) {
     return request(`/api/pickup-requests/${id}/service-fee-paid`, { method: 'PATCH' });
+  },
+  submitPaymentProof(id, payload) {
+    return request(`/api/pickup-requests/${id}/payment-proof`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  confirmReadyForPickup(id) {
+    return request(`/api/pickup-requests/${id}/confirm-ready`, { method: 'POST' });
+  },
+  confirmPayment(id) {
+    return request(`/api/pickup-requests/${id}/payment-confirm`, { method: 'PATCH' });
+  },
+  rejectPayment(id, payload = {}) {
+    return request(`/api/pickup-requests/${id}/payment-reject`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
   },
   rate(id, payload) {
     return request(`/api/pickup-requests/${id}/rating`, {
@@ -275,6 +337,9 @@ export const notificationApi = {
   },
   markRead(id) {
     return request(`/api/notifications/${id}/read`, { method: 'PATCH' });
+  },
+  clearAll() {
+    return request('/api/notifications', { method: 'DELETE' });
   },
 };
 

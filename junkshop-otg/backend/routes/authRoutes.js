@@ -13,17 +13,14 @@ const {
   resetPassword,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
+const { authLimiter } = require('../middlewares/rateLimiters');
 
 const router = express.Router();
 
-// Register account
-router.post('/register', registerUser);
-
-// Login account
-router.post('/login', loginUser);
-
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
+router.post('/register', authLimiter, registerUser);
+router.post('/login', authLimiter, loginUser);
+router.post('/forgot-password', authLimiter, forgotPassword);
+router.post('/reset-password', authLimiter, resetPassword);
 
 // Current authenticated account
 router.get('/me', protect, getCurrentUser);

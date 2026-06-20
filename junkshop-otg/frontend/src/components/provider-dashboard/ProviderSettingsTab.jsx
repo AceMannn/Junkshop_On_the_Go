@@ -4,6 +4,8 @@ import { authApiExtended, domainApi, authApi } from "../../services/api";
 import { useProviderJunkshop } from "../../hooks/useProviderData";
 import NumberInput from "../ui/NumberInput";
 import LocationPickerMap from "../maps/LocationPickerMap";
+import ShopRating from "../ui/ShopRating";
+import PartnerReviews from "../ui/PartnerReviews";
 
 const PH_GCASH_PATTERN = /^09\d{9}$/;
 
@@ -194,8 +196,8 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
     const validatePickupForm = () => {
         const errors = {};
 
-        if (pickupProfile.pickupServiceFee < 0) {
-            errors.pickupServiceFee = "Service fee cannot be negative.";
+        if (pickupProfile.pickupServiceFee <= 0) {
+            errors.pickupServiceFee = "Home pickups need a service fee greater than ₱0.";
         }
 
         const number = pickupProfile.gcashNumber.trim();
@@ -273,7 +275,7 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
     };
 
     return (
-        <div className="space-y-6 sm:space-y-8 pb-24 lg:pb-8">
+        <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
             <div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#191c1c]">
                     Settings
@@ -286,13 +288,13 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
             <section className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 sm:p-6">
                 <h2 className="text-lg font-bold text-[#154212] mb-1">Pickup &amp; GCash</h2>
                 <p className="text-sm text-[#72796e] mb-4">
-                    Shown to customers after you accept a pickup.
+                    Shown to customers after you accept a home pickup. Drop-offs do not use this fee.
                 </p>
                 <form onSubmit={handleSavePickup} className="space-y-4 max-w-lg">
                     <Field
                         label="Service fee (₱)"
                         type="number"
-                        min={0}
+                        min={1}
                         value={String(pickupProfile.pickupServiceFee)}
                         onChange={handleServiceFeeChange}
                         error={pickupErrors.pickupServiceFee}
@@ -384,6 +386,27 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                         {savingShop ? "Saving..." : "Save shop profile"}
                     </button>
                 </form>
+            </section>
+
+            <section className="rounded-xl border border-zinc-200 bg-white p-5 sm:p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-[#191c1c] mb-1">Customer reviews</h2>
+                <p className="text-sm text-[#72796e] mb-4">
+                    Ratings from completed pickups. Same scores customers see on the public shop listing.
+                </p>
+                {!shop ? (
+                    <p className="text-sm text-[#72796e]">
+                        Save your shop profile first to collect customer reviews.
+                    </p>
+                ) : shop.reviewCount > 0 || shop.rating > 0 ? (
+                    <div>
+                        <ShopRating shop={shop} className="mb-2" />
+                        <PartnerReviews shop={shop} />
+                    </div>
+                ) : (
+                    <p className="text-sm text-[#72796e]">
+                        No customer reviews yet. Ratings appear here after completed pickups are rated.
+                    </p>
+                )}
             </section>
         </div>
     );

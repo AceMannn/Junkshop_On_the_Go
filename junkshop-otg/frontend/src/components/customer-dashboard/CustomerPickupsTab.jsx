@@ -8,7 +8,6 @@ import {
     ChevronRight,
     ChevronLeft,
     CheckCircle,
-    Navigation,
     CreditCard,
 } from "lucide-react";
 import { pickupApi } from "../../services/api";
@@ -24,9 +23,19 @@ import {
     getShopName,
     materialsSummary,
     canCustomerCancel,
-    mapsLink,
 } from "../../utils/pickupHelpers";
 import { getUserFullName } from "../../utils/userDisplay";
+import { formatReviewDate } from "../../utils/reviewFormat";
+import PickupTrackingMap, { formatLastUpdated } from "../maps/PickupTrackingMap";
+import PaymentProofUpload from "../ui/PaymentProofUpload";
+import PickupDetailDrawerShell from "../ui/PickupDetailDrawerShell";
+import {
+    estimateDropOffPoints,
+    formatPoints,
+    getPaymentAttemptsLeft,
+    getPaymentCooldownMinutes,
+    POINTS_PER_KG,
+} from "../../utils/pickupPoints";
 
 const STEPS = ["Type", "Shop", "Materials", "Schedule", "Contact", "Review"];
 
@@ -35,6 +44,9 @@ export default function CustomerPickupsTab({
     onNotify,
     onGoProfile,
     openWizardOnMount = false,
+    focusPickupId = null,
+    onFocusHandled,
+    onUserUpdate,
 }) {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -67,6 +79,12 @@ export default function CustomerPickupsTab({
         }
     }, [openWizardOnMount, user?.profileComplete]);
 
+    useEffect(() => {
+        if (!focusPickupId) return;
+        setSelectedId(focusPickupId);
+        onFocusHandled?.();
+    }, [focusPickupId, onFocusHandled]);
+
     const startWizard = () => {
         if (!user?.profileComplete) {
             onNotify?.("Add your mobile number in Profile Settings before booking a pickup.");
@@ -92,7 +110,7 @@ export default function CustomerPickupsTab({
     }, [requests, filter]);
 
     return (
-        <div className="space-y-6 sm:space-y-8 pb-24 lg:pb-8">
+        <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-[#191c1c]">My Pickups</h1>
@@ -184,6 +202,7 @@ export default function CustomerPickupsTab({
                     onClose={() => setSelectedId(null)}
                     onRefresh={load}
                     onNotify={onNotify}
+                    onUserUpdate={onUserUpdate}
                 />
             )}
         </div>
@@ -201,7 +220,6 @@ function PickupWizard({ user, shops, onClose, onSuccess }) {
     const [junkshopId, setJunkshopId] = useState("");
     const [selectedMaterials, setSelectedMaterials] = useState([]);
     const [estimatedWeightKg, setEstimatedWeightKg] = useState("");
-    const [scheduledDate, setScheduledDate] = useState("");
     const [timeSlot, setTimeSlot] = useState("morning");
     const [contactName, setContactName] = useState(getUserFullName(user));
     const [contactPhone, setContactPhone] = useState(user?.phone || "");
@@ -259,8 +277,8 @@ function PickupWizard({ user, shops, onClose, onSuccess }) {
             return true;
         }
         if (step === 3) {
-            if (!scheduledDate || !estimatedWeightKg || Number(estimatedWeightKg) < 0.1) {
-                setError("Scheduled date and estimated weight (kg) are required.");
+            if (!estimatedWeightKg || Number(estimatedWeightKg) < 0.1) {
+                setError("Estimated weight (kg) is required.");
                 return false;
             }
             return true;
@@ -293,7 +311,7 @@ function PickupWizard({ user, shops, onClose, onSuccess }) {
                 contactEmail: contactEmail.trim(),
                 materials: selectedMaterials,
                 estimatedWeightKg: Number(estimatedWeightKg),
-                scheduledDate,
+                scheduledDate: new Date().toISOString().slice(0, 10),
                 timeSlot,
                 address: address.trim(),
                 notes: notes.trim(),
@@ -306,7 +324,8 @@ function PickupWizard({ user, shops, onClose, onSuccess }) {
         }
     };
 
-    const minDate = new Date().toISOString().slice(0, 10);
+    const selectedTimeLabel =
+        TIME_SLOTS.find((s) => s.id === timeSlot)?.label || timeSlot;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
@@ -423,13 +442,6 @@ function PickupWizard({ user, shops, onClose, onSuccess }) {
 
                     {step === 3 && (
                         <>
-                            <input
-                                type="date"
-                                min={minDate}
-                                value={scheduledDate}
-                                onChange={(e) => setScheduledDate(e.target.value)}
-                                className="w-full border rounded-xl px-4 py-3 text-sm"
-                            />
                             <select
                                 value={timeSlot}
                                 onChange={(e) => setTimeSlot(e.target.value)}
@@ -495,7 +507,7 @@ function PickupWizard({ user, shops, onClose, onSuccess }) {
                             <p><strong>Shop:</strong> {assignmentMode === "nearest" ? "Nearest available" : openShops.find((s) => s.id === junkshopId)?.name}</p>
                             <p><strong>Materials:</strong> {materialsSummary(selectedMaterials)}</p>
                             <p><strong>Weight:</strong> {estimatedWeightKg} kg</p>
-                            <p><strong>When:</strong> {scheduledDate} ({timeSlot})</p>
+                            <p><strong>When:</strong> Today · {selectedTimeLabel}</p>
                             <p><strong>Address:</strong> {address}</p>
                             <p className="text-xs text-[#72796e] pt-2">
                                 Service fee is paid via GCash after a shop accepts — not for your recyclables.
@@ -544,10 +556,14 @@ function PickupWizard({ user, shops, onClose, onSuccess }) {
     );
 }
 
-function PickupDetailModal({ request, onClose, onRefresh, onNotify }) {
+function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate }) {
     const [rating, setRating] = useState(request.rating?.score || 0);
     const [comment, setComment] = useState("");
     const [live, setLive] = useState(request);
+    const [paymentReference, setPaymentReference] = useState("");
+    const [paymentProofPreview, setPaymentProofPreview] = useState("");
+    const [submittingPayment, setSubmittingPayment] = useState(false);
+    const [cooldownTick, setCooldownTick] = useState(0);
 
     useEffect(() => {
         setLive(request);
@@ -557,14 +573,23 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify }) {
         try {
             const { request: r } = await pickupApi.get(request.id);
             setLive(r);
+            if (r.status === "completed" && r.pointsAwarded > 0) {
+                onUserUpdate?.();
+            }
         } catch {
             /* ignore silent poll errors */
         }
-    }, [request.id]);
+    }, [request.id, onUserUpdate]);
 
     useEffect(() => {
         refreshDetail();
     }, [refreshDetail, request]);
+
+    useEffect(() => {
+        if (!live.paymentCooldownUntil) return undefined;
+        const interval = setInterval(() => setCooldownTick((t) => t + 1), 30000);
+        return () => clearInterval(interval);
+    }, [live.paymentCooldownUntil]);
 
     const detailStatus = live.status || request.status;
     const detailPollMs =
@@ -572,8 +597,26 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify }) {
 
     useAutoRefresh(refreshDetail, { intervalMs: detailPollMs });
 
+    const isHomePickup = live.requestType !== "drop_off";
+    const isDropOff = !isHomePickup;
+    const serviceFee = Number(live.serviceFee || 0);
+    const isZeroFee = serviceFee <= 0;
+    const paymentStatus = live.serviceFeePaymentStatus || "none";
+    const cooldownMinutes = getPaymentCooldownMinutes(live.paymentCooldownUntil);
+    const attemptsLeft = getPaymentAttemptsLeft(live.paymentSubmitCount);
+    void cooldownTick;
+
+    const showTrackingMap =
+        isHomePickup && ["accepted", "in_transit"].includes(live.status);
+    const showDropOffMap = isDropOff && live.status === "accepted";
+    const showLiveRoute = live.status === "in_transit" && live.providerLocation?.lat != null;
+
     const loc = live.providerLocation;
-    const mapUrl = loc?.lat != null ? mapsLink(loc.lat, loc.lng) : null;
+    const canSubmitPayment =
+        paymentStatus !== "submitted" &&
+        paymentStatus !== "confirmed" &&
+        cooldownMinutes === 0 &&
+        attemptsLeft > 0;
 
     const handleCancel = async () => {
         try {
@@ -586,13 +629,32 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify }) {
         }
     };
 
-    const handlePaid = async () => {
+    const handleSubmitPaymentProof = async () => {
+        setSubmittingPayment(true);
         try {
-            await pickupApi.markServiceFeePaid(request.id);
-            onNotify?.("Marked as paid. Thank you!");
+            if (isZeroFee) {
+                await pickupApi.confirmReadyForPickup(request.id);
+                onNotify?.("Ready confirmation sent to the shop.");
+            } else {
+                const ref = paymentReference.trim();
+                if (ref.length < 4) {
+                    onNotify?.("Enter a valid GCash reference number.");
+                    return;
+                }
+                await pickupApi.submitPaymentProof(request.id, {
+                    paymentReference: ref,
+                    paymentProofUrl: paymentProofPreview || "",
+                });
+                onNotify?.("Payment proof submitted. Waiting for shop confirmation.");
+            }
+            setPaymentReference("");
+            setPaymentProofPreview("");
+            await refreshDetail();
             onRefresh();
         } catch (err) {
             onNotify?.(err.message);
+        } finally {
+            setSubmittingPayment(false);
         }
     };
 
@@ -609,16 +671,18 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify }) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
-            <div className="bg-white w-full max-w-md h-full overflow-y-auto shadow-xl">
-                <div className="sticky top-0 bg-white border-b px-5 py-4 flex justify-between items-center">
-                    <h2 className="font-bold">Pickup details</h2>
-                    <button type="button" onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-full">
-                        <X size={20} />
-                    </button>
-                </div>
+        <PickupDetailDrawerShell onClose={onClose}>
+            <div className="md:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+                <div className="h-1 w-10 rounded-full bg-zinc-300" aria-hidden="true" />
+            </div>
+            <div className="shrink-0 border-b bg-white px-5 py-4 flex justify-between items-center">
+                <h2 className="font-bold">Pickup details</h2>
+                <button type="button" onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-full">
+                    <X size={20} />
+                </button>
+            </div>
 
-                <div className="p-5 space-y-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-5">
                     <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[live.status]}`}>
                         {STATUS_LABELS[live.status]}
                     </span>
@@ -633,52 +697,216 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify }) {
                         </p>
                     </div>
 
+                    {showTrackingMap && (
+                        <div className="rounded-xl border border-zinc-200 bg-white p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-semibold text-[#191c1c]">
+                                    {live.status === "in_transit" ? "Live pickup tracking" : "Pickup location"}
+                                </p>
+                                {live.status === "in_transit" && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                        On the way
+                                    </span>
+                                )}
+                            </div>
+                            {live.status === "accepted" && (
+                                <p className="text-xs text-[#72796e]">
+                                    Your provider will share live location when they mark the pickup as in transit.
+                                </p>
+                            )}
+                            {live.status === "in_transit" && !loc?.lat && (
+                                <p className="text-xs text-[#72796e]">
+                                    Waiting for provider location…
+                                </p>
+                            )}
+                            {loc?.updatedAt && (
+                                <p className="text-xs text-[#72796e]">
+                                    {formatLastUpdated(loc.updatedAt)}
+                                </p>
+                            )}
+                            <PickupTrackingMap
+                                address={live.address}
+                                destination={live.pickupLocation}
+                                provider={live.providerLocation}
+                                showRoute={showLiveRoute}
+                                minHeight="240px"
+                            />
+                        </div>
+                    )}
+
                     {live.status === "rejected" && (
                         <p className="text-sm bg-red-50 text-red-800 rounded-xl p-3 border border-red-100">
                             {live.rejectMessage || live.rejectReason}
                         </p>
                     )}
 
-                    {live.status === "accepted" && (
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
-                            <p className="text-sm font-semibold text-emerald-900 flex items-center gap-2">
-                                <CreditCard size={18} />
-                                Service fee: ₱{live.serviceFee || 0}
+                    {showDropOffMap && (
+                        <div className="rounded-xl border border-zinc-200 bg-white p-3 space-y-2">
+                            <p className="text-sm font-semibold text-[#191c1c]">Drop-off location</p>
+                            <p className="text-xs text-[#72796e]">
+                                Visit the shop during your scheduled time with your recyclables.
                             </p>
-                            {live.gcashNumber && (
-                                <p className="text-sm">
-                                    GCash: <strong>{live.gcashNumber}</strong>
-                                </p>
-                            )}
-                            {live.gcashQrUrl && (
-                                <img src={live.gcashQrUrl} alt="GCash QR" className="max-w-[200px] rounded-lg border" />
-                            )}
-                            {!live.serviceFeePaid ? (
-                                <button
-                                    type="button"
-                                    onClick={handlePaid}
-                                    className="w-full py-2.5 bg-[#154212] text-white rounded-xl text-sm font-semibold"
-                                >
-                                    I&apos;ve sent the service fee
-                                </button>
-                            ) : (
-                                <p className="text-xs text-emerald-700 flex items-center gap-1">
-                                    <CheckCircle size={14} /> Service fee marked paid
+                            <PickupTrackingMap
+                                address={live.address}
+                                destination={live.pickupLocation}
+                                minHeight="220px"
+                            />
+                        </div>
+                    )}
+
+                    {isDropOff && live.status === "accepted" && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                            <p className="text-sm font-semibold text-amber-900">Estimated reward</p>
+                            <p className="text-2xl font-bold text-[#154212]">
+                                ~{formatPoints(estimateDropOffPoints(live.estimatedWeightKg))} pts
+                            </p>
+                            <p className="text-xs text-[#72796e]">
+                                {live.estimatedWeightKg} kg × {POINTS_PER_KG} pts/kg — final points when the shop weighs your items.
+                            </p>
+                        </div>
+                    )}
+
+                    {isDropOff && live.status === "completed" && live.pointsAwarded > 0 && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-1">
+                            <p className="text-sm font-semibold text-emerald-900">Points earned</p>
+                            <p className="text-2xl font-bold text-[#154212]">
+                                +{formatPoints(live.pointsAwarded)} pts
+                            </p>
+                            {live.actualWeightKg != null && (
+                                <p className="text-xs text-[#72796e]">
+                                    Based on {live.actualWeightKg} kg weighed at the shop.
                                 </p>
                             )}
                         </div>
                     )}
 
-                    {live.status === "in_transit" && mapUrl && (
-                        <a
-                            href={mapUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:underline"
-                        >
-                            <Navigation size={16} />
-                            Track pickup on map (OpenStreetMap)
-                        </a>
+                    {live.status === "accepted" && isHomePickup && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+                            <p className="text-sm font-semibold text-emerald-900 flex items-center gap-2">
+                                <CreditCard size={18} />
+                                {isZeroFee
+                                    ? "No service fee — confirm you're ready"
+                                    : `Service fee: ₱${serviceFee}`}
+                            </p>
+
+                            {!isZeroFee && live.gcashNumber && (
+                                <p className="text-sm">
+                                    GCash: <strong>{live.gcashNumber}</strong>
+                                </p>
+                            )}
+                            {!isZeroFee && live.gcashQrUrl && (
+                                <img src={live.gcashQrUrl} alt="GCash QR" className="max-w-[200px] rounded-lg border" />
+                            )}
+
+                            {paymentStatus === "confirmed" && (
+                                <p className="text-xs text-emerald-700 flex items-center gap-1">
+                                    <CheckCircle size={14} />
+                                    {isZeroFee ? "Shop confirmed — pickup will proceed" : "Payment confirmed — pickup will proceed"}
+                                </p>
+                            )}
+
+                            {paymentStatus === "submitted" && (
+                                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                    Waiting for the shop to confirm{isZeroFee ? " you're ready" : " your payment"}…
+                                </p>
+                            )}
+
+                            {paymentStatus === "rejected" && (
+                                <div className="text-xs text-red-800 bg-red-50 border border-red-100 rounded-lg px-3 py-2 space-y-1">
+                                    <p className="font-semibold">Not verified — please try again</p>
+                                    {live.paymentRejectNote && <p>{live.paymentRejectNote}</p>}
+                                </div>
+                            )}
+
+                            {canSubmitPayment && (
+                                <>
+                                    {!isZeroFee && (
+                                        <>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-semibold text-[#42493e]">
+                                                    GCash reference number *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={paymentReference}
+                                                    onChange={(e) => setPaymentReference(e.target.value)}
+                                                    placeholder="e.g. 123456789012"
+                                                    className="w-full border border-[#c2c9bb] rounded-xl px-3 py-2.5 text-sm"
+                                                />
+                                            </div>
+                                            <PaymentProofUpload
+                                                preview={paymentProofPreview}
+                                                onPreviewChange={setPaymentProofPreview}
+                                                onClear={() => setPaymentProofPreview("")}
+                                            />
+                                        </>
+                                    )}
+                                    {attemptsLeft < 5 && (
+                                        <p className="text-xs text-[#72796e]">
+                                            Attempts remaining: {attemptsLeft}
+                                        </p>
+                                    )}
+                                    <button
+                                        type="button"
+                                        disabled={submittingPayment}
+                                        onClick={handleSubmitPaymentProof}
+                                        className="w-full py-2.5 bg-[#154212] text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                                    >
+                                        {submittingPayment
+                                            ? "Submitting…"
+                                            : isZeroFee
+                                              ? "Confirm I'm ready for pickup"
+                                              : "Submit payment proof"}
+                                    </button>
+                                </>
+                            )}
+
+                            {cooldownMinutes > 0 && (
+                                <p className="text-xs text-red-700">
+                                    Too many attempts. Try again in {cooldownMinutes} minute(s).
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {live.status === "accepted" && isDropOff && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
+                            <p className="font-semibold">Drop-off accepted</p>
+                            <p className="text-xs mt-1 text-blue-800">
+                                Bring your items to the shop address above during your scheduled slot. No service fee required.
+                            </p>
+                        </div>
+                    )}
+
+                    {live.status === "completed" && live.rating?.score && (
+                        <div className="border rounded-xl p-4 space-y-2 bg-amber-50/50 border-amber-100">
+                            <p className="font-semibold text-sm">Your rating</p>
+                            <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map((n) => (
+                                    <Star
+                                        key={n}
+                                        size={22}
+                                        className={
+                                            n <= live.rating.score
+                                                ? "text-amber-400 fill-amber-400"
+                                                : "text-zinc-300"
+                                        }
+                                    />
+                                ))}
+                            </div>
+                            {live.rating.comment ? (
+                                <p className="text-sm text-[#42493e]">{live.rating.comment}</p>
+                            ) : null}
+                            {live.rating.createdAt ? (
+                                <p className="text-xs text-[#72796e]">
+                                    Rated on {formatReviewDate(live.rating.createdAt)}
+                                </p>
+                            ) : null}
+                            <p className="text-xs text-[#72796e]">
+                                Ratings cannot be changed after submission.
+                            </p>
+                        </div>
                     )}
 
                     {live.status === "completed" && !live.rating?.score && (
@@ -720,8 +948,7 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify }) {
                             Cancel request
                         </button>
                     )}
-                </div>
             </div>
-        </div>
+        </PickupDetailDrawerShell>
     );
 }

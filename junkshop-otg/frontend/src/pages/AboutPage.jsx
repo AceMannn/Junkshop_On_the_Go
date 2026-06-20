@@ -86,13 +86,13 @@ export default function AboutPage({ onNavigate }) {
   ];
 
   return (
-    <div className="pt-20 min-h-screen bg-light-gray">
+    <div className="min-h-screen bg-light-gray">
       {/* Hero */}
-      <section className="bg-gradient-to-br from-eco-green via-leaf-green to-clean-blue text-white py-20">
+      <section className="bg-gradient-to-br from-eco-green via-leaf-green to-clean-blue text-white py-20 pt-32">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div>
             <h1 className="mb-6 text-white">Our Mission</h1>
-            <p className="text-2xl text-white/90 mb-8">
+            <p className="text-lg sm:text-2xl text-white/90 mb-8">
               Empowering the Teresa, Sta. Mesa community through accessible recycling information and sustainable practices
             </p>
             <div className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 bg-white/20 backdrop-blur-sm px-4 sm:px-6 py-3 rounded-2xl sm:rounded-full max-w-full">

@@ -9,6 +9,18 @@ const {
   hasValidPhone,
   normalizePhone,
 } = require('../utils/profileCompletion');
+const {
+  findUserByRecovery,
+  resolveRecoveryInput,
+  generateResetCode,
+  hashResetCode,
+  isValidResetCode,
+  RESET_CODE_LENGTH,
+} = require('../utils/passwordRecovery');
+const {
+  sendPasswordResetEmail,
+  sendPasswordResetSms,
+} = require('../utils/deliveryService');
 
 const DEFAULT_SHOP_LOCATION = { lat: 14.5995, lng: 121.0055 };
 const nameRegex = /^[A-Za-zÀ-ÿÑñ\s.'-]+$/;
@@ -45,6 +57,7 @@ const userPayload = (user) => ({
   gcashQrUrl: user.gcashQrUrl || '',
   profileComplete: Boolean(user.profileComplete),
   leaderboardVisible: user.leaderboardVisible !== false,
+  recyclingPoints: user.recyclingPoints ?? 0,
 });
 
 async function buildUserResponse(user) {
@@ -137,7 +150,7 @@ const registerUser = async (req, res) => {
       middleName: cleanedMiddleName,
       lastName: cleanedLastName,
       email: cleanedEmail,
-      phone: cleanedPhone,
+      phone: cleanedPhone ? normalizePhone(cleanedPhone) : '',
       password: hashedPassword,
       junkshopName: cleanedJunkshopName,
       address: cleanedAddress,
@@ -234,7 +247,13 @@ const updateProviderProfile = async (req, res) => {
     } = req.body;
 
     if (pickupServiceFee !== undefined) {
-      req.user.pickupServiceFee = Math.max(0, Number(pickupServiceFee) || 0);
+      const fee = Math.max(0, Number(pickupServiceFee) || 0);
+      if (req.user.role === 'provider' && fee <= 0) {
+        return res.status(400).json({
+          message: 'Home pickup service fee must be greater than ₱0.',
+        });
+      }
+      req.user.pickupServiceFee = fee;
     }
     if (pickupEnabled !== undefined) {
       req.user.pickupEnabled = Boolean(pickupEnabled);
@@ -438,33 +457,68 @@ const toggleFavorite = async (req, res) => {
 
 const forgotPassword = async (req, res) => {
   try {
-    const email = String(req.body.email || '')
-      .trim()
-      .toLowerCase();
+    const parsed = resolveRecoveryInput(req.body);
 
-    if (!email) {
-      return res.status(400).json({ message: 'Email is required.' });
+    if (!parsed.ok) {
+      return res.status(400).json({ message: parsed.message });
     }
 
-    const user = await User.findOne({ email });
+    const user = await findUserByRecovery(parsed);
 
     if (!user) {
       return res.json({
-        message: 'If that email is registered, a reset code has been generated.',
+        message: 'If that email or number is registered, a reset code has been generated.',
       });
     }
 
-    const resetToken = crypto.randomBytes(24).toString('hex');
-    user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    if (parsed.type === 'phone' && !normalizePhone(user.phone)) {
+      return res.json({
+        message: 'If that email or number is registered, a reset code has been generated.',
+      });
+    }
+
+    const resetCode = generateResetCode();
+    user.passwordResetToken = hashResetCode(resetCode);
     user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save();
 
-    console.log(`[password-reset] ${email} → code: ${resetToken}`);
+    let delivery;
+    try {
+      if (parsed.type === 'email') {
+        delivery = await sendPasswordResetEmail(user.email, resetCode, user.firstName);
+      } else {
+        const phone = normalizePhone(user.phone);
+        delivery = await sendPasswordResetSms(phone, resetCode);
+      }
+    } catch (deliveryError) {
+      user.passwordResetToken = null;
+      user.passwordResetExpires = null;
+      await user.save();
+      console.error('[password-reset] delivery failed:', deliveryError.message);
+      return res.status(503).json({
+        message: 'Could not send reset code right now. Please try again later.',
+      });
+    }
 
-    res.json({
-      message: 'Reset code generated. It expires in 1 hour.',
-      resetToken,
-    });
+    if (delivery.stub) {
+      console.log(
+        `[password-reset] stub delivery ${parsed.label} (${user.email}) → code: ${resetCode}`
+      );
+    }
+
+    const payload = {
+      message:
+        parsed.type === 'email'
+          ? 'Reset code sent to your email. It expires in 1 hour.'
+          : 'Reset code sent to your mobile number. It expires in 1 hour.',
+      recoveryType: parsed.type,
+    };
+
+    if (delivery.stub && process.env.NODE_ENV !== 'production') {
+      payload.resetToken = resetCode;
+    }
+
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ message: 'Could not process password reset.' });
   }
@@ -472,27 +526,38 @@ const forgotPassword = async (req, res) => {
 
 const resetPassword = async (req, res) => {
   try {
-    const email = String(req.body.email || '')
-      .trim()
-      .toLowerCase();
+    const parsed = resolveRecoveryInput(req.body);
     const { resetToken, newPassword } = req.body;
 
-    if (!email || !resetToken || !newPassword) {
-      return res.status(400).json({ message: 'Email, reset code, and new password are required.' });
+    if (!parsed.ok) {
+      return res.status(400).json({ message: parsed.message });
+    }
+
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({
+        message: 'Recovery contact, reset code, and new password are required.',
+      });
+    }
+
+    if (!isValidResetCode(resetToken)) {
+      return res.status(400).json({
+        message: `Reset code must be ${RESET_CODE_LENGTH} digits.`,
+      });
     }
 
     if (newPassword.length < 8) {
       return res.status(400).json({ message: 'New password must be at least 8 characters.' });
     }
 
-    const hashedToken = crypto.createHash('sha256').update(String(resetToken)).digest('hex');
-    const user = await User.findOne({
-      email,
-      passwordResetToken: hashedToken,
-      passwordResetExpires: { $gt: new Date() },
-    });
+    const hashedToken = hashResetCode(resetToken);
+    const user = await findUserByRecovery(parsed);
 
-    if (!user) {
+    if (
+      !user ||
+      user.passwordResetToken !== hashedToken ||
+      !user.passwordResetExpires ||
+      user.passwordResetExpires <= new Date()
+    ) {
       return res.status(400).json({ message: 'Invalid or expired reset code.' });
     }
 

@@ -89,6 +89,7 @@ export function normalizeProviderMaterial(item) {
 export function normalizeProviderJunkshop(shop) {
   return {
     _id: shop._id,
+    id: String(shop._id),
     name: shop.name,
     address: shop.address,
     phone: shop.phone || '',
@@ -98,6 +99,8 @@ export function normalizeProviderJunkshop(shop) {
     lng: shop.location?.lng,
     materials: shop.materials || [],
     topPrice: shop.topPrice || '',
+    rating: shop.rating ?? 0,
+    reviewCount: shop.reviewCount ?? 0,
   };
 }
 

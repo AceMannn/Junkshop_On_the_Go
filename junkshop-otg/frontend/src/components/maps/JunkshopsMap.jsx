@@ -76,6 +76,7 @@ export default function JunkshopsMap({
     routingEnabled = false,
     autoRouteShopId = null,
     onRouteDrawn,
+    fillContainer = false,
 }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
@@ -386,8 +387,18 @@ export default function JunkshopsMap({
 
     const selectedShop = mappableShops.find((s) => s.id === routeTargetId);
 
+    const shellClassName = fillContainer
+        ? `h-full w-full min-h-0 ${className}`
+        : `space-y-3 ${className}`;
+    const mapFrameClassName = fillContainer
+        ? "relative z-0 h-full w-full min-h-0 overflow-hidden bg-zinc-100"
+        : "rounded-xl border border-emerald-200 overflow-hidden shadow-sm relative z-0";
+    const mapContainerClassName = fillContainer
+        ? "h-full min-h-[320px] w-full z-0 bg-zinc-100 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]"
+        : "h-[280px] sm:h-[320px] w-full z-0 bg-zinc-100 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]";
+
     return (
-        <div className={`space-y-3 ${className}`}>
+        <div className={shellClassName}>
             {routingEnabled && (
                 <div className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 sm:p-4">
                     <p className="text-xs font-semibold text-[#42493e]">Your starting point</p>
@@ -447,16 +458,10 @@ export default function JunkshopsMap({
                 </div>
             )}
 
-            <p className="text-xs text-[#72796e] flex items-center gap-1.5">
-                <MapPin size={14} className="text-emerald-700 shrink-0" />
-                Free map — partner junkshop pins only. Metro Manila.
-                {routingEnabled && " · Routes via OSRM (free)."}
-            </p>
-
-            <div className="rounded-xl border border-emerald-200 overflow-hidden shadow-sm relative z-0">
+            <div className={mapFrameClassName}>
                 <div
                     ref={containerRef}
-                    className="h-[280px] sm:h-[320px] w-full z-0 bg-zinc-100 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]"
+                    className={mapContainerClassName}
                     aria-label="Junkshop locations map"
                 />
             </div>
@@ -524,10 +529,6 @@ export default function JunkshopsMap({
                 </a>
             )}
 
-            <p className="text-[10px] text-[#72796e]">
-                © OpenStreetMap contributors
-                {routingEnabled ? " · Routing by OSRM" : ""}
-            </p>
         </div>
     );
 }

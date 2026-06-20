@@ -42,7 +42,7 @@ export default function ProviderPricesTab({ onNotify }) {
     };
 
     return (
-        <div className="space-y-6 sm:space-y-8 pb-24 lg:pb-8">
+        <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
             <div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#191c1c]">
                     Prices

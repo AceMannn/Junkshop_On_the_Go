@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Package, Truck, DollarSign, CheckCircle } from "lucide-react";
+import { Truck, CheckCircle } from "lucide-react";
 import { pickupApi } from "../../services/api";
 import { useProviderMaterials } from "../../hooks/useProviderData";
 
@@ -53,7 +53,18 @@ export default function ProviderOverviewTab({ onNavigate }) {
     const recentPickups = pickups.slice(0, 4);
 
     return (
-        <div className="space-y-6 sm:space-y-8 pb-24 lg:pb-8">
+        <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
+            <section className="md:hidden">
+                <button
+                    type="button"
+                    onClick={() => onNavigate("requests")}
+                    className="w-full flex items-center justify-center gap-2.5 rounded-2xl border border-emerald-200/70 bg-emerald-100/80 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-sm hover:bg-emerald-100 hover:shadow transition-colors"
+                >
+                    <Truck size={20} />
+                    Pickups
+                </button>
+            </section>
+
             <section>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#191c1c]">
                     Overview
@@ -119,48 +130,29 @@ export default function ProviderOverviewTab({ onNavigate }) {
                 </div>
 
                 <div className="bg-white rounded-xl border border-zinc-200 p-5 shadow-sm">
-                    <h2 className="text-lg font-bold text-[#191c1c] mb-4">Quick Actions</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {[
-                            { id: "materials", label: "Materials", icon: Package },
-                            { id: "requests", label: "Pickups", icon: Truck },
-                            { id: "settings", label: "GCash", icon: DollarSign },
-                        ].map(({ id, label, icon: Icon }) => (
-                            <button
-                                key={id}
-                                type="button"
-                                onClick={() => onNavigate(id)}
-                                className="flex flex-col items-center gap-2 py-4 px-2 bg-[#f9f9f8] border border-zinc-200 rounded-xl hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors"
-                            >
-                                <Icon size={20} className="text-emerald-800" />
-                                <span className="text-xs font-semibold">{label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {materials.length > 0 && (
-                <section className="bg-white rounded-xl border border-zinc-200 p-5 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
                         <CheckCircle size={18} className="text-emerald-700" />
                         <h2 className="text-lg font-bold text-[#191c1c]">Top Materials</h2>
                     </div>
-                    <div className="space-y-2">
-                        {materials.slice(0, 5).map((item) => (
-                            <div
-                                key={item.id}
-                                className="flex justify-between text-sm text-[#42493e]"
-                            >
-                                <span>{item.name}</span>
-                                <span className="font-semibold text-emerald-800">
-                                    ₱{item.price}/{item.unit}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-            )}
+                    {materials.length === 0 ? (
+                        <p className="text-sm text-[#72796e]">No materials listed yet.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {materials.slice(0, 5).map((item) => (
+                                <div
+                                    key={item.id}
+                                    className="flex justify-between text-sm text-[#42493e]"
+                                >
+                                    <span>{item.name}</span>
+                                    <span className="font-semibold text-emerald-800">
+                                        ₱{item.price}/{item.unit}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </section>
         </div>
     );
 }

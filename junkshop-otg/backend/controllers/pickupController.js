@@ -5,6 +5,20 @@ const Notification = require('../models/Notification');
 const Transaction = require('../models/Transaction');
 const { evaluateProfile } = require('../utils/profileCompletion');
 const { syncJunkshopRating } = require('../utils/shopRatings');
+const { geocodeFirst } = require('../utils/mapService');
+const {
+  isHomePickup,
+  isZeroServiceFee,
+  isPaymentConfirmed,
+  dropOffPoints,
+  clearPaymentCooldownIfExpired,
+  assertCustomerCanSubmitPayment,
+  MAX_PAYMENT_SUBMITS,
+} = require('../utils/pickupPayment');
+const {
+  sendTransactionalEmail,
+  sendTransactionalSms,
+} = require('../utils/deliveryService');
 
 const POPULATE_FIELDS =
   'firstName lastName email phone junkshopName name address pickupServiceFee gcashNumber gcashQrUrl pickupEnabled';
@@ -34,13 +48,39 @@ const notifyUser = async (userId, { title, message, pickupRequestId }) => {
     channels: { inApp: true, email: Boolean(user.email), sms: Boolean(user.phone) },
   });
 
-  // Email/SMS: log for now; wire SendGrid/Twilio when credentials are added.
   if (user.email) {
-    console.log(`[notify:email] ${user.email} — ${title}: ${message}`);
+    sendTransactionalEmail(user.email, title, message).catch((err) => {
+      console.warn('[notify:email]', err.message);
+    });
   }
   if (user.phone) {
-    console.log(`[notify:sms] ${user.phone} — ${title}: ${message}`);
+    sendTransactionalSms(user.phone, `${title}: ${message}`).catch((err) => {
+      console.warn('[notify:sms]', err.message);
+    });
   }
+};
+
+const resolvePickupLocation = async ({ requestType, address, junkshop }) => {
+  if (junkshop?.location?.lat != null && junkshop?.location?.lng != null) {
+    if (requestType === 'drop_off') {
+      return { lat: junkshop.location.lat, lng: junkshop.location.lng };
+    }
+  }
+
+  if (requestType !== 'home_pickup') {
+    return null;
+  }
+
+  try {
+    const hit = await geocodeFirst(address);
+    if (hit) {
+      return { lat: hit.lat, lng: hit.lng };
+    }
+  } catch (error) {
+    console.warn('[pickup] geocode failed:', error.message);
+  }
+
+  return null;
 };
 
 const serializeRequest = (doc) => {
@@ -58,6 +98,7 @@ const serializeRequest = (doc) => {
     materials: r.materials,
     estimatedWeightKg: r.estimatedWeightKg,
     address: r.address,
+    pickupLocation: r.pickupLocation,
     scheduledDate: r.scheduledDate,
     timeSlot: r.timeSlot,
     scheduledAt: r.scheduledAt,
@@ -66,6 +107,16 @@ const serializeRequest = (doc) => {
     gcashNumber: r.gcashNumber,
     gcashQrUrl: r.gcashQrUrl,
     serviceFeePaid: r.serviceFeePaid,
+    serviceFeePaymentStatus: r.serviceFeePaymentStatus || 'none',
+    paymentReference: r.paymentReference || '',
+    paymentProofUrl: r.paymentProofUrl || '',
+    paymentSubmittedAt: r.paymentSubmittedAt,
+    paymentConfirmedAt: r.paymentConfirmedAt,
+    paymentSubmitCount: r.paymentSubmitCount || 0,
+    paymentCooldownUntil: r.paymentCooldownUntil,
+    paymentRejectNote: r.paymentRejectNote || '',
+    actualWeightKg: r.actualWeightKg,
+    pointsAwarded: r.pointsAwarded || 0,
     rejectReason: r.rejectReason,
     rejectMessage: r.rejectMessage,
     notes: r.notes,
@@ -211,6 +262,12 @@ exports.createPickupRequest = async (req, res) => {
     const pickupAddress =
       requestType === 'drop_off' && junkshop ? junkshop.address : address.trim();
 
+    const pickupLocation = await resolvePickupLocation({
+      requestType,
+      address: pickupAddress,
+      junkshop,
+    });
+
     const request = await PickupRequest.create({
       customer: req.user._id,
       junkshop: junkshop?._id,
@@ -222,6 +279,7 @@ exports.createPickupRequest = async (req, res) => {
       materials,
       estimatedWeightKg: weight,
       address: pickupAddress,
+      pickupLocation: pickupLocation || undefined,
       scheduledDate,
       timeSlot,
       scheduledAt: buildScheduledAt(scheduledDate, timeSlot),
@@ -318,21 +376,46 @@ exports.acceptPickupRequest = async (req, res) => {
 
     const serviceFee = Number(req.body.serviceFee ?? junkshop.pickupServiceFee ?? provider.pickupServiceFee ?? 0);
 
+    if (request.requestType === 'home_pickup' && serviceFee <= 0) {
+      return res.status(400).json({
+        message:
+          'Set a pickup service fee greater than ₱0 in Settings before accepting home pickups.',
+      });
+    }
+
     request.status = 'accepted';
     request.provider = req.user._id;
     request.junkshop = junkshop._id;
     request.serviceFee = serviceFee;
     request.gcashNumber = provider.gcashNumber || '';
     request.gcashQrUrl = provider.gcashQrUrl || '';
+    request.serviceFeePaid = false;
+    request.serviceFeePaymentStatus = 'none';
+    request.paymentReference = '';
+    request.paymentProofUrl = '';
+    request.paymentSubmittedAt = undefined;
+    request.paymentConfirmedAt = undefined;
+    request.paymentSubmitCount = 0;
+    request.paymentCooldownUntil = undefined;
+    request.paymentRejectNote = '';
 
     await request.save();
     await request.populate('customer', POPULATE_FIELDS);
     await request.populate('provider', POPULATE_FIELDS);
     await request.populate('junkshop', 'name address phone');
 
+    let customerMessage;
+    if (request.requestType === 'drop_off') {
+      customerMessage = `${junkshop.name} accepted your drop-off. Visit the shop during your scheduled time.`;
+    } else if (serviceFee <= 0) {
+      customerMessage = `${junkshop.name} accepted your request. Confirm you're ready for pickup.`;
+    } else {
+      customerMessage = `${junkshop.name} accepted your request. Pay the service fee via GCash.`;
+    }
+
     await notifyUser(request.customer, {
-      title: 'Pickup accepted',
-      message: `${junkshop.name} accepted your request. Pay the service fee via GCash to confirm.`,
+      title: request.requestType === 'drop_off' ? 'Drop-off accepted' : 'Pickup accepted',
+      message: customerMessage,
       pickupRequestId: request._id,
     });
 
@@ -407,12 +490,28 @@ exports.updatePickupStatus = async (req, res) => {
       return res.status(403).json({ message: 'Not allowed to update this request.' });
     }
 
-    if (status === 'in_transit' && request.status !== 'accepted') {
-      return res.status(400).json({ message: 'Request must be accepted first.' });
+    if (status === 'in_transit') {
+      if (request.requestType === 'drop_off') {
+        return res.status(400).json({ message: 'Drop-off requests do not use in transit.' });
+      }
+      if (request.status !== 'accepted') {
+        return res.status(400).json({ message: 'Request must be accepted first.' });
+      }
+      if (!isPaymentConfirmed(request)) {
+        return res.status(400).json({
+          message: 'Confirm the customer payment before marking in transit.',
+        });
+      }
     }
 
-    if (status === 'completed' && !['accepted', 'in_transit'].includes(request.status)) {
-      return res.status(400).json({ message: 'Invalid status transition.' });
+    if (status === 'completed') {
+      if (request.requestType === 'drop_off') {
+        if (request.status !== 'accepted') {
+          return res.status(400).json({ message: 'Invalid status transition.' });
+        }
+      } else if (!['accepted', 'in_transit'].includes(request.status)) {
+        return res.status(400).json({ message: 'Invalid status transition.' });
+      }
     }
 
     request.status = status;
@@ -422,31 +521,43 @@ exports.updatePickupStatus = async (req, res) => {
       }
     }
 
-    await request.save();
-
     if (status === 'completed') {
-      const existingTx = await Transaction.findOne({ pickupRequest: request._id });
-      if (!existingTx && request.customer && request.provider) {
-        const materialLabel =
-          request.materials?.map((m) => m.name).join(', ') || 'Mixed recyclables';
-        const weight = Number(req.body.actualWeight ?? request.estimatedWeightKg) || 0;
-        const pricePerUnit = Number(req.body.pricePerUnit ?? 15);
-        const totalAmount = Number(
-          req.body.totalAmount ?? Math.round(weight * pricePerUnit * 100) / 100
-        );
-
-        await Transaction.create({
-          customer: request.customer,
-          provider: request.provider,
-          pickupRequest: request._id,
-          material: materialLabel,
-          weight,
-          pricePerUnit,
-          totalAmount,
-          status: 'completed',
+      if (request.requestType === 'drop_off') {
+        const actualWeight = Number(req.body.actualWeight);
+        if (!actualWeight || actualWeight < 0.1) {
+          return res.status(400).json({ message: 'Enter actual weight (min 0.1 kg).' });
+        }
+        request.actualWeightKg = actualWeight;
+        request.pointsAwarded = dropOffPoints(actualWeight);
+        await User.findByIdAndUpdate(request.customer, {
+          $inc: { recyclingPoints: request.pointsAwarded },
         });
+      } else {
+        const existingTx = await Transaction.findOne({ pickupRequest: request._id });
+        if (!existingTx && request.customer && request.provider) {
+          const materialLabel =
+            request.materials?.map((m) => m.name).join(', ') || 'Mixed recyclables';
+          const weight = Number(req.body.actualWeight ?? request.estimatedWeightKg) || 0;
+          const pricePerUnit = Number(req.body.pricePerUnit ?? 15);
+          const totalAmount = Number(
+            req.body.totalAmount ?? Math.round(weight * pricePerUnit * 100) / 100
+          );
+
+          await Transaction.create({
+            customer: request.customer,
+            provider: request.provider,
+            pickupRequest: request._id,
+            material: materialLabel,
+            weight,
+            pricePerUnit,
+            totalAmount,
+            status: 'completed',
+          });
+        }
       }
     }
+
+    await request.save();
 
     await request.populate('customer', POPULATE_FIELDS);
     await request.populate('provider', POPULATE_FIELDS);
@@ -454,13 +565,26 @@ exports.updatePickupStatus = async (req, res) => {
 
     const statusTitles = {
       in_transit: 'Driver on the way',
-      completed: 'Pickup completed',
+      completed: request.requestType === 'drop_off' ? 'Drop-off completed' : 'Pickup completed',
       cancelled: 'Pickup cancelled',
     };
 
-    if (statusTitles[status] && request.customer) {
+    if (statusTitles[status] && request.customer && status !== 'completed') {
       await notifyUser(request.customer._id || request.customer, {
         title: statusTitles[status],
+        message: `Your pickup is now: ${status.replace('_', ' ')}.`,
+        pickupRequestId: request._id,
+      });
+    }
+    if (status === 'completed' && request.requestType === 'drop_off' && request.customer) {
+      await notifyUser(request.customer, {
+        title: 'Drop-off completed',
+        message: `You earned ${request.pointsAwarded} recycling points!`,
+        pickupRequestId: request._id,
+      });
+    } else if (status === 'completed' && request.requestType !== 'drop_off' && request.customer) {
+      await notifyUser(request.customer._id || request.customer, {
+        title: statusTitles.completed,
         message: `Your pickup is now: ${status.replace('_', ' ')}.`,
         pickupRequestId: request._id,
       });
@@ -502,20 +626,191 @@ exports.updateProviderLocation = async (req, res) => {
   }
 };
 
-exports.markServiceFeePaid = async (req, res) => {
+exports.submitPaymentProof = async (req, res) => {
   try {
     const request = await PickupRequest.findById(req.params.id);
     if (!request || request.customer.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not allowed.' });
     }
-
-    if (request.status !== 'accepted') {
-      return res.status(400).json({ message: 'Pay service fee after the shop accepts your request.' });
+    if (!isHomePickup(request)) {
+      return res.status(400).json({ message: 'Drop-off requests do not require a service fee.' });
+    }
+    if (isZeroServiceFee(request)) {
+      return res.status(400).json({
+        message: 'Use confirm ready for zero-fee pickups.',
+      });
     }
 
-    request.serviceFeePaid = true;
+    const blockReason = assertCustomerCanSubmitPayment(request);
+    if (blockReason) {
+      return res.status(400).json({ message: blockReason });
+    }
+
+    const paymentReference = String(req.body.paymentReference || '').trim();
+    const paymentProofUrl = String(req.body.paymentProofUrl || '').trim();
+
+    if (paymentReference.length < 4) {
+      return res.status(400).json({ message: 'Enter a valid GCash reference number.' });
+    }
+    if (paymentProofUrl.length > 900000) {
+      return res.status(400).json({ message: 'Payment screenshot is too large.' });
+    }
+
+    request.paymentReference = paymentReference;
+    request.paymentProofUrl = paymentProofUrl;
+    request.paymentSubmittedAt = new Date();
+    request.serviceFeePaymentStatus = 'submitted';
+    request.paymentRejectNote = '';
+    request.paymentSubmitCount += 1;
+
+    if (request.paymentSubmitCount >= MAX_PAYMENT_SUBMITS) {
+      request.paymentCooldownUntil = new Date(Date.now() + 10 * 60 * 1000);
+      request.paymentSubmitCount = 0;
+    }
+
     await request.save();
+
+    if (request.provider) {
+      await notifyUser(request.provider, {
+        title: 'Payment proof submitted',
+        message: `${request.contactName} submitted GCash payment for review.`,
+        pickupRequestId: request._id,
+      });
+    }
+
     res.json({ request: serializeRequest(request) });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not submit payment proof.' });
+  }
+};
+
+exports.confirmReadyForPickup = async (req, res) => {
+  try {
+    const request = await PickupRequest.findById(req.params.id);
+    if (!request || request.customer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not allowed.' });
+    }
+    if (!isHomePickup(request) || !isZeroServiceFee(request)) {
+      return res.status(400).json({ message: 'This action is only for free home pickups.' });
+    }
+
+    const blockReason = assertCustomerCanSubmitPayment(request);
+    if (blockReason) {
+      return res.status(400).json({ message: blockReason });
+    }
+
+    request.paymentReference = 'READY';
+    request.paymentProofUrl = '';
+    request.paymentSubmittedAt = new Date();
+    request.serviceFeePaymentStatus = 'submitted';
+    request.paymentRejectNote = '';
+    request.paymentSubmitCount += 1;
+
+    if (request.paymentSubmitCount >= MAX_PAYMENT_SUBMITS) {
+      request.paymentCooldownUntil = new Date(Date.now() + 10 * 60 * 1000);
+      request.paymentSubmitCount = 0;
+    }
+
+    await request.save();
+
+    if (request.provider) {
+      await notifyUser(request.provider, {
+        title: 'Customer ready for pickup',
+        message: `${request.contactName} confirmed they are ready for pickup.`,
+        pickupRequestId: request._id,
+      });
+    }
+
+    res.json({ request: serializeRequest(request) });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not confirm readiness.' });
+  }
+};
+
+exports.confirmPayment = async (req, res) => {
+  try {
+    if (req.user.role !== 'provider') {
+      return res.status(403).json({ message: 'Provider account required.' });
+    }
+
+    const request = await PickupRequest.findById(req.params.id);
+    if (!request || request.provider?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not allowed.' });
+    }
+    if (!isHomePickup(request)) {
+      return res.status(400).json({ message: 'Not applicable for drop-off.' });
+    }
+    if (request.status !== 'accepted') {
+      return res.status(400).json({ message: 'Request must be accepted first.' });
+    }
+    if (request.serviceFeePaymentStatus !== 'submitted') {
+      return res.status(400).json({ message: 'No payment proof waiting for review.' });
+    }
+
+    request.serviceFeePaymentStatus = 'confirmed';
+    request.serviceFeePaid = true;
+    request.paymentConfirmedAt = new Date();
+    request.paymentRejectNote = '';
+
+    await request.save();
+
+    await notifyUser(request.customer, {
+      title: isZeroServiceFee(request) ? 'Pickup confirmed' : 'Payment confirmed',
+      message: isZeroServiceFee(request)
+        ? 'Your shop confirmed you are ready. They can start the pickup when scheduled.'
+        : 'Your GCash payment was confirmed. Your pickup will proceed as scheduled.',
+      pickupRequestId: request._id,
+    });
+
+    res.json({ request: serializeRequest(request) });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not confirm payment.' });
+  }
+};
+
+exports.rejectPayment = async (req, res) => {
+  try {
+    if (req.user.role !== 'provider') {
+      return res.status(403).json({ message: 'Provider account required.' });
+    }
+
+    const request = await PickupRequest.findById(req.params.id);
+    if (!request || request.provider?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not allowed.' });
+    }
+    if (!isHomePickup(request)) {
+      return res.status(400).json({ message: 'Not applicable for drop-off.' });
+    }
+    if (request.serviceFeePaymentStatus !== 'submitted') {
+      return res.status(400).json({ message: 'No payment proof waiting for review.' });
+    }
+
+    const note = String(req.body.note || '').trim();
+    request.serviceFeePaymentStatus = 'rejected';
+    request.serviceFeePaid = false;
+    request.paymentRejectNote = note || 'Payment could not be verified. Please check and resubmit.';
+
+    clearPaymentCooldownIfExpired(request);
+
+    await request.save();
+
+    await notifyUser(request.customer, {
+      title: isZeroServiceFee(request) ? 'Confirmation needed again' : 'Payment not verified',
+      message: request.paymentRejectNote,
+      pickupRequestId: request._id,
+    });
+
+    res.json({ request: serializeRequest(request) });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not reject payment.' });
+  }
+};
+
+exports.markServiceFeePaid = async (req, res) => {
+  try {
+    return res.status(400).json({
+      message: 'Submit payment proof with reference number instead.',
+    });
   } catch (error) {
     res.status(500).json({ message: 'Could not update payment status.' });
   }
@@ -537,6 +832,10 @@ exports.ratePickupRequest = async (req, res) => {
 
     if (request.status !== 'completed') {
       return res.status(400).json({ message: 'You can only rate completed pickups.' });
+    }
+
+    if (request.rating?.score) {
+      return res.status(400).json({ message: 'You have already rated this pickup.' });
     }
 
     request.rating = { score: rating, comment: comment.trim(), createdAt: new Date() };
@@ -572,5 +871,14 @@ exports.markNotificationRead = async (req, res) => {
     res.json({ message: 'ok' });
   } catch (error) {
     res.status(500).json({ message: 'Could not update notification.' });
+  }
+};
+
+exports.clearNotifications = async (req, res) => {
+  try {
+    await Notification.deleteMany({ user: req.user._id });
+    res.json({ message: 'Notifications cleared.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not clear notifications.' });
   }
 };

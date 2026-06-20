@@ -26,6 +26,36 @@ function cacheSet(key, data, ttl) {
   cache.set(key, { data, expires: Date.now() + ttl });
 }
 
+function uniqueQueries(queries) {
+  const seen = new Set();
+  return queries
+    .map((q) => q.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .filter((q) => {
+      const key = q.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function buildGeocodeQueries(query) {
+  const base = query.trim();
+  const expanded = base
+    .replace(/\bQ\.?\s*C\.?\b/gi, 'Quezon City')
+    .replace(/\bProj\.?\b/gi, 'Project')
+    .replace(/\bBrgy\.?\b/gi, 'Barangay')
+    .replace(/\bSt\.?\b/gi, 'Street');
+  const withCountry = /philippines/i.test(expanded) ? expanded : `${expanded} Philippines`;
+  const noHouseNumber = withCountry.replace(/^\s*\d+\s*[A-Za-z]?\s+/, '');
+  const simplified = noHouseNumber
+    .replace(/\bProject\s*\d+\b/gi, '')
+    .replace(/\bBarangay\b/gi, '')
+    .replace(/\s+/g, ' ');
+
+  return uniqueQueries([base, expanded, withCountry, noHouseNumber, simplified]);
+}
+
 async function throttledFetch(url) {
   const now = Date.now();
   const wait = Math.max(0, MIN_INTERVAL_MS - (now - lastExternalRequest));
@@ -48,13 +78,9 @@ async function throttledFetch(url) {
   return response.json();
 }
 
-async function geocodeSearch(query) {
+async function fetchGeocode(query) {
   const q = query.trim();
   if (q.length < 3) return [];
-
-  const cacheKey = `geo:${q.toLowerCase()}`;
-  const cached = cacheGet(cacheKey);
-  if (cached) return cached;
 
   const params = new URLSearchParams({
     q,
@@ -66,16 +92,41 @@ async function geocodeSearch(query) {
   });
 
   const data = await throttledFetch(`${NOMINATIM_BASE}/search?${params}`);
-  const results = (data || [])
+  return (data || [])
     .map((item) => ({
       lat: parseFloat(item.lat),
       lng: parseFloat(item.lon),
       label: item.display_name,
     }))
     .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng));
+}
 
-  cacheSet(cacheKey, results, GEOCODE_TTL_MS);
-  return results;
+async function geocodeSearch(query) {
+  const q = query.trim();
+  if (q.length < 3) return [];
+
+  const cacheKey = `geo:${q.toLowerCase()}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+
+  for (const candidate of buildGeocodeQueries(q)) {
+    const candidateKey = `geo:${candidate.toLowerCase()}`;
+    const cachedCandidate = cacheGet(candidateKey);
+    if (cachedCandidate) {
+      cacheSet(cacheKey, cachedCandidate, GEOCODE_TTL_MS);
+      return cachedCandidate;
+    }
+
+    const results = await fetchGeocode(candidate);
+    cacheSet(candidateKey, results, GEOCODE_TTL_MS);
+    if (results.length > 0) {
+      cacheSet(cacheKey, results, GEOCODE_TTL_MS);
+      return results;
+    }
+  }
+
+  cacheSet(cacheKey, [], GEOCODE_TTL_MS);
+  return [];
 }
 
 async function reverseGeocode(lat, lng) {
@@ -123,8 +174,14 @@ async function getRoute(fromLat, fromLng, toLat, toLng) {
   return result;
 }
 
+async function geocodeFirst(query) {
+  const results = await geocodeSearch(query);
+  return results[0] || null;
+}
+
 module.exports = {
   geocodeSearch,
+  geocodeFirst,
   reverseGeocode,
   getRoute,
 };

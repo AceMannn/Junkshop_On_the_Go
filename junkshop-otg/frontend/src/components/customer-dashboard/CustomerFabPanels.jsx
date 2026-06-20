@@ -51,7 +51,7 @@ export function QuickAddPanel({
                 Quickly save a favorite junkshop, a reminder note, or a transaction memo.
             </p>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {QUICK_MODES.map(({ id, label, icon: Icon }) => (
                     <button
                         key={id}
