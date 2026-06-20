@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { notificationApi } from "../../services/api";
-import { REFRESH_INTERVAL_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
+import { useEffect, useRef } from "react";
 import {
-    Bell,
     HelpCircle,
     User,
     Settings,
     LogOut,
     UserX,
+    Recycle,
 } from "lucide-react";
 import { getUserInitials, getUserFullName } from "../../utils/userDisplay";
+import { formatPoints } from "../../utils/pickupPoints";
 import logoImage from "../../assets/junkshop-logo.png";
+import DashboardNotificationMenu, { getPickupRequestId } from "../dashboard/DashboardNotificationMenu";
 import {
     dashboardAvatarClass,
     dashboardIconButtonClass,
@@ -36,11 +36,9 @@ export default function CustomerTopbar({
     onAccountSettings,
     onLogout,
     onDeactivate,
+    onNotificationNavigate,
 }) {
     const menuRef = useRef(null);
-    const notifRef = useRef(null);
-    const [showNotifs, setShowNotifs] = useState(false);
-    const [notifications, setNotifications] = useState([]);
     const displayName = getDisplayName(user);
     const initials = getUserInitials(user);
     const fullName = getUserFullName(user) || displayName;
@@ -66,34 +64,6 @@ export default function CustomerTopbar({
         };
     }, [showProfileMenu, setShowProfileMenu]);
 
-    const loadNotifications = useCallback(async () => {
-        try {
-            const { notifications: rows } = await notificationApi.list();
-            setNotifications(rows || []);
-        } catch {
-            /* keep last list on poll failure */
-        }
-    }, []);
-
-    useEffect(() => {
-        loadNotifications();
-    }, [loadNotifications]);
-
-    useAutoRefresh(loadNotifications, { intervalMs: REFRESH_INTERVAL_MS });
-
-    useEffect(() => {
-        if (!showNotifs) return;
-        const handlePointerDown = (event) => {
-            if (notifRef.current && !notifRef.current.contains(event.target)) {
-                setShowNotifs(false);
-            }
-        };
-        document.addEventListener("mousedown", handlePointerDown);
-        return () => document.removeEventListener("mousedown", handlePointerDown);
-    }, [showNotifs]);
-
-    const unreadCount = notifications.filter((n) => !n.read).length;
-
     const runMenuAction = (action) => {
         setShowProfileMenu(false);
         action();
@@ -111,48 +81,24 @@ export default function CustomerTopbar({
                 </div>
 
                 <div className={dashboardTopbarActionsClass}>
-                    <div className="relative" ref={notifRef}>
-                        <button
-                            type="button"
-                            onClick={() => setShowNotifs((o) => !o)}
-                            className={`relative ${dashboardIconButtonClass}`}
-                            aria-label="Notifications"
+                    {(user?.recyclingPoints ?? 0) > 0 && (
+                        <span
+                            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800"
+                            title="Recycling points balance"
                         >
-                            <Bell size={20} className="text-emerald-900" />
-                            {unreadCount > 0 && (
-                                <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
-                                    {unreadCount > 9 ? "9+" : unreadCount}
-                                </span>
-                            )}
-                        </button>
-                        {showNotifs && (
-                            <div className="absolute right-0 top-full mt-2 w-72 max-h-80 overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl z-50 p-2">
-                                {notifications.length === 0 ? (
-                                    <p className="text-sm text-[#72796e] px-3 py-4 text-center">No notifications</p>
-                                ) : (
-                                    notifications.map((n) => (
-                                        <button
-                                            key={n._id}
-                                            type="button"
-                                            onClick={() => {
-                                                if (!n.read) notificationApi.markRead(n._id).catch(() => {});
-                                                setNotifications((prev) =>
-                                                    prev.map((x) =>
-                                                        x._id === n._id ? { ...x, read: true } : x
-                                                    )
-                                                );
-                                            }}
-                                            className={`w-full text-left px-3 py-2.5 rounded-xl text-sm mb-1 ${n.read ? "text-[#72796e]" : "bg-emerald-50 font-semibold text-[#191c1c]"
-                                                }`}
-                                        >
-                                            <p className="font-semibold text-xs">{n.title}</p>
-                                            <p className="text-xs mt-0.5 line-clamp-2">{n.message}</p>
-                                        </button>
-                                    ))
-                                )}
-                            </div>
-                        )}
-                    </div>
+                            <Recycle size={14} />
+                            {formatPoints(user.recyclingPoints)} pts
+                        </span>
+                    )}
+
+                    <DashboardNotificationMenu
+                        onNavigate={(notification) => {
+                            const pickupId = getPickupRequestId(notification);
+                            if (pickupId) {
+                                onNotificationNavigate?.(pickupId);
+                            }
+                        }}
+                    />
 
                     <button
                         type="button"
@@ -220,7 +166,7 @@ export default function CustomerTopbar({
                                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#191c1c] hover:bg-[#f3f4f3]"
                                 >
                                     <Settings size={18} className="text-[#4e6953]" />
-                                    Account Settings
+                                    Settings
                                 </button>
 
                                 <div className="h-px bg-zinc-100 my-1" />

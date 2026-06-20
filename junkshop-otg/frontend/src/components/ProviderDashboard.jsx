@@ -12,6 +12,10 @@ import ProviderAvailabilityTab from "./provider-dashboard/ProviderAvailabilityTa
 import ProviderSettingsTab from "./provider-dashboard/ProviderSettingsTab";
 import ProviderTransactionsTab from "./provider-dashboard/ProviderTransactionsTab";
 import ProfileCompletionBanner from "./ui/ProfileCompletionBanner";
+import {
+    ViewProfilePage,
+    DeactivateAccountModal,
+} from "./customer-dashboard/CustomerAccountViews";
 import { dashboardMainPaddingClass } from "./dashboard/dashboardTopbarUi";
 
 export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
@@ -20,6 +24,9 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     const [toastMessage, setToastMessage] = useState("");
     const [showToast, setShowToast] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
+    const [focusRequestId, setFocusRequestId] = useState(null);
+    const [accountView, setAccountView] = useState(null);
+    const [showDeactivateModal, setShowDeactivateModal] = useState(false);
 
     const refreshUser = useCallback(async () => {
         try {
@@ -31,8 +38,26 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     }, [onUserUpdate]);
 
     const handleNavigate = (tabId) => {
+        setAccountView(null);
         setActiveTab(tabId);
         setShowProfileMenu(false);
+    };
+
+    const openAccountView = (view) => {
+        setAccountView(view);
+        setShowProfileMenu(false);
+    };
+
+    const handleDeactivateConfirm = () => {
+        setShowDeactivateModal(false);
+        showNotification("Account deactivated.");
+        onLogout();
+    };
+
+    const handleNotificationNavigate = (pickupId) => {
+        setShowProfileMenu(false);
+        setActiveTab("requests");
+        setFocusRequestId(pickupId);
     };
 
     const showNotification = (message) => {
@@ -48,8 +73,14 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                 showProfileMenu={showProfileMenu}
                 setShowProfileMenu={setShowProfileMenu}
                 onHelp={() => setShowHelp(true)}
+                onViewProfile={() => openAccountView("profile")}
                 onNavigateSettings={() => handleNavigate("settings")}
                 onLogout={onLogout}
+                onDeactivate={() => {
+                    setShowProfileMenu(false);
+                    setShowDeactivateModal(true);
+                }}
+                onNotificationNavigate={handleNotificationNavigate}
             />
 
             <HelpModal
@@ -60,13 +91,9 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                 }}
             />
 
-            <ProviderSidebar
-                activeTab={activeTab}
-                onNavigate={handleNavigate}
-                user={user}
-            />
+            <ProviderSidebar activeTab={activeTab} onNavigate={handleNavigate} />
 
-            <main className="lg:pl-56 pt-16 min-h-screen pb-24 lg:pb-8">
+            <main className="md:pl-56 pt-16 min-h-screen pb-24 md:pb-8">
                 <div className={dashboardMainPaddingClass}>
                     {showToast && (
                         <div className="fixed top-20 right-4 left-4 sm:left-auto z-50 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 sm:px-5 rounded-xl shadow-lg max-w-md sm:ml-auto">
@@ -75,37 +102,55 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                         </div>
                     )}
 
-                    <ProfileCompletionBanner
-                        user={user}
-                        role="provider"
-                        onGoSettings={() => handleNavigate("settings")}
-                        className="mb-5 sm:mb-6"
-                    />
+                    {!accountView && (
+                        <ProfileCompletionBanner
+                            user={user}
+                            role="provider"
+                            onGoSettings={() => openAccountView("profile")}
+                            className="mb-5 sm:mb-6"
+                        />
+                    )}
 
-                    {activeTab === "dashboard" && (
+                    {accountView === "profile" && (
+                        <ViewProfilePage
+                            user={user}
+                            onBack={() => setAccountView(null)}
+                            onUserUpdate={onUserUpdate}
+                            onSaveSuccess={() =>
+                                showNotification("Profile updated successfully")
+                            }
+                        />
+                    )}
+
+                    {!accountView && activeTab === "dashboard" && (
                         <ProviderOverviewTab onNavigate={handleNavigate} />
                     )}
-                    {activeTab === "materials" && (
+                    {!accountView && activeTab === "materials" && (
                         <ProviderMaterialsTab
                             onNotify={showNotification}
                             onRefreshProfile={refreshUser}
                         />
                     )}
-                    {activeTab === "prices" && (
+                    {!accountView && activeTab === "prices" && (
                         <ProviderPricesTab onNotify={showNotification} />
                     )}
-                    {activeTab === "availability" && (
+                    {!accountView && activeTab === "availability" && (
                         <ProviderAvailabilityTab
                             user={user}
                             onNotify={showNotification}
                             onRefreshProfile={refreshUser}
                         />
                     )}
-                    {activeTab === "requests" && <ProviderPickupRequests />}
-                    {activeTab === "transactions" && (
+                    {!accountView && activeTab === "requests" && (
+                        <ProviderPickupRequests
+                            focusRequestId={focusRequestId}
+                            onFocusHandled={() => setFocusRequestId(null)}
+                        />
+                    )}
+                    {!accountView && activeTab === "transactions" && (
                         <ProviderTransactionsTab onNotify={showNotification} />
                     )}
-                    {activeTab === "settings" && (
+                    {!accountView && activeTab === "settings" && (
                         <ProviderSettingsTab
                             user={user}
                             onNotify={showNotification}
@@ -116,6 +161,12 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
             </main>
 
             <ProviderMobileNav activeTab={activeTab} onNavigate={handleNavigate} />
+
+            <DeactivateAccountModal
+                isOpen={showDeactivateModal}
+                onClose={() => setShowDeactivateModal(false)}
+                onConfirm={handleDeactivateConfirm}
+            />
         </div>
     );
 }

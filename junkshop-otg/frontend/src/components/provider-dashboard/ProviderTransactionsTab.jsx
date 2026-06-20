@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search, Download, Plus } from "lucide-react";
 import { domainApi } from "../../services/api";
+import LoadErrorBanner from "../ui/LoadErrorBanner";
 import { normalizeTransaction } from "../../utils/catalogMappers";
 import { REFRESH_INTERVAL_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
 import NumberInput from "../ui/NumberInput";
@@ -8,6 +9,7 @@ import NumberInput from "../ui/NumberInput";
 export default function ProviderTransactionsTab({ onNotify }) {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState("");
     const [search, setSearch] = useState("");
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -23,8 +25,14 @@ export default function ProviderTransactionsTab({ onNotify }) {
             if (!silent) setLoading(true);
             const { transactions } = await domainApi.getTransactions();
             setRows((transactions || []).map(normalizeTransaction));
-        } catch {
-            if (!silent) setRows([]);
+            setLoadError("");
+        } catch (err) {
+            if (!silent) {
+                setRows([]);
+                if (!err?.sessionExpired && !err?.accountSuspended) {
+                    setLoadError(err.message || "Could not load transactions.");
+                }
+            }
         } finally {
             if (!silent) setLoading(false);
         }
@@ -93,7 +101,7 @@ export default function ProviderTransactionsTab({ onNotify }) {
     };
 
     return (
-        <div className="space-y-6 sm:space-y-8 pb-24 lg:pb-8">
+        <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#191c1c]">
@@ -123,6 +131,10 @@ export default function ProviderTransactionsTab({ onNotify }) {
                     </button>
                 </div>
             </div>
+
+            {loadError && (
+                <LoadErrorBanner message={loadError} onRetry={() => load(false)} />
+            )}
 
             {showForm && (
                 <form

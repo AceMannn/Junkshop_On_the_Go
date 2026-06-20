@@ -15,6 +15,12 @@ export const dashboardTopbarActionsClass =
 export const dashboardIconButtonClass =
   'p-2 rounded-full hover:bg-zinc-100 transition-colors inline-flex';
 
+/** Notification count on bell — tweak top/right in px for fine placement */
+export const notificationBadgePositionClass = 'top-[-3px] right-[-5px]';
+
+export const notificationBadgeBaseClass =
+  'pointer-events-none absolute flex items-center justify-center rounded-full bg-red-500 text-[9px] font-bold leading-none text-white ring-2 ring-white shadow-sm';
+
 /** Mobile: avatar only. md+: pill with border + name */
 export const dashboardProfileTriggerClass =
   'flex shrink-0 items-center rounded-full transition-colors hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 md:h-10 md:gap-2 md:border md:border-zinc-200 md:bg-white md:pl-0.5 md:pr-3 md:hover:bg-zinc-50';

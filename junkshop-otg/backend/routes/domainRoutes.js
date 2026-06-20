@@ -1,5 +1,4 @@
 const express = require('express');
-const ContactMessage = require('../models/ContactMessage');
 const Junkshop = require('../models/Junkshop');
 const Material = require('../models/Material');
 const PickupRequest = require('../models/PickupRequest');
@@ -7,10 +6,19 @@ const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const CustomerNote = require('../models/CustomerNote');
 const { protect } = require('../middlewares/authMiddleware');
+const { contactLimiter } = require('../middlewares/rateLimiters');
 const pickupController = require('../controllers/pickupController');
+const contactController = require('../controllers/contactController');
 const { haversineKm, formatDistanceKm } = require('../utils/geo');
 const { syncProfileComplete } = require('../utils/profileCompletion');
 const { syncJunkshopMaterialTags } = require('../utils/syncJunkshopTags');
+const {
+  pickAllowed,
+  JUNKSHOP_WRITE_KEYS,
+  MATERIAL_WRITE_KEYS,
+  TRANSACTION_CREATE_KEYS,
+  LOG_TRIP_KEYS,
+} = require('../utils/requestWhitelist');
 
 const CATALOG_PROVIDER_EMAIL = 'catalog@junkshop.internal';
 
@@ -213,8 +221,9 @@ router.get('/junkshops/:id/reviews', async (req, res) => {
 });
 
 router.post('/junkshops', protect, requireProvider, async (req, res) => {
+  const data = pickAllowed(req.body, JUNKSHOP_WRITE_KEYS);
   const junkshop = await Junkshop.create({
-    ...req.body,
+    ...data,
     provider: req.user._id,
   });
 
@@ -224,9 +233,10 @@ router.post('/junkshops', protect, requireProvider, async (req, res) => {
 });
 
 router.patch('/junkshops/:id', protect, requireProvider, async (req, res) => {
+  const data = pickAllowed(req.body, JUNKSHOP_WRITE_KEYS);
   const junkshop = await Junkshop.findOneAndUpdate(
     { _id: req.params.id, provider: req.user._id },
-    req.body,
+    data,
     { new: true, runValidators: true }
   );
 
@@ -323,10 +333,11 @@ router.get('/materials/mine', protect, requireProvider, async (req, res) => {
 });
 
 router.post('/materials', protect, requireProvider, async (req, res) => {
+  const data = pickAllowed(req.body, MATERIAL_WRITE_KEYS);
   const material = await Material.create({
-    ...req.body,
+    ...data,
     provider: req.user._id,
-    previousPrice: req.body.previousPrice || req.body.price,
+    previousPrice: data.price,
   });
 
   await syncJunkshopMaterialTags(req.user._id);
@@ -342,9 +353,10 @@ router.patch('/materials/:id', protect, requireProvider, async (req, res) => {
     return res.status(404).json({ message: 'Material not found.' });
   }
 
-  const nextPrice = req.body.price !== undefined ? Number(req.body.price) : existing.price;
+  const data = pickAllowed(req.body, MATERIAL_WRITE_KEYS);
+  const nextPrice = data.price !== undefined ? Number(data.price) : existing.price;
   existing.set({
-    ...req.body,
+    ...data,
     previousPrice: nextPrice !== existing.price ? existing.price : existing.previousPrice,
     price: nextPrice,
   });
@@ -380,10 +392,15 @@ router.patch('/pickup-requests/:id/reject', protect, pickupController.rejectPick
 router.patch('/pickup-requests/:id/status', protect, pickupController.updatePickupStatus);
 router.patch('/pickup-requests/:id/location', protect, pickupController.updateProviderLocation);
 router.patch('/pickup-requests/:id/service-fee-paid', protect, pickupController.markServiceFeePaid);
+router.post('/pickup-requests/:id/payment-proof', protect, pickupController.submitPaymentProof);
+router.post('/pickup-requests/:id/confirm-ready', protect, pickupController.confirmReadyForPickup);
+router.patch('/pickup-requests/:id/payment-confirm', protect, pickupController.confirmPayment);
+router.patch('/pickup-requests/:id/payment-reject', protect, pickupController.rejectPayment);
 router.post('/pickup-requests/:id/rating', protect, pickupController.ratePickupRequest);
 
 router.get('/notifications', protect, pickupController.listNotifications);
 router.patch('/notifications/:id/read', protect, pickupController.markNotificationRead);
+router.delete('/notifications', protect, pickupController.clearNotifications);
 
 router.get('/transactions', protect, async (req, res) => {
   const key = req.user.role === 'provider' ? 'provider' : 'customer';
@@ -410,13 +427,14 @@ router.get('/transactions', protect, async (req, res) => {
 });
 
 router.post('/transactions', protect, requireProvider, async (req, res) => {
-  const { customerEmail, material, weight, pricePerUnit, unit, status } = req.body;
+  const body = pickAllowed(req.body, TRANSACTION_CREATE_KEYS);
+  const { customerEmail, material, weight, pricePerUnit, unit, status } = body;
 
   if (!material || weight == null || pricePerUnit == null) {
     return res.status(400).json({ message: 'Material, weight, and price are required.' });
   }
 
-  let customerId = req.body.customer;
+  let customerId = null;
   if (customerEmail) {
     const customer = await User.findOne({
       email: String(customerEmail).trim().toLowerCase(),
@@ -434,7 +452,7 @@ router.post('/transactions', protect, requireProvider, async (req, res) => {
 
   const weightNum = Number(weight);
   const price = Number(pricePerUnit);
-  const totalAmount = Number(req.body.totalAmount ?? weightNum * price);
+  const totalAmount = Math.round(weightNum * price * 100) / 100;
 
   const transaction = await Transaction.create({
     customer: customerId,
@@ -460,7 +478,7 @@ router.post('/transactions/log-trip', protect, async (req, res) => {
     return res.status(403).json({ message: 'Customer account required.' });
   }
 
-  const { junkshopId, material, weight, pricePerUnit } = req.body;
+  const { junkshopId, material, weight, pricePerUnit } = pickAllowed(req.body, LOG_TRIP_KEYS);
 
   if (!material || !weight || !pricePerUnit) {
     return res.status(400).json({ message: 'Material, weight, and price are required.' });
@@ -562,18 +580,6 @@ router.post('/notes', protect, async (req, res) => {
   res.status(201).json({ note: safe });
 });
 
-router.post('/contact', async (req, res) => {
-  const { name, email, subject, message } = req.body;
-
-  if (!name || !email || !subject || !message) {
-    return res.status(400).json({ message: 'Please complete all contact fields.' });
-  }
-
-  const contactMessage = await ContactMessage.create({ name, email, subject, message });
-  res.status(201).json({
-    message: 'Message received. We will get back to you soon.',
-    contactMessage,
-  });
-});
+router.post('/contact', contactLimiter, contactController.submitContactMessage);
 
 module.exports = router;

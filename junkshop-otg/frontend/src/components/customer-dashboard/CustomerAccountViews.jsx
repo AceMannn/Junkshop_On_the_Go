@@ -12,6 +12,7 @@ import {
 import { authApi, domainApi } from "../../services/api";
 import EmptyState from "../ui/EmptyState";
 import { getUserInitials } from "../../utils/userDisplay";
+import { formatPoints } from "../../utils/pickupPoints";
 
 function getDisplayName(user) {
     if (!user) return "Eco Warrior";
@@ -20,7 +21,7 @@ function getDisplayName(user) {
 
 export function AccountPageShell({ title, subtitle, onBack, children }) {
     return (
-        <div className="space-y-6 sm:space-y-8 pb-24 lg:pb-8">
+        <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <button
@@ -107,6 +108,18 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                     <p className="text-sm text-[#72796e] truncate">{user?.email}</p>
                     <p className="text-xs text-emerald-700 font-medium mt-1 capitalize">
                         {user?.role || "customer"} account
+                    </p>
+                </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 p-4 sm:p-5 bg-gradient-to-r from-amber-50 to-emerald-50 rounded-2xl border border-amber-100 shadow-sm">
+                <div>
+                    <p className="text-sm font-semibold text-[#42493e]">Recycling points</p>
+                    <p className="text-2xl font-bold text-[#154212] mt-1">
+                        {formatPoints(user?.recyclingPoints ?? 0)} pts
+                    </p>
+                    <p className="text-xs text-[#72796e] mt-1">
+                        Earned from drop-offs at partner shops. Redeem rewards coming soon.
                     </p>
                 </div>
             </div>
@@ -280,7 +293,7 @@ export function AccountSettingsPage({ user, onBack, onNotify, onUserUpdate }) {
 
     return (
         <AccountPageShell
-            title="Account Settings"
+            title="Settings"
             subtitle="Security, privacy, and account preferences."
             onBack={onBack}
         >

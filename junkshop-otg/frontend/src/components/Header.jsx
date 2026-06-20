@@ -159,13 +159,16 @@ export default function Header({
                             transition={{ duration: 0.3 }}
                         >
                             <nav className="px-4 py-4 space-y-2">
-                                {navItems.map((item) => (
+                                {navItems.map((item) => {
+                                    const isActive = activeSection === item.id;
+                                    return (
                                     <button
                                         key={item.id}
-                                        className={`block w-full text-left px-4 py-3 rounded-lg transition-colors ${activeSection === item.id
-                                            ? 'bg-eco-green text-white'
-                                            : 'hover:bg-light-gray text-charcoal'
-                                            }`}
+                                        className={`block w-full text-left px-4 py-3 rounded-lg transition-colors border-l-4 ${
+                                            isActive
+                                                ? 'border-eco-green text-eco-green font-semibold bg-eco-green/5'
+                                                : 'border-transparent hover:bg-light-gray text-charcoal'
+                                        }`}
                                         onClick={() => {
                                             onNavigate(item.id);
                                             setIsMobileMenuOpen(false);
@@ -173,7 +176,8 @@ export default function Header({
                                     >
                                         {item.label}
                                     </button>
-                                ))}
+                                    );
+                                })}
                                 {isAuthenticated && (
                                     <button
                                         className="flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors hover:bg-light-gray text-charcoal border-t border-gray-200 mt-2 pt-4"

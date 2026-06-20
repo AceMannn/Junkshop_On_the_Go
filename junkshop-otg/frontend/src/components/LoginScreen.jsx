@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { authApi } from '../services/api';
 import {
@@ -15,6 +15,8 @@ import {
   authSubmitClass,
 } from './auth/authModalUi';
 
+const OTP_LENGTH = 6;
+
 export default function LoginScreen({
   onLoginSuccess,
   onClose,
@@ -25,6 +27,7 @@ export default function LoginScreen({
 }) {
   const [view, setView] = useState('login');
   const [email, setEmail] = useState(initialEmail);
+  const [recoveryContact, setRecoveryContact] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -34,9 +37,17 @@ export default function LoginScreen({
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const otpInputRef = useRef(null);
+
+  useEffect(() => {
+    if (view === 'reset') {
+      otpInputRef.current?.focus();
+    }
+  }, [view]);
 
   useEffect(() => {
     setEmail(initialEmail);
+    setRecoveryContact(initialEmail);
     setSelectedRole(initialRole);
     setPassword('');
     setResetToken('');
@@ -87,24 +98,27 @@ export default function LoginScreen({
     setError('');
     setInfo('');
 
-    if (!email) {
-      setError('Enter your account email.');
+    if (!recoveryContact.trim()) {
+      setError('Enter your registered email or mobile number.');
       return;
     }
 
     setIsLoading(true);
     try {
-      const data = await authApi.forgotPassword({ email });
-      setInfo(
-        data.message || 'If that email is registered, a reset code was generated.'
-      );
+      const data = await authApi.forgotPassword({ identifier: recoveryContact.trim() });
 
       if (import.meta.env.DEV && data.resetToken) {
-        setResetToken(data.resetToken);
+        setResetToken(String(data.resetToken).replace(/\D/g, '').slice(0, OTP_LENGTH));
+        setInfo(`${data.message} Dev code (no SendGrid/Twilio): ${data.resetToken}`);
+      } else {
+        setResetToken('');
         setInfo(
-          `${data.message || 'Reset code generated.'} Dev code: ${data.resetToken}`
+          data.message ||
+            'If that email or number is registered, a reset code has been sent.'
         );
       }
+
+      setView('reset');
     } catch (forgotError) {
       setError(forgotError.message);
     } finally {
@@ -117,8 +131,13 @@ export default function LoginScreen({
     setError('');
     setInfo('');
 
-    if (!email || !resetToken || !newPassword) {
-      setError('Email, reset code, and new password are required.');
+    if (!recoveryContact.trim() || !resetToken || !newPassword) {
+      setError('Email or mobile number, reset code, and new password are required.');
+      return;
+    }
+
+    if (resetToken.length !== OTP_LENGTH) {
+      setError(`Enter the ${OTP_LENGTH}-digit code from your email or SMS.`);
       return;
     }
 
@@ -130,7 +149,7 @@ export default function LoginScreen({
     setIsLoading(true);
     try {
       const data = await authApi.resetPassword({
-        email,
+        identifier: recoveryContact.trim(),
         resetToken,
         newPassword,
       });
@@ -154,8 +173,8 @@ export default function LoginScreen({
 
   const subtitles = {
     login: 'Login to continue using JunkShop On-The-Go',
-    forgot: 'Enter your email to receive a reset code',
-    reset: 'Enter your reset code and choose a new password',
+    forgot: 'Enter your email or mobile number (09XXXXXXXXX) to get a reset code',
+    reset: `Enter the ${OTP_LENGTH}-digit code we sent, then choose a new password`,
   };
 
   const scrollableViews = view === 'reset';
@@ -278,6 +297,7 @@ export default function LoginScreen({
                   <button
                     type="button"
                     onClick={() => {
+                      setRecoveryContact(email);
                       setView('forgot');
                       setError('');
                       setInfo('');
@@ -303,20 +323,21 @@ export default function LoginScreen({
           {view === 'forgot' && (
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div>
-                <label htmlFor="forgot-email" className={authLabelClass}>
-                  Email address
+                <label htmlFor="forgot-recovery" className={authLabelClass}>
+                  Email or mobile number
                 </label>
                 <input
-                  type="email"
-                  id="forgot-email"
-                  value={email}
+                  type="text"
+                  id="forgot-recovery"
+                  value={recoveryContact}
                   onChange={(e) => {
-                    setEmail(e.target.value);
+                    setRecoveryContact(e.target.value);
                     setError('');
                   }}
-                  placeholder="your@email.com"
+                  placeholder="your@email.com or 09XXXXXXXXX"
                   className={authInputClass}
                   disabled={isLoading}
+                  autoComplete="username"
                 />
               </div>
 
@@ -324,20 +345,18 @@ export default function LoginScreen({
                 {isLoading ? 'Sending...' : 'Get reset code'}
               </button>
 
-              {resetToken && (
-                <div className="text-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView('reset');
-                      setError('');
-                    }}
-                    className="text-eco-green hover:text-eco-green/80 font-semibold text-sm"
-                  >
-                    Enter reset code →
-                  </button>
-                </div>
-              )}
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setView('reset');
+                    setError('');
+                  }}
+                  className="text-eco-green hover:text-eco-green/80 font-semibold text-sm"
+                >
+                  Enter reset code →
+                </button>
+              </div>
 
               <div className="text-center">
                 <button
@@ -358,37 +377,42 @@ export default function LoginScreen({
           {view === 'reset' && (
             <form onSubmit={handleResetPassword} className="space-y-4">
               <div>
-                <label htmlFor="reset-email" className={authLabelClass}>
-                  Email address
+                <label htmlFor="reset-recovery" className={authLabelClass}>
+                  Email or mobile number
                 </label>
                 <input
-                  type="email"
-                  id="reset-email"
-                  value={email}
+                  type="text"
+                  id="reset-recovery"
+                  value={recoveryContact}
                   onChange={(e) => {
-                    setEmail(e.target.value);
+                    setRecoveryContact(e.target.value);
                     setError('');
                   }}
-                  placeholder="your@email.com"
+                  placeholder="your@email.com or 09XXXXXXXXX"
                   className={authInputClass}
                   disabled={isLoading}
+                  autoComplete="username"
                 />
               </div>
 
               <div>
                 <label htmlFor="reset-token" className={authLabelClass}>
-                  Reset code
+                  {OTP_LENGTH}-digit code
                 </label>
                 <input
+                  ref={otpInputRef}
                   type="text"
                   id="reset-token"
                   value={resetToken}
                   onChange={(e) => {
-                    setResetToken(e.target.value);
+                    setResetToken(e.target.value.replace(/\D/g, '').slice(0, OTP_LENGTH));
                     setError('');
                   }}
-                  placeholder="Paste reset code"
-                  className={authInputClass}
+                  placeholder={'0'.repeat(OTP_LENGTH)}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={OTP_LENGTH}
+                  className={`${authInputClass} text-center text-lg tracking-[0.35em] font-semibold`}
                   disabled={isLoading}
                 />
               </div>

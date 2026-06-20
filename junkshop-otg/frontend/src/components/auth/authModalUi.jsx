@@ -33,7 +33,7 @@ export function AuthModalClose({ onClick, label }) {
     <button
       type="button"
       onClick={onClick}
-      className="absolute top-3.5 right-3.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-light-gray text-charcoal/70 transition-colors hover:bg-red-600 hover:text-white"
+      className="absolute top-3.5 right-3.5 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-light-gray text-charcoal/70 transition-colors hover:bg-red-600 hover:text-white"
       aria-label={label}
     >
       <X className="h-3.5 w-3.5" strokeWidth={2.5} />

@@ -13,6 +13,7 @@ import {
     Leaf,
     AlertCircle,
     ReceiptText,
+    RefreshCw,
 } from "lucide-react";
 import { Heart } from "lucide-react";
 import JunkshopsMap from "../maps/JunkshopsMap";
@@ -55,7 +56,7 @@ function parsePriceMid(perKgPrice) {
     return match ? Number(match[1]) : 0;
 }
 
-function PanelStatus({ loading, error, source }) {
+function PanelStatus({ loading, error, source, onRetry }) {
     if (loading) {
         return (
             <p className="text-sm text-[#72796e] animate-pulse" role="status">
@@ -66,9 +67,19 @@ function PanelStatus({ loading, error, source }) {
 
     if (error) {
         return (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 px-3 py-2 rounded-lg">
-                Could not reach the server. Showing saved reference data.
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-red-800 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+                <p>{error}</p>
+                {onRetry && (
+                    <button
+                        type="button"
+                        onClick={onRetry}
+                        className="inline-flex items-center gap-2 font-semibold text-red-900 hover:underline shrink-0"
+                    >
+                        <RefreshCw size={14} />
+                        Retry
+                    </button>
+                )}
+            </div>
         );
     }
 
@@ -115,7 +126,7 @@ export function JunkshopsPanel({
     autoRouteShopId = null,
     onRouteDrawn,
 }) {
-    const { shops, loading, error, source } = useCatalogJunkshops({ partnersOnly: true });
+    const { shops, loading, error, source, refresh } = useCatalogJunkshops({ partnersOnly: true });
     const [query, setQuery] = useState("");
     const [locationFilter, setLocationFilter] = useState("all");
     const [expandedId, setExpandedId] = useState(initialShopId);
@@ -178,7 +189,7 @@ export function JunkshopsPanel({
 
     return (
         <div className="space-y-6">
-            <PanelStatus loading={loading} error={error} source={source} />
+            <PanelStatus loading={loading} error={error} source={source} onRetry={refresh} />
             <p className="text-sm text-[#72796e] max-w-2xl">
                 Verified partner junkshops only — providers appear here after they complete shop setup.
             </p>
@@ -489,7 +500,7 @@ function TrendBadge({ trend }) {
 }
 
 export function MaterialPricesPanel() {
-    const { materials, loading, error, source } = useCatalogMaterials();
+    const { materials, loading, error, source, refresh } = useCatalogMaterials();
     const [activeCategory, setActiveCategory] = useState("all");
 
     const filteredPrices = useMemo(() => {
@@ -518,7 +529,7 @@ export function MaterialPricesPanel() {
     if (!loading && materials.length === 0) {
         return (
             <div className="space-y-6">
-                <PanelStatus loading={loading} error={error} source={source} />
+                <PanelStatus loading={loading} error={error} source={source} onRetry={refresh} />
                 <EmptyState
                     title="No price data yet"
                     description="Run npm run seed for reference catalog prices, or check back when partner shops publish their buy rates."
@@ -529,7 +540,7 @@ export function MaterialPricesPanel() {
 
     return (
         <div className="space-y-6">
-            <PanelStatus loading={loading} error={error} source={source} />
+            <PanelStatus loading={loading} error={error} source={source} onRetry={refresh} />
             <p className="text-sm text-[#72796e] max-w-2xl">
                 Live catalog and partner shop rates. Prices vary by condition and volume.
             </p>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
@@ -16,6 +16,7 @@ import {
   persistSession as saveSession,
   setStoredUser,
 } from './utils/authStorage';
+import { setAuthHandlers } from './utils/authEvents';
 
 export default function App() {
   const [activeSection, setActiveSection] = useState('home');
@@ -71,6 +72,37 @@ export default function App() {
     setActiveSection('home');
   };
 
+  const handleSessionExpired = useCallback((message) => {
+    setUser(null);
+    setActiveSection('home');
+    setLoginPrefill({
+      email: '',
+      role: 'customer',
+      message: message || 'Session expired. Please log in again.',
+    });
+    setShowLoginModal(true);
+  }, []);
+
+  const handleAccountSuspended = useCallback((message) => {
+    setUser(null);
+    setActiveSection('home');
+    setLoginPrefill({
+      email: '',
+      role: 'customer',
+      message: message || 'Your account is not active. Please contact support if you need help.',
+    });
+    setShowLoginModal(true);
+  }, []);
+
+  useLayoutEffect(() => {
+    setAuthHandlers({
+      onSessionExpired: handleSessionExpired,
+      onAccountSuspended: handleAccountSuspended,
+    });
+
+    return () => setAuthHandlers({});
+  }, [handleSessionExpired, handleAccountSuspended]);
+
   // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
@@ -93,7 +125,7 @@ export default function App() {
         setStoredUser(currentUser);
       })
       .catch((error) => {
-        // Only clear session when the token is actually invalid — not on Render cold start / network blips
+        if (error.sessionExpired || error.accountSuspended) return;
         if (error.status === 401) {
           clearSession();
           setUser(null);
@@ -116,9 +148,10 @@ export default function App() {
     };
   }, [showLoginModal, showSignUpModal]);
 
-  // Show provider dashboard if logged in as provider
+  let mainContent;
+
   if (isAuthenticated && isProviderMode) {
-    return (
+    mainContent = (
       <ProviderDashboard
         onLogout={handleLogout}
         user={user}
@@ -128,11 +161,8 @@ export default function App() {
         }}
       />
     );
-  }
-
-  // Show customer dashboard if logged in as customer
-  if (isAuthenticated && !isProviderMode) {
-    return (
+  } else if (isAuthenticated && !isProviderMode) {
+    mainContent = (
       <CustomerDashboard
         onLogout={handleLogout}
         user={user}
@@ -142,41 +172,37 @@ export default function App() {
         }}
       />
     );
+  } else {
+    mainContent = (
+      <div className="min-h-screen bg-white">
+        <Header
+          activeSection={activeSection}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+          isAuthenticated={isAuthenticated}
+          onShowLogin={() => {
+            setLoginPrefill({ email: '', role: 'customer', message: '' });
+            setShowLoginModal(true);
+          }}
+          onShowSignUp={() => setShowSignUpModal(true)}
+        />
+        <main>
+          {activeSection === 'home' && <HomePage />}
+          {activeSection === 'about' && <AboutPage onNavigate={handleNavigate} />}
+          {activeSection === 'contact' && <ContactPage />}
+          {activeSection !== 'home' && activeSection !== 'about' && activeSection !== 'contact' && (
+            <HomePage />
+          )}
+        </main>
+        <Footer onNavigate={handleNavigate} />
+      </div>
+    );
   }
 
-  // Customer view with header and footer
-  const renderPage = () => {
-    switch (activeSection) {
-      case 'home':
-        return <HomePage />;
-      case 'about':
-        return <AboutPage onNavigate={handleNavigate} />;
-      case 'contact':
-        return <ContactPage />;
-      default:
-        return <HomePage />;
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-white">
-      <Header
-        activeSection={activeSection}
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
-        isAuthenticated={isAuthenticated}
-        onShowLogin={() => {
-          setLoginPrefill({ email: '', role: 'customer', message: '' });
-          setShowLoginModal(true);
-        }}
-        onShowSignUp={() => setShowSignUpModal(true)}
-      />
-      <main>
-        {renderPage()}
-      </main>
-      <Footer onNavigate={handleNavigate} />
+    <>
+      {mainContent}
 
-      {/* Login Modal */}
       {showLoginModal && (
         <LoginScreen
           onLoginSuccess={handleAuthSuccess}
@@ -192,7 +218,6 @@ export default function App() {
         />
       )}
 
-      {/* Sign Up Modal */}
       {showSignUpModal && (
         <SignUpModal
           isOpen={showSignUpModal}
@@ -205,7 +230,6 @@ export default function App() {
           }}
         />
       )}
-
-    </div>
+    </>
   );
 }

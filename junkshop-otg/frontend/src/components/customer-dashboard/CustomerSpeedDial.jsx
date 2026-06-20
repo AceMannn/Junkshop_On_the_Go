@@ -60,11 +60,11 @@ export default function CustomerSpeedDial({ open, onToggle, onClose, onSelect })
     return (
         <div
             ref={rootRef}
-            className="fixed bottom-24 right-4 sm:right-6 lg:bottom-8 lg:right-8 z-30 flex flex-col items-end pointer-events-none"
+            className="fixed bottom-24 right-4 sm:right-6 md:bottom-8 md:right-8 z-30 flex flex-col items-end pointer-events-none"
         >
             {open && (
                 <div
-                    className="fixed inset-0 bg-black/20 z-[-1] lg:hidden pointer-events-auto"
+                    className="fixed inset-0 bg-black/20 z-[-1] md:hidden pointer-events-auto"
                     aria-hidden="true"
                     onClick={onClose}
                 />
