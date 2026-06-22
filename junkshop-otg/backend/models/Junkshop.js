@@ -26,6 +26,19 @@ const junkshopSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+
+    operatingHours: [
+      {
+        day: {
+          type: String,
+          enum: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+          required: true,
+        },
+        open: { type: String, trim: true, default: '' },
+        close: { type: String, trim: true, default: '' },
+        closed: { type: Boolean, default: false },
+      },
+    ],
     status: {
       type: String,
       enum: ['open', 'closed'],

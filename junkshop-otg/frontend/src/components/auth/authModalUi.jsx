@@ -25,7 +25,7 @@ export function authRoleTabClass(isActive) {
 
 export const authRoleHints = {
   customer: 'Customer — Access recycling tools',
-  provider: 'Provider — Manage junkshop operations',
+  provider: 'Junkshop Owner — Register your shop for admin verification',
 };
 
 export function AuthModalClose({ onClick, label }) {

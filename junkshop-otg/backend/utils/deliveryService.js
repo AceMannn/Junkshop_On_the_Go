@@ -85,6 +85,22 @@ async function sendPasswordResetSms(phone, code) {
   return sendSms({ to: phone, body });
 }
 
+async function sendEmailVerificationEmail(email, code, firstName = '') {
+  const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
+  const subject = `${APP_NAME} email verification code`;
+  const text = [
+    greeting,
+    '',
+    `Your email verification code is: ${code}`,
+    '',
+    'This code expires in 15 minutes. Enter it in the app to activate your account.',
+    '',
+    `— ${APP_NAME}`,
+  ].join('\n');
+
+  return sendEmail({ to: email, subject, text });
+}
+
 async function sendTransactionalEmail(email, subject, message) {
   if (!email) return { ok: false, skipped: true };
   const text = `${message}\n\n— ${APP_NAME}`;
@@ -102,6 +118,7 @@ module.exports = {
   isSmsConfigured,
   sendPasswordResetEmail,
   sendPasswordResetSms,
+  sendEmailVerificationEmail,
   sendTransactionalEmail,
   sendTransactionalSms,
 };

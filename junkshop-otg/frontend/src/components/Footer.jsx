@@ -2,8 +2,6 @@ import { Facebook, Mail, Instagram } from 'lucide-react';
 import logoImage from '../assets/junkshop-logo.png';
 
 export default function Footer({ onNavigate }) {
-    const currentYear = new Date().getFullYear();
-
     const handleSocialClick = (platform) => {
         switch (platform) {
             case 'facebook':
@@ -19,9 +17,9 @@ export default function Footer({ onNavigate }) {
     };
 
     return (
-        <footer className="bg-charcoal text-white pt-12 pb-8">
+        <footer className="bg-charcoal text-white py-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                     {/* Logo & Description */}
                     <div className="lg:col-span-2">
                         <div className="flex items-center mb-4">
@@ -96,11 +94,6 @@ export default function Footer({ onNavigate }) {
                     </div>
                 </div>
 
-                {/* Bottom Bar */}
-                <div className="border-t border-gray-700 pt-8 text-center text-gray-400">
-                    <p>&copy; {currentYear} JunkShop On-The-Go. All rights reserved.</p>
-                    <p className="mt-2 text-sm">Built with ♻️ for the community</p>
-                </div>
             </div>
         </footer>
     );

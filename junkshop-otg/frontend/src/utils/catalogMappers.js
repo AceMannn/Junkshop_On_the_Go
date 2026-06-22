@@ -50,8 +50,12 @@ export function normalizeMaterial(item) {
     examples: item.examples || '',
     notes: item.notes || '',
     price: item.price,
+    unit: item.unit || 'kg',
     previousPrice: item.previousPrice,
+    postedAt: item.createdAt || item.updatedAt,
     updatedAt: item.updatedAt,
+    source: item.source || (item.isCatalog ? 'catalog' : 'partner'),
+    junkshop: item.junkshop || null,
   };
 }
 

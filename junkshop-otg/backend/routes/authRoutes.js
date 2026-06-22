@@ -11,6 +11,8 @@ const {
   toggleFavorite,
   forgotPassword,
   resetPassword,
+  verifyEmail,
+  resendEmailVerification,
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 const { authLimiter } = require('../middlewares/rateLimiters');
@@ -19,6 +21,8 @@ const router = express.Router();
 
 router.post('/register', authLimiter, registerUser);
 router.post('/login', authLimiter, loginUser);
+router.post('/verify-email', authLimiter, verifyEmail);
+router.post('/resend-verification', authLimiter, resendEmailVerification);
 router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/reset-password', authLimiter, resetPassword);
 

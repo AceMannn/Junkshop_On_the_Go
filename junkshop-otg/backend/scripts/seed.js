@@ -77,6 +77,25 @@ const seed = async () => {
   }
 
   console.log(`Seeded ${junkshopCount} junkshops and ${materialCount} catalog materials.`);
+
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@junkshop-otg.ph').trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || 'AdminChangeMe123!';
+
+  await User.findOneAndUpdate(
+    { email: adminEmail },
+    {
+      firstName: 'Platform',
+      lastName: 'Admin',
+      email: adminEmail,
+      password: await bcrypt.hash(adminPassword, 10),
+      role: 'admin',
+      status: 'active',
+      emailVerified: true,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  console.log(`Admin account ready: ${adminEmail}`);
   process.exit(0);
 };
 

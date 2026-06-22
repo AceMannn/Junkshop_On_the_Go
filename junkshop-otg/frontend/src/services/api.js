@@ -11,6 +11,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000
 const AUTH_LOCAL_ERROR_PATHS = [
   '/api/auth/login',
   '/api/auth/register',
+  '/api/auth/verify-email',
+  '/api/auth/resend-verification',
   '/api/auth/forgot-password',
   '/api/auth/reset-password',
   '/api/auth/password',
@@ -25,13 +27,25 @@ function sleep(ms) {
 }
 
 export class ApiError extends Error {
-  constructor(message, { status, isNetworkError = false, sessionExpired = false, accountSuspended = false } = {}) {
+  constructor(
+    message,
+    {
+      status,
+      isNetworkError = false,
+      sessionExpired = false,
+      accountSuspended = false,
+      requiresEmailVerification = false,
+      email = '',
+    } = {}
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.isNetworkError = isNetworkError;
     this.sessionExpired = sessionExpired;
     this.accountSuspended = accountSuspended;
+    this.requiresEmailVerification = requiresEmailVerification;
+    this.email = email;
   }
 }
 
@@ -83,7 +97,11 @@ async function request(path, options = {}, attempt = 0) {
       throw new ApiError(userMessage, { status: 403, accountSuspended: true });
     }
 
-    throw new ApiError(message, { status: response.status });
+    throw new ApiError(message, {
+      status: response.status,
+      requiresEmailVerification: Boolean(data.requiresEmailVerification),
+      email: data.email || '',
+    });
   }
 
   return data;
@@ -98,6 +116,18 @@ export const authApi = {
   },
   register(payload) {
     return request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  verifyEmail(payload) {
+    return request('/api/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  resendVerification(payload) {
+    return request('/api/auth/resend-verification', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -349,5 +379,20 @@ export const authApiExtended = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
+  },
+};
+
+export const verificationApi = {
+  getMe() {
+    return request('/api/verification/me');
+  },
+  saveDocuments(payload) {
+    return request('/api/verification/documents', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+  submit() {
+    return request('/api/verification/submit', { method: 'POST' });
   },
 };

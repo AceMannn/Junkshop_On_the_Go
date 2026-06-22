@@ -64,8 +64,19 @@ function InputField({ label, required, type = "text", value, onChange, readOnly 
     );
 }
 
+function isProviderInternalEmail(email) {
+    return String(email || "").endsWith("@provider.junkshop.internal");
+}
+
 export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
+    const isProvider = user?.role === "provider";
     const displayName = getDisplayName(user);
+    const showEmail = user?.email && !isProviderInternalEmail(user.email);
+    const emailDisplay = showEmail
+        ? user.email
+        : isProvider
+          ? "No email on file (optional at signup)"
+          : user?.email || "";
     const [form, setForm] = useState({
         firstName: user?.firstName || "",
         lastName: user?.lastName || "",
@@ -93,7 +104,11 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
     return (
         <AccountPageShell
             title="View Profile"
-            subtitle="Your personal information used for pickups and account recovery."
+            subtitle={
+                isProvider
+                    ? "Your owner profile for verification, login, and shop contact details."
+                    : "Your personal information used for pickups and account recovery."
+            }
             onBack={onBack}
         >
             <div className="flex items-center gap-4 p-4 sm:p-5 bg-white rounded-2xl border border-zinc-200 shadow-sm">
@@ -105,24 +120,31 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                 </span>
                 <div className="min-w-0">
                     <p className="font-bold text-[#191c1c] truncate">{displayName}</p>
-                    <p className="text-sm text-[#72796e] truncate">{user?.email}</p>
+                    <p className="text-sm text-[#72796e] truncate">
+                        {isProvider ? user?.phone || emailDisplay : emailDisplay}
+                    </p>
+                    {isProvider && showEmail && (
+                        <p className="text-xs text-[#72796e] truncate mt-0.5">{user.email}</p>
+                    )}
                     <p className="text-xs text-emerald-700 font-medium mt-1 capitalize">
-                        {user?.role || "customer"} account
+                        {isProvider ? "Junkshop owner" : `${user?.role || "customer"} account`}
                     </p>
                 </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 p-4 sm:p-5 bg-gradient-to-r from-amber-50 to-emerald-50 rounded-2xl border border-amber-100 shadow-sm">
-                <div>
-                    <p className="text-sm font-semibold text-[#42493e]">Recycling points</p>
-                    <p className="text-2xl font-bold text-[#154212] mt-1">
-                        {formatPoints(user?.recyclingPoints ?? 0)} pts
-                    </p>
-                    <p className="text-xs text-[#72796e] mt-1">
-                        Earned from drop-offs at partner shops. Redeem rewards coming soon.
-                    </p>
+            {!isProvider && (
+                <div className="flex items-center justify-between gap-4 p-4 sm:p-5 bg-gradient-to-r from-amber-50 to-emerald-50 rounded-2xl border border-amber-100 shadow-sm">
+                    <div>
+                        <p className="text-sm font-semibold text-[#42493e]">Recycling points</p>
+                        <p className="text-2xl font-bold text-[#154212] mt-1">
+                            {formatPoints(user?.recyclingPoints ?? 0)} pts
+                        </p>
+                        <p className="text-xs text-[#72796e] mt-1">
+                            Earned from drop-offs at partner shops. Redeem rewards coming soon.
+                        </p>
+                    </div>
                 </div>
-            </div>
+            )}
 
             <section className="bg-white p-5 sm:p-8 rounded-2xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.12)]">
                 <div className="flex items-center gap-3 mb-6">
@@ -148,13 +170,13 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                         />
                         <InputField
                             label="Email address"
-                            required
+                            required={!isProvider}
                             type="email"
-                            value={user?.email || ""}
+                            value={emailDisplay}
                             readOnly
                         />
                         <InputField
-                            label="Mobile number"
+                            label={isProvider ? "Mobile number (login)" : "Mobile number"}
                             type="tel"
                             value={form.phone}
                             onChange={(v) =>
@@ -165,14 +187,16 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                             }
                         />
                         <p className="text-xs text-[#72796e] md:col-span-2 -mt-2">
-                            Required for pickup requests and account recovery. Use format{" "}
+                            {isProvider
+                                ? "Used to sign in and for customer pickup contact. Format "
+                                : "Required for pickup requests and account recovery. Use format "}
                             <strong>09XXXXXXXXX</strong>.
                         </p>
                     </div>
 
                     <div className="space-y-2">
                         <label className="block text-sm font-semibold text-[#42493e]">
-                            Street address
+                            {isProvider ? "Business address" : "Street address"}
                         </label>
                         <textarea
                             className="w-full bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#154212] focus:border-transparent outline-none transition-all resize-none text-sm"
@@ -265,7 +289,14 @@ function CustomerNotesSection() {
     );
 }
 
-export function AccountSettingsPage({ user, onBack, onNotify, onUserUpdate }) {
+export function AccountSettingsPage({
+    user,
+    onBack,
+    onNotify,
+    onUserUpdate,
+    variant = "customer",
+}) {
+    const isProvider = variant === "provider";
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [saving, setSaving] = useState(false);
@@ -293,11 +324,15 @@ export function AccountSettingsPage({ user, onBack, onNotify, onUserUpdate }) {
 
     return (
         <AccountPageShell
-            title="Settings"
-            subtitle="Security, privacy, and account preferences."
+            title="Account Settings"
+            subtitle={
+                isProvider
+                    ? "Update your login password and account security."
+                    : "Security, privacy, and account preferences."
+            }
             onBack={onBack}
         >
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+            <div className={`grid grid-cols-1 ${isProvider ? "max-w-xl" : "lg:grid-cols-2"} gap-5 sm:gap-6`}>
                 <section className="bg-white p-5 sm:p-8 rounded-2xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.12)]">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="w-9 h-9 rounded-full bg-[#c9e7cc] flex items-center justify-center">
@@ -357,7 +392,8 @@ export function AccountSettingsPage({ user, onBack, onNotify, onUserUpdate }) {
                     </div>
                 </section>
 
-                <section className="bg-[#45544a] p-5 sm:p-6 rounded-2xl text-[#b6c7bb] flex flex-col justify-between gap-4 min-h-[200px]">
+                {!isProvider && (
+                    <section className="bg-[#45544a] p-5 sm:p-6 rounded-2xl text-[#b6c7bb] flex flex-col justify-between gap-4 min-h-[200px]">
                     <div className="flex items-start gap-4">
                         <div className="p-2.5 bg-white/10 rounded-xl shrink-0">
                             <Shield size={20} />
@@ -401,9 +437,11 @@ export function AccountSettingsPage({ user, onBack, onNotify, onUserUpdate }) {
                         </button>
                     </div>
                 </section>
+                )}
             </div>
 
-            <section className="bg-white p-5 sm:p-8 rounded-2xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.12)]">
+            {!isProvider && (
+                <section className="bg-white p-5 sm:p-8 rounded-2xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.12)]">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="w-9 h-9 rounded-full bg-[#c9e7cc] flex items-center justify-center">
                         <StickyNote size={20} className="text-[#4e6953]" />
@@ -412,6 +450,7 @@ export function AccountSettingsPage({ user, onBack, onNotify, onUserUpdate }) {
                 </div>
                 <CustomerNotesSection />
             </section>
+            )}
         </AccountPageShell>
     );
 }

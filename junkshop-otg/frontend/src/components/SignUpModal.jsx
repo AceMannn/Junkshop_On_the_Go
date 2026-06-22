@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../services/api';
+import ProviderSignUpWizard from './ProviderSignUpWizard';
+import EmailVerificationStep from './auth/EmailVerificationStep';
 import {
   AuthModalClose,
   AuthErrorPopup,
@@ -16,6 +18,7 @@ import {
 } from './auth/authModalUi';
 
 export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowLogin }) {
+  const [selectedRole, setSelectedRole] = useState('customer');
   const [formData, setFormData] = useState({
     firstName: '',
     middleName: '',
@@ -26,9 +29,28 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState('customer');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState('form');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const [devVerificationCode, setDevVerificationCode] = useState('');
+
+  if (!isOpen) {
+    return null;
+  }
+
+  if (selectedRole === 'provider') {
+    return (
+      <ProviderSignUpWizard
+        isOpen={isOpen}
+        onClose={onClose}
+        onComplete={onSignUpComplete}
+        onShowLogin={onShowLogin}
+        onSwitchToCustomer={() => setSelectedRole('customer')}
+      />
+    );
+  }
 
   const handleInputChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -62,8 +84,8 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
 
     try {
       setIsLoading(true);
-      await authApi.register({
-        role: selectedRole,
+      const result = await authApi.register({
+        role: 'customer',
         firstName: formData.firstName,
         middleName: formData.middleName,
         lastName: formData.lastName,
@@ -71,22 +93,16 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
         password: formData.password,
       });
 
-      const signedUpEmail = formData.email;
-      const signedUpRole = selectedRole;
-
-      setFormData({
-        firstName: '',
-        middleName: '',
-        lastName: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-      });
-
-      if (onSignUpComplete) {
-        onSignUpComplete({ email: signedUpEmail, role: signedUpRole });
+      if (result.requiresEmailVerification) {
+        setPendingEmail(formData.email.trim().toLowerCase());
+        setVerificationMessage(result.message || 'Check your email for a verification code.');
+        setDevVerificationCode(result.devVerificationCode || '');
+        setStep('verify');
+        setError('');
+        return;
       }
 
+      onSignUpComplete?.(result);
       onClose();
     } catch (registerError) {
       setError(registerError.message);
@@ -94,10 +110,6 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
       setIsLoading(false);
     }
   };
-
-  if (!isOpen) {
-    return null;
-  }
 
   return (
     <div
@@ -120,11 +132,43 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
 
           <header className="mb-4 pr-10">
             <h2 id="signup-title" className="text-xl font-bold text-charcoal mb-1">
-              Create Account
+              {step === 'verify' ? 'Verify your email' : 'Create Account'}
             </h2>
-            <p className="text-charcoal/60 text-sm">Join JunkShop On-The-Go community</p>
+            <p className="text-charcoal/60 text-sm">
+              {step === 'verify'
+                ? 'Enter the code we sent to activate your customer account.'
+                : 'Join JunkShop On-The-Go community'}
+            </p>
           </header>
 
+          {step === 'verify' ? (
+            <EmailVerificationStep
+              email={pendingEmail}
+              initialDevCode={devVerificationCode}
+              initialMessage={verificationMessage}
+              onVerified={(session) => {
+                setFormData({
+                  firstName: '',
+                  middleName: '',
+                  lastName: '',
+                  email: '',
+                  password: '',
+                  confirmPassword: '',
+                });
+                setStep('form');
+                setPendingEmail('');
+                setDevVerificationCode('');
+                onSignUpComplete?.(session);
+                onClose();
+              }}
+              onBack={() => {
+                setStep('form');
+                setError('');
+              }}
+              verifyLabel="Verify & continue"
+            />
+          ) : (
+            <>
           <div className={authRoleToggleWrapClass}>
             <button
               type="button"
@@ -138,13 +182,11 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
               onClick={() => setSelectedRole('provider')}
               className={authRoleTabClass(selectedRole === 'provider')}
             >
-              Provider
+              Junkshop Owner
             </button>
           </div>
 
-          <p className="text-xs text-charcoal/50 mb-4">
-            {authRoleHints[selectedRole]}
-          </p>
+          <p className="text-xs text-charcoal/50 mb-4">{authRoleHints[selectedRole]}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-4">
@@ -272,9 +314,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
             </div>
 
             <button type="submit" disabled={isLoading} className={authSubmitClass}>
-              {isLoading
-                ? 'Creating Account...'
-                : `Sign up as ${selectedRole === 'customer' ? 'Customer' : 'Provider'}`}
+              {isLoading ? 'Creating Account...' : 'Sign up as Customer'}
             </button>
           </form>
 
@@ -289,6 +329,8 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
               Log in
             </button>
           </p>
+            </>
+          )}
         </div>
         <AuthErrorPopup message={error} onDismiss={() => setError('')} />
       </div>

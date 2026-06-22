@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { HelpCircle, LogOut, Settings, User, UserX } from "lucide-react";
+import { HelpCircle, Lock, LogOut, Store, User, UserX } from "lucide-react";
 import { getUserInitials, getUserFullName } from "../../utils/userDisplay";
 import logoImage from "../../assets/junkshop-logo.png";
 import DashboardNotificationMenu, { getPickupRequestId } from "../dashboard/DashboardNotificationMenu";
@@ -20,7 +20,8 @@ export default function ProviderTopbar({
     setShowProfileMenu,
     onHelp,
     onViewProfile,
-    onNavigateSettings,
+    onNavigateShopSettings,
+    onNavigateAccountSettings,
     onLogout,
     onDeactivate,
     onNotificationNavigate,
@@ -126,11 +127,21 @@ export default function ProviderTopbar({
                                 <button
                                     type="button"
                                     role="menuitem"
-                                    onClick={() => runMenuAction(onNavigateSettings)}
+                                    onClick={() => runMenuAction(onNavigateShopSettings)}
                                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#191c1c] hover:bg-[#f3f4f3]"
                                 >
-                                    <Settings size={18} className="text-[#4e6953]" />
-                                    Settings
+                                    <Store size={18} className="text-[#4e6953]" />
+                                    Shop Settings
+                                </button>
+
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => runMenuAction(onNavigateAccountSettings)}
+                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#191c1c] hover:bg-[#f3f4f3]"
+                                >
+                                    <Lock size={18} className="text-[#4e6953]" />
+                                    Account Settings
                                 </button>
 
                                 <div className="h-px bg-zinc-100 my-1" />

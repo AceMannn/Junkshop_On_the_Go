@@ -12,6 +12,8 @@ const { getDatabaseHealth } = connectDB;
 const authRoutes = require('./routes/authRoutes');
 const domainRoutes = require('./routes/domainRoutes');
 const mapRoutes = require('./routes/mapRoutes');
+const verificationRoutes = require('./routes/verificationRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const { mapsLimiter } = require('./middlewares/rateLimiters');
 
 // =====================
@@ -34,10 +36,16 @@ const defaultOrigins = [
   'http://127.0.0.1:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5174',
+  'http://localhost:5175',
+  'http://127.0.0.1:5175',
 ];
 const clientOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN.split(',').map((origin) => origin.trim())
   : defaultOrigins;
+const adminPortalOrigins = process.env.ADMIN_PORTAL_ORIGIN
+  ? process.env.ADMIN_PORTAL_ORIGIN.split(',').map((origin) => origin.trim())
+  : [];
+const allowedOrigins = [...new Set([...clientOrigins, ...adminPortalOrigins])];
 
 const isLocalDevOrigin = (origin) => {
   if (!origin) return false;
@@ -61,7 +69,7 @@ const isVercelOrigin = (origin) => {
 
 const isOriginAllowed = (origin) => {
   if (!origin) return true;
-  if (clientOrigins.includes(origin)) return true;
+  if (allowedOrigins.includes(origin)) return true;
   // Production + preview deploys on Vercel (branch URLs change per push)
   if (isVercelOrigin(origin)) return true;
   // Vite picks 5174, 5175, … when 5173 is already in use
@@ -115,6 +123,8 @@ app.get('/api/health', async (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/maps', mapsLimiter, mapRoutes);
+app.use('/api/verification', verificationRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api', domainRoutes);
 
 app.use((req, res) => {

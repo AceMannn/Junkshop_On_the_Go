@@ -14,6 +14,7 @@ import {
   authRoleToggleWrapClass,
   authSubmitClass,
 } from './auth/authModalUi';
+import EmailVerificationStep from './auth/EmailVerificationStep';
 
 const OTP_LENGTH = 6;
 
@@ -37,6 +38,9 @@ export default function LoginScreen({
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verificationDevCode, setVerificationDevCode] = useState('');
+  const [verificationMessage, setVerificationMessage] = useState('');
   const otpInputRef = useRef(null);
 
   useEffect(() => {
@@ -54,6 +58,9 @@ export default function LoginScreen({
     setNewPassword('');
     setError('');
     setInfo('');
+    setVerificationEmail('');
+    setVerificationDevCode('');
+    setVerificationMessage('');
     setView('login');
   }, [initialEmail, initialRole, successMessage]);
 
@@ -63,14 +70,26 @@ export default function LoginScreen({
     setInfo('');
 
     if (!email || !password) {
-      setError('Please enter both email and password to continue.');
+      setError(
+        selectedRole === 'provider'
+          ? 'Please enter your mobile number and password.'
+          : 'Please enter both email and password to continue.'
+      );
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address.');
-      return;
+    if (selectedRole === 'provider') {
+      const normalizedPhone = email.replace(/\D/g, '').slice(0, 11);
+      if (!/^09\d{9}$/.test(normalizedPhone)) {
+        setError('Enter a valid mobile number (09XXXXXXXXX).');
+        return;
+      }
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        setError('Please enter a valid email address.');
+        return;
+      }
     }
 
     if (password.length < 8) {
@@ -81,12 +100,20 @@ export default function LoginScreen({
     setIsLoading(true);
     try {
       const session = await authApi.login({
-        email,
+        identifier: selectedRole === 'provider' ? email.replace(/\D/g, '').slice(0, 11) : email,
+        email: selectedRole === 'provider' ? undefined : email,
         password,
         role: selectedRole,
       });
       onLoginSuccess(session);
     } catch (loginError) {
+      if (loginError.requiresEmailVerification) {
+        setVerificationEmail(loginError.email || email);
+        setVerificationMessage(loginError.message);
+        setView('verifyEmail');
+        setError('');
+        return;
+      }
       setError(loginError.message);
     } finally {
       setIsLoading(false);
@@ -169,15 +196,17 @@ export default function LoginScreen({
     login: 'Welcome Back',
     forgot: 'Forgot Password',
     reset: 'Reset Password',
+    verifyEmail: 'Verify your email',
   };
 
   const subtitles = {
     login: 'Login to continue using JunkShop On-The-Go',
     forgot: 'Enter your email or mobile number (09XXXXXXXXX) to get a reset code',
     reset: `Enter the ${OTP_LENGTH}-digit code we sent, then choose a new password`,
+    verifyEmail: 'Enter the verification code to activate your customer account',
   };
 
-  const scrollableViews = view === 'reset';
+  const scrollableViews = view === 'reset' || view === 'verifyEmail';
 
   return (
     <div
@@ -224,7 +253,7 @@ export default function LoginScreen({
                   onClick={() => setSelectedRole('provider')}
                   className={authRoleTabClass(selectedRole === 'provider')}
                 >
-                  Provider
+                  Junkshop Owner
                 </button>
               </div>
               <p className="text-xs text-charcoal/50 mb-4">{authRoleHints[selectedRole]}</p>
@@ -249,19 +278,26 @@ export default function LoginScreen({
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label htmlFor="email" className={authLabelClass}>
-                  Email address
+                  {selectedRole === 'provider' ? 'Mobile number' : 'Email address'}
                 </label>
                 <input
-                  type="email"
+                  type={selectedRole === 'provider' ? 'tel' : 'email'}
                   id="email"
                   value={email}
                   onChange={(e) => {
-                    setEmail(e.target.value);
+                    const nextValue =
+                      selectedRole === 'provider'
+                        ? e.target.value.replace(/\D/g, '').slice(0, 11)
+                        : e.target.value;
+                    setEmail(nextValue);
                     setError('');
                   }}
-                  placeholder="your@email.com"
+                  placeholder={
+                    selectedRole === 'provider' ? '09XXXXXXXXX' : 'your@email.com'
+                  }
                   className={authInputClass}
                   disabled={isLoading}
+                  autoComplete={selectedRole === 'provider' ? 'tel' : 'email'}
                 />
               </div>
 
@@ -313,7 +349,7 @@ export default function LoginScreen({
               <button type="submit" disabled={isLoading} className={authSubmitClass}>
                 {isLoading
                   ? 'Logging in...'
-                  : `Log in as ${selectedRole === 'customer' ? 'Customer' : 'Provider'}`}
+                  : `Log in as ${selectedRole === 'customer' ? 'Customer' : 'Junkshop Owner'}`}
               </button>
 
               <p className="text-xs text-charcoal/50">Your account is protected securely.</p>
@@ -469,6 +505,23 @@ export default function LoginScreen({
                 </button>
               </div>
             </form>
+          )}
+
+          {view === 'verifyEmail' && (
+            <EmailVerificationStep
+              email={verificationEmail}
+              initialDevCode={verificationDevCode}
+              initialMessage={verificationMessage}
+              onVerified={(session) => {
+                onLoginSuccess(session);
+              }}
+              onBack={() => {
+                setView('login');
+                setError('');
+                setInfo('');
+              }}
+              verifyLabel="Verify & log in"
+            />
           )}
 
           {view === 'login' && (

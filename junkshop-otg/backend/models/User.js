@@ -35,6 +35,69 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    emailVerified: {
+      type: Boolean,
+      default: true,
+    },
+
+    emailVerificationCodeHash: {
+      type: String,
+      default: null,
+    },
+
+    emailVerificationExpiresAt: {
+      type: Date,
+      default: null,
+    },
+
+    verificationStatus: {
+      type: String,
+      enum: ['draft', 'pending', 'approved', 'rejected'],
+      default: 'draft',
+    },
+
+    verificationRejectNote: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+
+    verificationSubmittedAt: Date,
+
+    verificationReviewedAt: Date,
+
+    badges: {
+      type: [String],
+      default: [],
+    },
+
+    verificationDocuments: {
+      governmentId: {
+        docType: { type: String, trim: true, default: '' },
+        fileName: { type: String, trim: true, default: '' },
+        mimeType: { type: String, trim: true, default: '' },
+        data: { type: String, default: '' },
+        uploadedAt: Date,
+      },
+      businessPermit: {
+        docType: { type: String, trim: true, default: '' },
+        fileName: { type: String, trim: true, default: '' },
+        mimeType: { type: String, trim: true, default: '' },
+        data: { type: String, default: '' },
+        uploadedAt: Date,
+      },
+      shopPhotos: [
+        {
+          slot: { type: Number, min: 1, max: 3 },
+          label: { type: String, trim: true, default: '' },
+          fileName: { type: String, trim: true, default: '' },
+          mimeType: { type: String, trim: true, default: '' },
+          data: { type: String, default: '' },
+          uploadedAt: Date,
+        },
+      ],
+    },
+
     phone: {
       type: String,
       trim: true,

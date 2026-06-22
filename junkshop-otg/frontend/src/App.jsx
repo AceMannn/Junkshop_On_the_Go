@@ -46,16 +46,46 @@ export default function App() {
     setShowSignUpModal(false);
   };
 
+  const adminPortalUrl =
+    import.meta.env.VITE_ADMIN_PORTAL_URL || 'http://localhost:5175';
+
   const handleAuthSuccess = (session) => {
+    if (session?.user?.role === 'admin') {
+      clearSession();
+      setLoginPrefill({
+        email: session.user.email || '',
+        role: 'customer',
+        message: `Admin accounts must sign in through the admin portal (${adminPortalUrl}).`,
+      });
+      setShowLoginModal(true);
+      return;
+    }
+
     persistSession(session);
     setLoginPrefill({ email: '', role: 'customer', message: '' });
   };
 
-  const handleSignUpComplete = ({ email, role }) => {
+  const handleSignUpComplete = (result) => {
     setShowSignUpModal(false);
+
+    if (result?.token && result?.user) {
+      handleAuthSuccess({ token: result.token, user: result.user });
+      return;
+    }
+
+    if (result?.requiresEmailVerification) {
+      setLoginPrefill({
+        email: result.email || '',
+        role: 'customer',
+        message: result.message || 'Verify your email to finish signing up.',
+      });
+      setShowLoginModal(true);
+      return;
+    }
+
     setLoginPrefill({
-      email,
-      role,
+      email: result?.email || '',
+      role: result?.role || 'customer',
       message: 'Account created! Please log in.',
     });
     setShowLoginModal(true);
@@ -121,6 +151,12 @@ export default function App() {
 
     authApi.me()
       .then(({ user: currentUser }) => {
+        if (currentUser?.role === 'admin') {
+          clearSession();
+          setUser(null);
+          return;
+        }
+
         setUser(currentUser);
         setStoredUser(currentUser);
       })

@@ -129,7 +129,10 @@ async function syncProfileComplete(userId) {
     }).sort({ createdAt: 1 });
 
     if (shop) {
-      shop.isPublished = status.complete;
+      const verificationBlocked = ['draft', 'pending', 'rejected'].includes(
+        user.verificationStatus
+      );
+      shop.isPublished = !verificationBlocked && status.complete;
       await shop.save();
     }
 

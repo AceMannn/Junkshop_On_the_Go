@@ -20,7 +20,20 @@ const {
 const {
   sendPasswordResetEmail,
   sendPasswordResetSms,
+  sendEmailVerificationEmail,
 } = require('../utils/deliveryService');
+const {
+  assignEmailVerificationCode,
+  clearEmailVerificationCode,
+  isCustomerEmailVerified,
+  verifyEmailCode,
+  maybeAttachDevVerificationCode,
+} = require('../utils/emailVerification');
+const {
+  sanitizeOperatingHours,
+  formatOperatingHoursSummary,
+  providerPlaceholderEmail,
+} = require('../utils/operatingHours');
 
 const DEFAULT_SHOP_LOCATION = { lat: 14.5995, lng: 121.0055 };
 const nameRegex = /^[A-Za-zÀ-ÿÑñ\s.'-]+$/;
@@ -58,6 +71,10 @@ const userPayload = (user) => ({
   profileComplete: Boolean(user.profileComplete),
   leaderboardVisible: user.leaderboardVisible !== false,
   recyclingPoints: user.recyclingPoints ?? 0,
+  verificationStatus: user.verificationStatus || 'draft',
+  verificationRejectNote: user.verificationRejectNote || '',
+  badges: user.badges || [],
+  emailVerified: isCustomerEmailVerified(user),
 });
 
 async function buildUserResponse(user) {
@@ -67,6 +84,22 @@ async function buildUserResponse(user) {
     profileComplete: profileStatus.complete,
     profileStatus,
   };
+}
+
+async function findProviderByPhone(rawPhone) {
+  const normalizedPhone = normalizePhone(rawPhone);
+  if (!hasValidPhone(normalizedPhone)) {
+    return null;
+  }
+
+  let user = await User.findOne({ phone: normalizedPhone, role: 'provider' });
+  if (user) return user;
+
+  const candidates = await User.find({ role: 'provider', phone: { $ne: '' } }).select('phone');
+  const match = candidates.find((row) => normalizePhone(row.phone) === normalizedPhone);
+  if (!match) return null;
+
+  return User.findById(match._id);
 }
 
 // Register new user
@@ -82,27 +115,27 @@ const registerUser = async (req, res) => {
       password,
       junkshopName,
       address,
+      location,
+      operatingHours,
     } = req.body;
 
     const cleanedRole = role.trim().toLowerCase();
     const cleanedFirstName = firstName?.trim();
     const cleanedMiddleName = middleName?.trim() || '';
     const cleanedLastName = lastName?.trim();
-    const cleanedEmail = email?.trim().toLowerCase();
+    const cleanedEmail = email?.trim().toLowerCase() || '';
     const cleanedPhone = phone?.trim() || '';
     const cleanedJunkshopName = junkshopName?.trim() || '';
     const cleanedAddress = address?.trim() || '';
 
     const allowedRoles = ['customer', 'provider'];
-    const nameRegex = /^[A-Za-zÀ-ÿÑñ\s.'-]+$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^(\+63|0)9\d{9}$/;
 
     if (!allowedRoles.includes(cleanedRole)) {
       return res.status(400).json({ message: 'Invalid account role.' });
     }
 
-    if (!cleanedFirstName || !cleanedLastName || !cleanedEmail || !password) {
+    if (!cleanedFirstName || !cleanedLastName || !password) {
       return res.status(400).json({ message: 'Please fill in all required fields.' });
     }
 
@@ -118,42 +151,144 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Last name must contain letters only.' });
     }
 
-    if (!emailRegex.test(cleanedEmail)) {
-      return res.status(400).json({ message: 'Please enter a valid email address.' });
-    }
-
     if (password.length < 8) {
       return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
     }
 
-    if (cleanedPhone && !phoneRegex.test(cleanedPhone)) {
+    if (cleanedRole === 'customer') {
+      if (!cleanedEmail) {
+        return res.status(400).json({ message: 'Please fill in all required fields.' });
+      }
+
+      if (!emailRegex.test(cleanedEmail)) {
+        return res.status(400).json({ message: 'Please enter a valid email address.' });
+      }
+
+      if (cleanedPhone && !phoneRegex.test(cleanedPhone)) {
+        return res.status(400).json({
+          message: 'Please enter a valid Philippine phone number.',
+        });
+      }
+
+      const existingUser = await User.findOne({ email: cleanedEmail });
+      if (existingUser) {
+        return res.status(409).json({ message: 'Email is already registered.' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const user = new User({
+        role: cleanedRole,
+        firstName: cleanedFirstName,
+        middleName: cleanedMiddleName,
+        lastName: cleanedLastName,
+        email: cleanedEmail,
+        phone: cleanedPhone ? normalizePhone(cleanedPhone) : '',
+        password: hashedPassword,
+        emailVerified: false,
+      });
+
+      const verificationCode = assignEmailVerificationCode(user);
+      await user.save();
+
+      const delivery = await sendEmailVerificationEmail(
+        cleanedEmail,
+        verificationCode,
+        cleanedFirstName
+      );
+
+      await syncProfileComplete(user._id);
+
+      const payload = maybeAttachDevVerificationCode(
+        {
+          message: delivery.stub
+            ? 'Account created. Use the dev verification code below (no email provider configured).'
+            : 'Account created. Check your email for a verification code.',
+          requiresEmailVerification: true,
+          email: cleanedEmail,
+        },
+        verificationCode,
+        delivery
+      );
+
+      return res.status(201).json(payload);
+    }
+
+    // Provider / junkshop owner registration
+    if (!cleanedJunkshopName) {
+      return res.status(400).json({ message: 'Business name is required.' });
+    }
+
+    if (!cleanedAddress) {
+      return res.status(400).json({ message: 'Business address is required.' });
+    }
+
+    if (!cleanedPhone || !phoneRegex.test(cleanedPhone)) {
       return res.status(400).json({
-        message: 'Please enter a valid Philippine phone number.',
+        message: 'A valid mobile number (09XXXXXXXXX) is required.',
       });
     }
 
-    if (cleanedRole === 'provider') {
-      // Shop details collected in Settings after signup.
+    const normalizedPhone = normalizePhone(cleanedPhone);
+
+    if (cleanedEmail && !emailRegex.test(cleanedEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid email address.' });
     }
 
-    const existingUser = await User.findOne({ email: cleanedEmail });
+    const resolvedEmail = cleanedEmail || providerPlaceholderEmail(normalizedPhone);
 
-    if (existingUser) {
+    const existingPhone = await findProviderByPhone(normalizedPhone);
+    if (existingPhone) {
+      return res.status(409).json({ message: 'This mobile number is already registered.' });
+    }
+
+    const existingEmail = await User.findOne({ email: resolvedEmail });
+    if (existingEmail) {
       return res.status(409).json({ message: 'Email is already registered.' });
+    }
+
+    const schedule = sanitizeOperatingHours(operatingHours);
+    const hoursSummary = formatOperatingHoursSummary(schedule);
+
+    let shopLocation = null;
+    if (
+      location &&
+      Number.isFinite(Number(location.lat)) &&
+      Number.isFinite(Number(location.lng))
+    ) {
+      shopLocation = {
+        lat: Number(location.lat),
+        lng: Number(location.lng),
+      };
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
-      role: cleanedRole,
+      role: 'provider',
       firstName: cleanedFirstName,
       middleName: cleanedMiddleName,
       lastName: cleanedLastName,
-      email: cleanedEmail,
-      phone: cleanedPhone ? normalizePhone(cleanedPhone) : '',
+      email: resolvedEmail,
+      phone: normalizedPhone,
       password: hashedPassword,
       junkshopName: cleanedJunkshopName,
       address: cleanedAddress,
+      verificationStatus: 'draft',
+      emailVerified: true,
+    });
+
+    await Junkshop.create({
+      provider: user._id,
+      name: cleanedJunkshopName,
+      address: cleanedAddress,
+      phone: normalizedPhone,
+      hours: hoursSummary,
+      operatingHours: schedule,
+      location: shopLocation || DEFAULT_SHOP_LOCATION,
+      isPublished: false,
+      pickupEnabled: true,
+      pickupServiceFee: 0,
     });
 
     await syncProfileComplete(user._id);
@@ -161,11 +296,12 @@ const registerUser = async (req, res) => {
     const token = createToken(freshUser);
 
     res.status(201).json({
-      message: 'Account created successfully.',
+      message: 'Junkshop account created. Complete verification documents in your dashboard.',
       token,
       user: await buildUserResponse(freshUser),
     });
   } catch (error) {
+    console.error('registerUser', error);
     res.status(500).json({ message: 'Server error during registration.' });
   }
 };
@@ -173,22 +309,42 @@ const registerUser = async (req, res) => {
 // Login existing user
 const loginUser = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, identifier, password, role } = req.body;
 
-    const cleanedEmail = email?.trim().toLowerCase();
     const cleanedRole = role?.trim().toLowerCase();
+    const loginId = String(identifier || email || '').trim();
 
-    if (!cleanedEmail || !password) {
-      return res.status(400).json({ message: 'Please enter both email and password.' });
+    if (!loginId || !password) {
+      return res.status(400).json({ message: 'Please enter your login details and password.' });
     }
 
-    const user = await User.findOne({ email: cleanedEmail });
+    let user = null;
 
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password.' });
+    if (cleanedRole === 'provider') {
+      user = await findProviderByPhone(loginId);
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid mobile number or password.' });
+      }
+    } else {
+      const cleanedEmail = loginId.toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanedEmail)) {
+        return res.status(400).json({ message: 'Please enter a valid email address.' });
+      }
+
+      user = await User.findOne({ email: cleanedEmail });
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid email or password.' });
+      }
     }
 
-    if (cleanedRole && user.role !== cleanedRole) {
+    if (user.role === 'admin') {
+      if (cleanedRole) {
+        return res.status(403).json({
+          message: 'Admin accounts must sign in through the admin portal.',
+        });
+      }
+    } else if (cleanedRole && user.role !== cleanedRole) {
       return res.status(403).json({
         message: 'This account does not match the selected role.',
       });
@@ -205,7 +361,19 @@ const loginUser = async (req, res) => {
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
     if (!isPasswordCorrect) {
-      return res.status(401).json({ message: 'Invalid email or password.' });
+      const message =
+        cleanedRole === 'provider'
+          ? 'Invalid mobile number or password.'
+          : 'Invalid email or password.';
+      return res.status(401).json({ message });
+    }
+
+    if (user.role === 'customer' && user.emailVerified === false) {
+      return res.status(403).json({
+        message: 'Verify your email before signing in. Check your inbox for the code.',
+        requiresEmailVerification: true,
+        email: user.email,
+      });
     }
 
     await syncProfileComplete(user._id);
@@ -572,9 +740,96 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const verifyEmail = async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const code = String(req.body.code || '').trim();
+
+    if (!email || !code) {
+      return res.status(400).json({ message: 'Email and verification code are required.' });
+    }
+
+    const user = await User.findOne({ email, role: 'customer' });
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found for that email.' });
+    }
+
+    if (user.emailVerified !== false) {
+      return res.status(400).json({ message: 'This email is already verified. You can log in.' });
+    }
+
+    const result = verifyEmailCode(user, code);
+    if (!result.ok) {
+      return res.status(400).json({ message: result.message });
+    }
+
+    user.emailVerified = true;
+    clearEmailVerificationCode(user);
+    await user.save();
+    await syncProfileComplete(user._id);
+
+    const freshUser = await User.findById(user._id);
+    const token = createToken(freshUser);
+
+    res.json({
+      message: 'Email verified. Welcome to JunkShop On-The-Go!',
+      token,
+      user: await buildUserResponse(freshUser),
+    });
+  } catch (error) {
+    console.error('verifyEmail', error);
+    res.status(500).json({ message: 'Could not verify email.' });
+  }
+};
+
+const resendEmailVerification = async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+
+    const user = await User.findOne({ email, role: 'customer' });
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found for that email.' });
+    }
+
+    if (user.emailVerified !== false) {
+      return res.status(400).json({ message: 'This email is already verified.' });
+    }
+
+    const verificationCode = assignEmailVerificationCode(user);
+    await user.save();
+
+    const delivery = await sendEmailVerificationEmail(
+      user.email,
+      verificationCode,
+      user.firstName
+    );
+
+    const payload = maybeAttachDevVerificationCode(
+      {
+        message: delivery.stub
+          ? 'New verification code generated (dev stub — see code below).'
+          : 'A new verification code was sent to your email.',
+      },
+      verificationCode,
+      delivery
+    );
+
+    res.json(payload);
+  } catch (error) {
+    console.error('resendEmailVerification', error);
+    res.status(500).json({ message: 'Could not resend verification code.' });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
+  verifyEmail,
+  resendEmailVerification,
   getCurrentUser,
   updateProviderProfile,
   updateMe,

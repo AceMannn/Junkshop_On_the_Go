@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, User, LogIn } from 'lucide-react';
+import { Menu, X, LogIn, User } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import logoImage from '../assets/junkshop-logo.png';
-import { AccountPanel } from './AccountPanel';
 
 /* ==========================
    HEADER COMPONENT - MAIN PROGRAM GROUP
@@ -17,8 +16,6 @@ export default function Header({
 }) {
     // Mobile menu toggle
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    // Account panel overlay toggle
-    const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
 
     // ==========================
     // SCROLL HIDE/REVEAL LOGIC
@@ -52,11 +49,6 @@ export default function Header({
         { id: 'contact', label: 'Contact' },
     ];
 
-    // Handle opening the account panel
-    const handleAccountClick = () => {
-        setIsAccountPanelOpen(true);
-        setIsMobileMenuOpen(false);
-    };
 
     return (
         <>
@@ -100,17 +92,6 @@ export default function Header({
 
                         {/* Desktop Action Buttons */}
                         <div className="hidden lg:flex items-center gap-3">
-                            {isAuthenticated && (
-                                <Motion.button
-                                    onClick={handleAccountClick}
-                                    className="p-2.5 text-charcoal hover:bg-eco-green/10 hover:text-eco-green rounded-lg transition-all"
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    title="Account"
-                                >
-                                    <User size={24} />
-                                </Motion.button>
-                            )}
                             {!isAuthenticated && onShowLogin && (
                                 <Motion.button
                                     onClick={onShowLogin}
@@ -178,15 +159,6 @@ export default function Header({
                                     </button>
                                     );
                                 })}
-                                {isAuthenticated && (
-                                    <button
-                                        className="flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors hover:bg-light-gray text-charcoal border-t border-gray-200 mt-2 pt-4"
-                                        onClick={handleAccountClick}
-                                    >
-                                        <User size={20} />
-                                        <span>Account</span>
-                                    </button>
-                                )}
                                 {!isAuthenticated && onShowLogin && (
                                     <button
                                         className="flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg transition-colors hover:bg-light-gray text-charcoal border-t border-gray-200 mt-2 pt-4"
@@ -214,16 +186,6 @@ export default function Header({
                     )}
                 </AnimatePresence>
             </Motion.header>
-
-            {/* ==========================
-                ACCOUNT PANEL OVERLAY
-                ========================== */}
-            <AccountPanel
-                isOpen={isAccountPanelOpen}
-                onClose={() => setIsAccountPanelOpen(false)}
-                onLogout={onLogout}
-                role="customer"
-            />
         </>
     );
 }

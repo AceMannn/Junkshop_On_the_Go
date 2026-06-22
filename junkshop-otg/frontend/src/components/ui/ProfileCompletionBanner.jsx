@@ -83,7 +83,7 @@ export default function ProfileCompletionBanner({
                     onClick={onGoSettings}
                     className="w-full sm:w-auto shrink-0 rounded-xl bg-[#154212] px-4 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-900 transition-colors"
                 >
-                    {role === "provider" ? "Go to Settings" : "Add phone in Settings"}
+                    {role === "provider" ? "Go to Shop Settings" : "Add phone in Settings"}
                 </button>
             </div>
         </div>

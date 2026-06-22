@@ -300,13 +300,55 @@ router.get('/materials', async (req, res) => {
       }
     });
 
-    const materials = [...merged.values()].sort((a, b) => {
+    let materials = [...merged.values()].sort((a, b) => {
       if (a.source !== b.source) {
         return a.source === 'partner' ? -1 : 1;
       }
       const categoryCompare = String(a.category || '').localeCompare(String(b.category || ''));
       if (categoryCompare !== 0) return categoryCompare;
       return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+
+    const materialProviderIds = [
+      ...new Set(
+        materials
+          .filter((item) => item.provider && !item.isCatalog)
+          .map((item) => String(item.provider))
+      ),
+    ];
+
+    let shopByProviderId = {};
+    if (materialProviderIds.length > 0) {
+      const shops = await Junkshop.find({
+        provider: { $in: materialProviderIds },
+        isCatalog: { $ne: true },
+        isPublished: true,
+      })
+        .sort({ createdAt: 1 })
+        .select('_id provider name address')
+        .lean();
+
+      shopByProviderId = shops.reduce((acc, shop) => {
+        const key = String(shop.provider);
+        if (!acc[key]) {
+          acc[key] = shop;
+        }
+        return acc;
+      }, {});
+    }
+
+    materials = materials.map((item) => {
+      const shop = item.provider ? shopByProviderId[String(item.provider)] : null;
+      return {
+        ...item,
+        junkshop: shop
+          ? {
+              id: String(shop._id),
+              name: shop.name,
+              address: shop.address,
+            }
+          : null,
+      };
     });
 
     return res.json({ materials });

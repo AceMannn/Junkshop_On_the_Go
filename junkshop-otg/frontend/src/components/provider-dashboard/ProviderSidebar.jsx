@@ -7,10 +7,12 @@ import {
     Truck,
     ReceiptText,
     MoreHorizontal,
+    ShieldCheck,
 } from "lucide-react";
 
 export const providerTabs = [
     { id: "dashboard", label: "Overview", icon: LayoutDashboard },
+    { id: "verification", label: "Verification", icon: ShieldCheck },
     { id: "materials", label: "Materials", icon: Package },
     { id: "prices", label: "Prices", icon: DollarSign },
     { id: "availability", label: "Availability", icon: Clock },
@@ -18,8 +20,8 @@ export const providerTabs = [
     { id: "transactions", label: "Transactions", icon: ReceiptText },
 ];
 
-const mobilePrimaryIds = ["dashboard", "requests", "materials", "prices"];
-const mobileMoreIds = ["availability", "transactions"];
+const mobilePrimaryIds = ["dashboard", "verification", "requests", "materials"];
+const mobileMoreIds = ["prices", "availability", "transactions"];
 
 const primarySidebarButtonClass =
     "w-full flex items-center justify-center gap-2.5 rounded-2xl border border-emerald-200/70 bg-emerald-100/80 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-sm hover:bg-emerald-100 hover:shadow transition-colors";

@@ -278,7 +278,7 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
         <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
             <div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#191c1c]">
-                    Settings
+                    Shop Settings
                 </h1>
                 <p className="text-[#72796e] mt-2 text-sm">
                     Shop details appear on the customer dashboard map and shop list.

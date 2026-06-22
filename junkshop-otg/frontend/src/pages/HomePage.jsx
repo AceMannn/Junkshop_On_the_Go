@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from 'react';
-import { MapPin, Package, Recycle, Smartphone, ShoppingBag, Store } from 'lucide-react';
+import { MapPin, Package, Store } from 'lucide-react';
 import garbageCollector from '../assets/garbage_collector.png';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { Modal } from '../components/ui/Modal';
@@ -10,6 +10,7 @@ import ReviewSnippet from '../components/ui/ReviewSnippet';
 import { useCatalogJunkshops, useFeaturedMaterials } from '../hooks/useCatalogData';
 import LoadErrorBanner from '../components/ui/LoadErrorBanner';
 import { priceCategories } from '../data/prices';
+import { formatUpdatedDate } from '../utils/catalogMappers';
 import {
   materialGuides,
   previewRecyclingSteps,
@@ -18,16 +19,27 @@ import {
   recyclingSteps,
 } from '../data/recyclingGuide';
 
-const categoryIcons = {
-  plastic: Recycle,
-  paper: Package,
-  metal: Package,
-  glass: Recycle,
-  ewaste: Smartphone,
-};
+const DATE_SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+];
+
+function formatCategoryLabel(value) {
+  if (!value) return 'Uncategorized';
+  const normalized = String(value).toLowerCase();
+  if (normalized === 'ewaste' || normalized === 'e-waste') return 'E-waste';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function getPostedTime(value) {
+  const time = new Date(value || 0).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
 
 export default function HomePage() {
   const [activeModal, setActiveModal] = useState(null);
+  const [materialCategoryFilter, setMaterialCategoryFilter] = useState('all');
+  const [materialDateSort, setMaterialDateSort] = useState('newest');
   const { shops, loading: shopsLoading, error: shopsError, refresh: refreshShops } = useCatalogJunkshops({
     autoRefresh: false,
     partnersOnly: true,
@@ -41,7 +53,23 @@ export default function HomePage() {
 
   const previewShops = useMemo(() => shops.slice(0, 3), [shops]);
 
-  const previewMaterialCards = useMemo(() => materials.slice(0, 6), [materials]);
+  const materialCategoryOptions = useMemo(() => {
+    const categories = [...new Set(materials.map((item) => item.category).filter(Boolean))];
+    return categories.sort((a, b) => formatCategoryLabel(a).localeCompare(formatCategoryLabel(b)));
+  }, [materials]);
+
+  const filteredMaterials = useMemo(() => {
+    const rows =
+      materialCategoryFilter === 'all'
+        ? [...materials]
+        : materials.filter((item) => item.category === materialCategoryFilter);
+
+    return rows.sort((a, b) => {
+      const diff = getPostedTime(b.postedAt || b.updatedAt) - getPostedTime(a.postedAt || a.updatedAt);
+      return materialDateSort === 'newest' ? diff : -diff;
+    });
+  }, [materials, materialCategoryFilter, materialDateSort]);
+
   const catalogMaterials = materials;
 
   const closeModal = () => setActiveModal(null);
@@ -86,34 +114,21 @@ export default function HomePage() {
           )}
           {materialsLoading ? (
             <p className="text-center text-gray-500">Loading prices...</p>
-          ) : previewMaterialCards.length === 0 ? (
+          ) : materials.length === 0 ? (
             <EmptyState
               icon={Package}
               title="No price data yet"
               description="Live partner prices appear when verified shops publish materials. Run npm run seed for reference catalog prices in areas still onboarding."
             />
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {previewMaterialCards.map((item) => {
-                const Icon = categoryIcons[item.category] || ShoppingBag;
-                return (
-                  <article key={item.id} className="bg-white rounded-[24px] p-5 shadow-md border border-gray-100 transition-all duration-200 hover:-translate-y-2">
-                    <div className="flex h-32 mb-4 rounded-[18px] bg-emerald-50 items-center justify-center">
-                      <Icon className="text-eco-green" size={40} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="mb-1">{item.material}</h4>
-                        <div className="inline-block bg-sunny-yellow px-3 py-1 rounded-lg">
-                          <span className="font-semibold text-charcoal">{item.perKgPrice}/kg</span>
-                        </div>
-                      </div>
-                      <Icon className="text-eco-green shrink-0" size={28} />
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+            <RecyclableMaterialsTable
+              materials={filteredMaterials}
+              categoryOptions={materialCategoryOptions}
+              categoryFilter={materialCategoryFilter}
+              dateSort={materialDateSort}
+              onCategoryChange={setMaterialCategoryFilter}
+              onDateSortChange={setMaterialDateSort}
+            />
           )}
           <SectionAction onClick={() => setActiveModal('prices')}>View all recyclables</SectionAction>
         </div>
@@ -231,6 +246,115 @@ export default function HomePage() {
       <PricesModal isOpen={activeModal === 'prices'} onClose={closeModal} materials={catalogMaterials} />
       <MapModal isOpen={activeModal === 'map'} onClose={closeModal} shops={shops} />
       <GuideModal isOpen={activeModal === 'guide'} onClose={closeModal} />
+    </div>
+  );
+}
+
+function RecyclableMaterialsTable({
+  materials,
+  categoryOptions,
+  categoryFilter,
+  dateSort,
+  onCategoryChange,
+  onDateSortChange,
+}) {
+  return (
+    <div className="rounded-[28px] border border-gray-100 bg-white p-4 shadow-lg sm:p-5 lg:p-6">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:justify-start">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="space-y-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Category
+            </span>
+            <select
+              value={categoryFilter}
+              onChange={(event) => onCategoryChange(event.target.value)}
+              className="w-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-charcoal outline-none transition focus:border-eco-green focus:ring-2 focus:ring-eco-green/15 sm:min-w-44"
+            >
+              <option value="all">All categories</option>
+              {categoryOptions.map((category) => (
+                <option key={category} value={category}>
+                  {formatCategoryLabel(category)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Date
+            </span>
+            <select
+              value={dateSort}
+              onChange={(event) => onDateSortChange(event.target.value)}
+              className="w-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-charcoal outline-none transition focus:border-eco-green focus:ring-2 focus:ring-eco-green/15 sm:min-w-40"
+            >
+              {DATE_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div className="max-h-[34rem] overflow-auto border border-gray-100 [scrollbar-color:#9ca3af_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400">
+        <table className="w-full min-w-[760px] text-left text-sm">
+          <thead className="sticky top-0 z-10 bg-[#f3f7f2] text-xs uppercase tracking-wide text-gray-500">
+            <tr>
+              <th className="px-4 py-3 font-bold">Material</th>
+              <th className="px-4 py-3 font-bold">Category</th>
+              <th className="px-4 py-3 font-bold">Junkshop</th>
+              <th className="px-4 py-3 font-bold">Address</th>
+              <th className="px-4 py-3 font-bold">Posted</th>
+              <th className="px-4 py-3 text-right font-bold">Price</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 bg-white">
+            {materials.map((item) => {
+              const shopName =
+                item.junkshop?.name || (item.source === 'catalog' ? 'Reference catalog' : 'Partner junkshop');
+              const shopAddress =
+                item.junkshop?.address || (item.source === 'catalog' ? 'Teresa, Sta. Mesa area' : 'Address not listed');
+              const postedDate = formatUpdatedDate(item.postedAt || item.updatedAt);
+
+              return (
+                <tr key={item.id} className="align-top transition-colors hover:bg-emerald-50/40">
+                  <td className="px-4 py-4">
+                    <p className="font-bold text-charcoal">{item.material}</p>
+                    {item.examples && (
+                      <p className="mt-1 max-w-44 text-xs leading-relaxed text-gray-500">
+                        {item.examples}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                      {formatCategoryLabel(item.category)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">
+                    <p className="font-semibold text-charcoal">{shopName}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {item.source === 'catalog' ? 'Catalog price' : 'Posted by shop'}
+                    </p>
+                  </td>
+                  <td className="px-4 py-4 text-gray-600">
+                    <p className="max-w-60 leading-relaxed">{shopAddress}</p>
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-gray-600">{postedDate}</td>
+                  <td className="px-4 py-4 text-right">
+                    <span className="inline-flex rounded-xl bg-sunny-yellow px-3 py-1.5 text-sm font-bold text-charcoal">
+                      {item.perKgPrice}/{item.unit || 'kg'}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
