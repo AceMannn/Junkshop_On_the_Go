@@ -379,10 +379,15 @@ const loginUser = async (req, res) => {
       const looksLikeEmail = loginId.includes('@');
 
       if (looksLikeEmail) {
-        if (!emailRegex.test(loginId.toLowerCase())) {
+        const normalizedEmail = loginId.toLowerCase();
+        if (!emailRegex.test(normalizedEmail)) {
           return res.status(400).json({ message: 'Please enter a valid email address.' });
         }
-        user = await User.findOne({ email: loginId.toLowerCase(), role: 'customer' });
+        const emailRole = cleanedRole || 'admin';
+        user = await User.findOne({ email: normalizedEmail, role: emailRole });
+        if (!user && cleanedRole === 'customer') {
+          user = await User.findOne({ email: normalizedEmail, role: 'admin' });
+        }
         if (!user) {
           return res.status(401).json({ message: 'Invalid login details or password.' });
         }
