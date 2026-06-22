@@ -1,7 +1,15 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-export function Modal({ isOpen, title, description, onClose, children, size = 'large' }) {
+export function Modal({
+  isOpen,
+  title,
+  description,
+  onClose,
+  children,
+  size = 'large',
+  mobileSheet = false,
+}) {
   useEffect(() => {
     if (!isOpen) return undefined;
 
@@ -19,24 +27,32 @@ export function Modal({ isOpen, title, description, onClose, children, size = 'l
 
   const sizeClasses = {
     large: 'max-w-5xl',
-    fullscreen: 'max-w-[96rem] h-[92vh]',
+    fullscreen: 'max-w-[96rem] sm:h-[92vh]',
   };
+
+  const overlayClass = mobileSheet
+    ? 'fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-charcoal/60 p-0 sm:px-4 sm:py-6'
+    : 'fixed inset-0 z-[80] flex items-center justify-center bg-charcoal/60 px-4 py-6';
+
+  const panelClass = mobileSheet
+    ? `relative flex w-full ${sizeClasses[size]} max-h-[92dvh] sm:max-h-[90vh] flex-col overflow-hidden rounded-t-[24px] sm:rounded-[24px] bg-white shadow-2xl`
+    : `relative flex w-full ${sizeClasses[size]} max-h-[90vh] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl`;
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-charcoal/60 px-4 py-6"
+      className={overlayClass}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
       onMouseDown={onClose}
     >
       <div
-        className={`relative flex w-full ${sizeClasses[size]} max-h-[90vh] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl`}
+        className={panelClass}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 sm:px-6">
-          <div>
-            <h2 id="modal-title" className="text-2xl sm:text-3xl">
+          <div className="min-w-0">
+            <h2 id="modal-title" className="text-xl sm:text-2xl md:text-3xl">
               {title}
             </h2>
             {description && (
@@ -46,13 +62,13 @@ export function Modal({ isOpen, title, description, onClose, children, size = 'l
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-full bg-light-gray text-charcoal transition-colors hover:bg-eco-green hover:text-white"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-light-gray text-charcoal transition-colors hover:bg-eco-green hover:text-white"
             aria-label="Close modal"
           >
             <X size={22} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
+        <div className="scroll-y-clean flex-1 px-5 py-5 sm:px-6">{children}</div>
       </div>
     </div>
   );

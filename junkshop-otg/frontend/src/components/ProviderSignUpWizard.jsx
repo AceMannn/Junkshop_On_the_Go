@@ -190,7 +190,7 @@ export default function ProviderSignUpWizard({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+          <div className="scroll-y-clean min-h-0 flex-1 p-5 sm:p-6">
             <AuthModalClose onClick={onClose} label="Close junkshop signup" />
 
             <header className="mb-2 pr-10">
@@ -430,7 +430,78 @@ export default function ProviderSignUpWizard({
                   </button>
                 </div>
 
-                <div className="overflow-x-auto border border-gray-200">
+                <div className="space-y-3 md:hidden">
+                  {form.operatingHours.map((row, index) => (
+                    <div
+                      key={row.day}
+                      className="rounded-xl border border-gray-200 bg-white p-3 space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-semibold text-charcoal">
+                          {WEEKDAY_ROWS.find((item) => item.day === row.day)?.label || row.day}
+                        </p>
+                        <label className="flex items-center gap-2 text-xs font-semibold text-charcoal/70">
+                          <input
+                            type="checkbox"
+                            checked={row.closed}
+                            onChange={(event) => {
+                              const next = [...form.operatingHours];
+                              next[index] = {
+                                ...next[index],
+                                closed: event.target.checked,
+                                open: event.target.checked ? '' : next[index].open || '08:00',
+                                close: event.target.checked ? '' : next[index].close || '17:00',
+                              };
+                              updateField('operatingHours', next);
+                            }}
+                            disabled={isLoading}
+                          />
+                          Closed
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="space-y-1 text-xs font-semibold text-charcoal/70">
+                          Open
+                          <input
+                            type="time"
+                            value={row.closed ? '' : row.open}
+                            onChange={(event) => {
+                              const next = [...form.operatingHours];
+                              next[index] = {
+                                ...next[index],
+                                open: event.target.value,
+                                closed: false,
+                              };
+                              updateField('operatingHours', next);
+                            }}
+                            disabled={isLoading || row.closed}
+                            className="w-full min-h-11 border border-gray-300 px-2 py-1.5 text-sm rounded-lg"
+                          />
+                        </label>
+                        <label className="space-y-1 text-xs font-semibold text-charcoal/70">
+                          Close
+                          <input
+                            type="time"
+                            value={row.closed ? '' : row.close}
+                            onChange={(event) => {
+                              const next = [...form.operatingHours];
+                              next[index] = {
+                                ...next[index],
+                                close: event.target.value,
+                                closed: false,
+                              };
+                              updateField('operatingHours', next);
+                            }}
+                            disabled={isLoading || row.closed}
+                            className="w-full min-h-11 border border-gray-300 px-2 py-1.5 text-sm rounded-lg"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden md:block scroll-x-clean border border-gray-200">
                   <table className="w-full min-w-[420px] text-left text-sm">
                     <thead className="bg-light-gray text-xs uppercase tracking-wide text-charcoal/70">
                       <tr>

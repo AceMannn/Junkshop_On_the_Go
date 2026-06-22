@@ -118,7 +118,7 @@ export default function DashboardNotificationMenu({ onNavigate }) {
                         </p>
                     </div>
 
-                    <div className="max-h-72 overflow-y-auto p-2">
+                    <div className="scroll-y-clean max-h-72 p-2">
                         {visibleNotifications.length === 0 ? (
                             <p className="text-sm text-[#72796e] px-3 py-6 text-center">
                                 No notifications

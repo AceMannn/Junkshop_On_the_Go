@@ -18,6 +18,7 @@ import {
     CalendarDays,
     CheckCircle,
     Truck,
+    MoreHorizontal,
 } from "lucide-react";
 import CustomerPickupsTab from "./customer-dashboard/CustomerPickupsTab";
 import ProfileCompletionBanner from "./ui/ProfileCompletionBanner";
@@ -32,12 +33,14 @@ import {
     LogTripPanel,
     OVERVIEW_PANELS,
 } from "./customer-dashboard/CustomerOverviewPanels";
-import CustomerSpeedDial from "./customer-dashboard/CustomerSpeedDial";
+import MaterialMarketplaceSection from "./marketplace/MaterialMarketplaceSection";
 import { QuickAddPanel, ScanPhotoPanel } from "./customer-dashboard/CustomerFabPanels";
+import CustomerSpeedDial from "./customer-dashboard/CustomerSpeedDial";
 import CustomerTopbar from "./customer-dashboard/CustomerTopbar";
 import HelpModal from "./ui/HelpModal";
 import EmptyState from "./ui/EmptyState";
 import ShopRating from "./ui/ShopRating";
+import ShopBadges from "./ui/ShopBadges";
 import ReviewSnippet from "./ui/ReviewSnippet";
 import {
     ViewProfilePage,
@@ -63,7 +66,15 @@ const primarySidebarButtonClass =
 const SHOP_IMAGE =
     "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?q=80&w=1000&auto=format&fit=crop";
 
-export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
+export default function CustomerDashboard({
+    onLogout,
+    user,
+    onUserUpdate,
+    onBookMaterial,
+    onOpenAllPrices,
+    pickupWizardPrefill,
+    pickupWizardSignal,
+}) {
     const { shops } = useCatalogJunkshops({ partnersOnly: true });
     const { favoriteIds, toggleFavorite } = useFavorites();
     const [activeTab, setActiveTab] = useState("overview");
@@ -355,6 +366,14 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
                             onGoToHistory={() => handleTabChange("history")}
                             onOpenShopRoute={openShopRoute}
                             onToggleFavorite={handleToggleFavorite}
+                            onBookMaterial={(material) => {
+                                handleTabChange("pickups");
+                                onBookMaterial?.(material);
+                            }}
+                            onViewAllPrices={() => {
+                                onOpenAllPrices?.();
+                                openOverviewPanel("prices");
+                            }}
                         />
                     )}
                     {!accountView && !overviewPanel && pickupsTabMounted && (
@@ -370,6 +389,8 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
                                 focusPickupId={focusPickupId}
                                 onFocusHandled={() => setFocusPickupId(null)}
                                 onUserUpdate={refreshUser}
+                                wizardPrefill={pickupWizardPrefill}
+                                openWizardSignal={pickupWizardSignal}
                             />
                         </div>
                     )}
@@ -397,7 +418,14 @@ export default function CustomerDashboard({ onLogout, user, onUserUpdate }) {
                 </div>
             </main>
 
-            <MobileNav activeTab={activeTab} setActiveTab={handleTabChange} />
+            {!accountView && !overviewPanel && (
+                <MobileNav
+                    activeTab={activeTab}
+                    setActiveTab={handleTabChange}
+                    overviewPanel={overviewPanel}
+                    onOpenPanel={openOverviewPanel}
+                />
+            )}
 
             {showFab && (
                 <CustomerSpeedDial
@@ -437,7 +465,7 @@ function Sidebar({ activeTab, setActiveTab, overviewPanel, onOpenPanel }) {
                 </button>
             </div>
 
-            <nav className="flex flex-col gap-0.5 px-3 flex-1 overflow-y-auto">
+            <nav className="scroll-y-clean flex flex-col gap-0.5 px-3 flex-1">
                 {navTabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id && !overviewPanel;
@@ -486,28 +514,89 @@ function Sidebar({ activeTab, setActiveTab, overviewPanel, onOpenPanel }) {
     );
 }
 
-function MobileNav({ activeTab, setActiveTab }) {
-    return (
-        <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-1 py-2.5 bg-white border-t border-zinc-200 shadow-[0_-4px_12px_rgba(141,170,145,0.15)] z-50 rounded-t-2xl safe-area-pb max-w-lg mx-auto sm:max-w-none sm:mx-0">
-            {navTabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
+const mobileMoreItems = [
+    { id: "junkshops", label: "Find a Shop", icon: MapPin },
+    { id: "prices", label: "Prices", icon: DollarSign },
+    { id: "guide", label: "Guide", icon: BookOpen },
+];
 
-                return (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`flex flex-1 flex-col items-center justify-center min-w-0 px-1 py-1.5 rounded-xl active:scale-95 transition-transform ${isActive
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "text-zinc-500 hover:text-emerald-600"
-                            }`}
-                    >
-                        <Icon size={20} />
-                        <span className="text-[10px] font-medium mt-0.5 truncate max-w-full px-0.5">{tab.label}</span>
-                    </button>
-                );
-            })}
-        </nav>
+function MobileNav({ activeTab, setActiveTab, overviewPanel, onOpenPanel }) {
+    const [showMore, setShowMore] = useState(false);
+    const moreActive = mobileMoreItems.some((item) => overviewPanel === item.id);
+
+    const handleOpenPanel = (panelId) => {
+        onOpenPanel?.(panelId);
+        setShowMore(false);
+    };
+
+    return (
+        <>
+            {showMore && (
+                <button
+                    type="button"
+                    aria-label="Close menu"
+                    className="md:hidden fixed inset-0 z-40 bg-black/20"
+                    onClick={() => setShowMore(false)}
+                />
+            )}
+
+            {showMore && (
+                <div className="md:hidden fixed bottom-[4.25rem] left-3 right-3 z-50 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl safe-area-pb">
+                    {mobileMoreItems.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = overviewPanel === item.id;
+
+                        return (
+                            <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleOpenPanel(item.id)}
+                                className={`flex w-full min-h-11 items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold ${isActive
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "text-[#191c1c] hover:bg-zinc-50"
+                                    }`}
+                            >
+                                <Icon size={20} />
+                                {item.label}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
+            <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-1 py-2.5 bg-white border-t border-zinc-200 shadow-[0_-4px_12px_rgba(141,170,145,0.15)] z-50 rounded-t-2xl safe-area-pb max-w-lg mx-auto sm:max-w-none sm:mx-0">
+                {navTabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id && !overviewPanel;
+
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex flex-1 flex-col items-center justify-center min-h-11 min-w-0 px-1 py-1.5 rounded-xl active:scale-95 transition-transform ${isActive
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "text-zinc-500 hover:text-emerald-600"
+                                }`}
+                        >
+                            <Icon size={20} />
+                            <span className="text-[10px] font-medium mt-0.5 truncate max-w-full px-0.5">{tab.label}</span>
+                        </button>
+                    );
+                })}
+
+                <button
+                    type="button"
+                    onClick={() => setShowMore((open) => !open)}
+                    className={`flex flex-1 flex-col items-center justify-center min-h-11 min-w-0 px-1 py-1.5 rounded-xl active:scale-95 transition-transform ${moreActive || showMore
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "text-zinc-500 hover:text-emerald-600"
+                        }`}
+                >
+                    <MoreHorizontal size={20} />
+                    <span className="text-[10px] font-medium mt-0.5">More</span>
+                </button>
+            </nav>
+        </>
     );
 }
 
@@ -617,6 +706,8 @@ function OverviewTab({
     onGoToHistory,
     onOpenShopRoute,
     onToggleFavorite,
+    onBookMaterial,
+    onViewAllPrices,
 }) {
     const handleViewAllShops = () => onOpenPanel("junkshops");
     const welcomeName = user?.firstName || "there";
@@ -629,7 +720,7 @@ function OverviewTab({
                 .map((shop) => ({
                     ...shop,
                     location: shop.address,
-                    image: SHOP_IMAGE,
+                    image: shop.shopPhotoUrl || SHOP_IMAGE,
                 })),
         [shops]
     );
@@ -688,6 +779,15 @@ function OverviewTab({
             </section>
 
             <OverviewQuickAccess onOpenPanel={onOpenPanel} />
+
+            <MaterialMarketplaceSection
+                compact
+                isAuthenticated
+                title="Sell your recyclables"
+                description="Compare live partner prices and book a pickup or drop-off in a few taps."
+                onBookNow={onBookMaterial}
+                onViewAllPrices={onViewAllPrices}
+            />
 
             {/* Stats */}
             <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -864,7 +964,7 @@ function StatCard({ label, value, unit, icon: Icon, helper }) {
                 </Info>
             </div>
 
-            <p className="text-xl sm:text-2xl font-bold text-emerald-900 flex items-center gap-1.5 flex-wrap">
+            <p className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-900 flex items-center gap-1.5 flex-wrap">
                 {value}
                 {unit && <span className="text-xs sm:text-sm font-semibold">{unit}</span>}
                 {Icon && <Icon size={20} className="text-emerald-500" />}
@@ -881,12 +981,12 @@ function NearbyShopCard({
     onRoute,
 }) {
     return (
-        <div className="min-w-[280px] sm:min-w-[320px] max-w-[320px] snap-start bg-white rounded-xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.15)] overflow-hidden flex-shrink-0 group">
+        <div className="w-[min(100%,20rem)] min-w-[min(72vw,16rem)] sm:min-w-[18rem] max-w-[20rem] snap-start bg-white rounded-xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.15)] overflow-hidden shrink-0 group">
             <div className="h-36 bg-zinc-200 overflow-hidden relative">
                 <img
                     alt={shop.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    src={shop.image}
+                    src={shop.shopPhotoUrl || shop.image}
                 />
 
                 <div className="absolute top-3 right-3">
@@ -913,7 +1013,8 @@ function NearbyShopCard({
                         <h4 className="font-bold text-[#191c1c]">
                             {shop.name}
                         </h4>
-                        <p className="text-xs text-[#72796e]">
+                        <ShopBadges badges={shop.badges} className="mt-1" />
+                        <p className="text-xs text-[#72796e] mt-1">
                             {shop.distance} • {shop.location}
                         </p>
                     </div>
@@ -1261,7 +1362,7 @@ function HistoryTab({
                         })}
                     </div>
 
-                    <div className="hidden md:block overflow-x-auto">
+                    <div className="hidden md:block scroll-x-clean">
                         <table className="w-full text-sm">
                             <thead className="bg-[#f3f4f3] text-[#42493e]">
                                 <tr>

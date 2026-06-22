@@ -85,6 +85,20 @@
     padding-bottom: max(0.625rem, env(safe-area-inset-bottom, 0px));
   }
 
+  .fluid-map-height {
+    min-height: clamp(11rem, 32vh, 20rem);
+    height: clamp(11rem, 32vh, 20rem);
+  }
+
+  .fluid-map-min-height {
+    min-height: clamp(11rem, 32vh, 20rem);
+  }
+
+  .responsive-shell {
+    min-width: 0;
+    width: 100%;
+  }
+
   .grid-8 {
     gap: 8px;
   }

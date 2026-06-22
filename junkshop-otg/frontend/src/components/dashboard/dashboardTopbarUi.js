@@ -13,7 +13,7 @@ export const dashboardTopbarActionsClass =
   'flex items-center gap-1 md:gap-1.5 lg:gap-2 shrink-0';
 
 export const dashboardIconButtonClass =
-  'p-2 rounded-full hover:bg-zinc-100 transition-colors inline-flex';
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-zinc-100 transition-colors';
 
 /** Notification count on bell — tweak top/right in px for fine placement */
 export const notificationBadgePositionClass = 'top-[-3px] right-[-5px]';

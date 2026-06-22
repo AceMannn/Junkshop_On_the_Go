@@ -394,8 +394,8 @@ export default function JunkshopsMap({
         ? "relative z-0 h-full w-full min-h-0 overflow-hidden bg-zinc-100"
         : "rounded-xl border border-emerald-200 overflow-hidden shadow-sm relative z-0";
     const mapContainerClassName = fillContainer
-        ? "h-full min-h-[320px] w-full z-0 bg-zinc-100 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]"
-        : "h-[280px] sm:h-[320px] w-full z-0 bg-zinc-100 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]";
+        ? "fluid-map-min-height h-full w-full min-h-0 z-0 bg-zinc-100 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]"
+        : "fluid-map-height w-full z-0 bg-zinc-100 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]";
 
     return (
         <div className={shellClassName}>
@@ -415,7 +415,7 @@ export default function JunkshopsMap({
                                 />
                             </div>
                             {originSuggestions.length > 0 && (
-                                <ul className="absolute z-20 mt-1 w-full max-h-40 overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg">
+                                <ul className="scroll-y-clean absolute z-20 mt-1 w-full max-h-40 rounded-xl border border-zinc-200 bg-white shadow-lg">
                                     {originSuggestions.map((item) => (
                                         <li key={`${item.lat}-${item.lng}-${item.label}`}>
                                             <button

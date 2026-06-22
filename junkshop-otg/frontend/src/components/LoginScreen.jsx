@@ -71,14 +71,14 @@ export default function LoginScreen({
 
     if (!email || !password) {
       setError(
-        selectedRole === 'provider'
+        selectedRole === 'provider' || selectedRole === 'customer'
           ? 'Please enter your mobile number and password.'
-          : 'Please enter both email and password to continue.'
+          : 'Please enter your login details and password.'
       );
       return;
     }
 
-    if (selectedRole === 'provider') {
+    if (selectedRole === 'provider' || selectedRole === 'customer') {
       const normalizedPhone = email.replace(/\D/g, '').slice(0, 11);
       if (!/^09\d{9}$/.test(normalizedPhone)) {
         setError('Enter a valid mobile number (09XXXXXXXXX).');
@@ -100,8 +100,11 @@ export default function LoginScreen({
     setIsLoading(true);
     try {
       const session = await authApi.login({
-        identifier: selectedRole === 'provider' ? email.replace(/\D/g, '').slice(0, 11) : email,
-        email: selectedRole === 'provider' ? undefined : email,
+        identifier:
+          selectedRole === 'provider' || selectedRole === 'customer'
+            ? email.replace(/\D/g, '').slice(0, 11)
+            : email,
+        email: selectedRole === 'provider' || selectedRole === 'customer' ? undefined : email,
         password,
         role: selectedRole,
       });
@@ -206,8 +209,6 @@ export default function LoginScreen({
     verifyEmail: 'Enter the verification code to activate your customer account',
   };
 
-  const scrollableViews = view === 'reset' || view === 'verifyEmail';
-
   return (
     <div
       className={authOverlayClass}
@@ -217,16 +218,12 @@ export default function LoginScreen({
       onClick={onClose}
     >
       <div
-        className={`${authModalShellClass} max-w-md ${
-          scrollableViews ? '' : 'max-h-none'
-        }`}
+        className={`${authModalShellClass} max-w-lg`}
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className={`relative p-5 sm:p-6 ${
-            scrollableViews
-              ? `scroll-y-clean min-h-0 flex-1 overflow-y-auto ${error ? 'overflow-hidden' : ''}`
-              : ''
+          className={`scroll-y-clean relative min-h-0 flex-1 p-5 sm:p-6 ${
+            error ? 'overflow-hidden' : ''
           }`}
         >
           {onClose && <AuthModalClose onClick={onClose} label="Close login" />}
@@ -278,26 +275,32 @@ export default function LoginScreen({
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label htmlFor="email" className={authLabelClass}>
-                  {selectedRole === 'provider' ? 'Mobile number' : 'Email address'}
+                  {selectedRole === 'provider' || selectedRole === 'customer'
+                    ? 'Mobile number'
+                    : 'Email address'}
                 </label>
                 <input
-                  type={selectedRole === 'provider' ? 'tel' : 'email'}
+                  type={selectedRole === 'provider' || selectedRole === 'customer' ? 'tel' : 'email'}
                   id="email"
                   value={email}
                   onChange={(e) => {
                     const nextValue =
-                      selectedRole === 'provider'
+                      selectedRole === 'provider' || selectedRole === 'customer'
                         ? e.target.value.replace(/\D/g, '').slice(0, 11)
                         : e.target.value;
                     setEmail(nextValue);
                     setError('');
                   }}
                   placeholder={
-                    selectedRole === 'provider' ? '09XXXXXXXXX' : 'your@email.com'
+                    selectedRole === 'provider' || selectedRole === 'customer'
+                      ? '09XXXXXXXXX'
+                      : 'your@email.com'
                   }
                   className={authInputClass}
                   disabled={isLoading}
-                  autoComplete={selectedRole === 'provider' ? 'tel' : 'email'}
+                  autoComplete={
+                    selectedRole === 'provider' || selectedRole === 'customer' ? 'tel' : 'email'
+                  }
                 />
               </div>
 

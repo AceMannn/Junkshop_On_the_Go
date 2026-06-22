@@ -45,7 +45,13 @@ export function getShopName(request) {
 
 export function materialsSummary(materials = []) {
   if (!materials.length) return '—';
-  return materials.map((m) => m.name).join(', ');
+  return materials
+    .map((m) => {
+      const qty = m.quantity ?? m.qty ?? '';
+      const unitLabel = m.unit === 'piece' ? 'pc' : 'kg';
+      return qty ? `${m.name} ${qty}${unitLabel}` : m.name;
+    })
+    .join(', ');
 }
 
 export function canCustomerCancel(status) {

@@ -90,7 +90,23 @@ router.get('/junkshops', async (req, res) => {
   ];
 
   let materialsByProvider = {};
+  let providerMetaById = {};
   if (partnerProviderIds.length > 0) {
+    const partnerProviders = await User.find({ _id: { $in: partnerProviderIds } })
+      .select('badges verificationDocuments.shopPhotos')
+      .lean();
+
+    providerMetaById = partnerProviders.reduce((acc, provider) => {
+      const photo = (provider.verificationDocuments?.shopPhotos || []).find(
+        (row) => row?.data
+      );
+      acc[String(provider._id)] = {
+        badges: provider.badges || [],
+        shopPhotoUrl: photo?.data || '',
+      };
+      return acc;
+    }, {});
+
     const partnerMaterials = await Material.find({
       provider: { $in: partnerProviderIds },
       isCatalog: { $ne: true },
@@ -107,6 +123,7 @@ router.get('/junkshops', async (req, res) => {
         category: item.category,
         price: item.price,
         unit: item.unit || 'kg',
+        postedAt: item.createdAt,
       });
       return acc;
     }, {});
@@ -118,9 +135,12 @@ router.get('/junkshops', async (req, res) => {
     }
 
     const listingPrices = materialsByProvider[String(shop.provider)] || [];
+    const providerMeta = providerMetaById[String(shop.provider)] || {};
     return {
       ...shop,
       listingPrices,
+      badges: providerMeta.badges || [],
+      shopPhotoUrl: providerMeta.shopPhotoUrl || '',
       materials:
         shop.materials?.length > 0
           ? shop.materials
@@ -376,6 +396,13 @@ router.get('/materials/mine', protect, requireProvider, async (req, res) => {
 
 router.post('/materials', protect, requireProvider, async (req, res) => {
   const data = pickAllowed(req.body, MATERIAL_WRITE_KEYS);
+  const price = Number(data.price);
+  if (!Number.isFinite(price) || price <= 0) {
+    return res.status(400).json({ message: 'Price must be greater than ₱0.' });
+  }
+  if (data.unit && !['kg', 'piece'].includes(String(data.unit))) {
+    data.unit = 'kg';
+  }
   const material = await Material.create({
     ...data,
     provider: req.user._id,
@@ -397,6 +424,12 @@ router.patch('/materials/:id', protect, requireProvider, async (req, res) => {
 
   const data = pickAllowed(req.body, MATERIAL_WRITE_KEYS);
   const nextPrice = data.price !== undefined ? Number(data.price) : existing.price;
+  if (!Number.isFinite(nextPrice) || nextPrice <= 0) {
+    return res.status(400).json({ message: 'Price must be greater than ₱0.' });
+  }
+  if (data.unit && !['kg', 'piece'].includes(String(data.unit))) {
+    data.unit = existing.unit || 'kg';
+  }
   existing.set({
     ...data,
     previousPrice: nextPrice !== existing.price ? existing.price : existing.previousPrice,

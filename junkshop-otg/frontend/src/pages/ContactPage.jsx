@@ -72,7 +72,7 @@ const inputClass =
 
 function ContactCard({ children, className = '', id }) {
   return (
-    <div id={id} className={`bg-white rounded-xl border border-gray-200 p-6 ${className}`}>
+    <div id={id} className={`min-w-0 overflow-hidden bg-white rounded-xl border border-gray-200 p-4 sm:p-6 ${className}`}>
       {children}
     </div>
   );

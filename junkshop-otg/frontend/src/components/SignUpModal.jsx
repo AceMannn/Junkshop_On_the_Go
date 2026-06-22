@@ -23,6 +23,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
     firstName: '',
     middleName: '',
     lastName: '',
+    phone: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -61,15 +62,23 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
     e.preventDefault();
     setError('');
 
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
+    if (!formData.firstName || !formData.lastName || !formData.phone || !formData.password) {
       setError('Please fill in all required fields.');
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setError('Please enter a valid email address.');
+    const normalizedPhone = formData.phone.replace(/\D/g, '').slice(0, 11);
+    if (!/^09\d{9}$/.test(normalizedPhone)) {
+      setError('Enter a valid mobile number (09XXXXXXXXX).');
       return;
+    }
+
+    if (formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        setError('Please enter a valid email address.');
+        return;
+      }
     }
 
     if (formData.password.length < 8) {
@@ -89,7 +98,8 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
         firstName: formData.firstName,
         middleName: formData.middleName,
         lastName: formData.lastName,
-        email: formData.email,
+        phone: normalizedPhone,
+        email: formData.email.trim() || undefined,
         password: formData.password,
       });
 
@@ -124,7 +134,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className={`scroll-y-clean relative min-h-0 flex-1 overflow-y-auto p-5 sm:p-6 ${
+          className={`scroll-y-clean relative min-h-0 flex-1 p-5 sm:p-6 ${
             error ? 'overflow-hidden' : ''
           }`}
         >
@@ -151,6 +161,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
                   firstName: '',
                   middleName: '',
                   lastName: '',
+                  phone: '',
                   email: '',
                   password: '',
                   confirmPassword: '',
@@ -236,8 +247,28 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
             </div>
 
             <div>
+              <label htmlFor="signup-phone" className={authLabelClass}>
+                Mobile number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                id="signup-phone"
+                inputMode="numeric"
+                maxLength={11}
+                value={formData.phone}
+                onChange={(e) =>
+                  handleInputChange('phone', e.target.value.replace(/\D/g, '').slice(0, 11))
+                }
+                placeholder="09XXXXXXXXX"
+                className={authInputClass}
+                disabled={isLoading}
+              />
+            </div>
+
+            <div>
               <label htmlFor="signup-email" className={authLabelClass}>
-                Email address <span className="text-red-500">*</span>
+                Email address{' '}
+                <span className="text-charcoal/40 font-normal text-xs">(optional)</span>
               </label>
               <input
                 type="email"

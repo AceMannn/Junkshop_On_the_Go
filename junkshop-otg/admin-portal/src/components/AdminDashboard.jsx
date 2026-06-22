@@ -379,8 +379,46 @@ function ApplicationsPanel({ applications, filter, onFilterChange, onOpen }) {
                 </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-                <div className="overflow-x-auto">
+            <div className="space-y-3 md:hidden">
+                {applications.length === 0 ? (
+                    <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-8 text-center text-zinc-500">
+                        No applications found.
+                    </div>
+                ) : (
+                    applications.map((row) => (
+                        <article
+                            key={row.id}
+                            className="rounded-2xl border border-zinc-200 bg-white p-4 space-y-3"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="font-semibold">{row.junkshopName}</p>
+                                    <p className="text-sm text-zinc-500">{row.ownerName}</p>
+                                </div>
+                                <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold capitalize">
+                                    {row.verificationStatus}
+                                </span>
+                            </div>
+                            <div className="text-sm text-zinc-600 space-y-1">
+                                <p>{row.phone || "—"}</p>
+                                <p className="text-xs text-zinc-500">
+                                    Submitted {formatDate(row.verificationSubmittedAt)}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => onOpen(row.id)}
+                                className="flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-200 text-sm font-semibold hover:bg-zinc-50"
+                            >
+                                Review
+                            </button>
+                        </article>
+                    ))
+                )}
+            </div>
+
+            <div className="hidden md:block overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+                <div className="scroll-x-clean">
                     <table className="min-w-full text-sm">
                         <thead className="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500">
                             <tr>
@@ -576,7 +614,7 @@ function ApplicationModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
-            <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-xl">
+            <div className="scroll-y-clean max-h-[92vh] w-full max-w-4xl rounded-t-2xl sm:rounded-2xl bg-white shadow-xl">
                 <div className="sticky top-0 flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-4 sm:px-6">
                     <div>
                         <h2 className="text-lg font-bold">Review application</h2>

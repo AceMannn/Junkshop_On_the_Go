@@ -112,7 +112,7 @@ export function DashboardPanelShell({ title, onClose, children }) {
                 </h2>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 lg:px-8 py-5 sm:py-6 pb-20 lg:pb-6">
+            <div className="scroll-y-clean flex-1 min-h-0 overscroll-contain px-4 sm:px-6 lg:px-8 py-5 sm:py-6 pb-20 lg:pb-6">
                 {children}
             </div>
         </div>
@@ -220,27 +220,8 @@ export function JunkshopsPanel({
                 </select>
             </div>
 
-            {!loading && (
-            <JunkshopsMap
-                key={`junkshops-map-${filteredShops.length}`}
-                shops={filteredShops}
-                selectedId={expandedId}
-                onSelectShop={setExpandedId}
-                routingEnabled
-                autoRouteShopId={effectiveRouteId}
-                onRouteDrawn={() => {
-                    setPendingRouteId(null);
-                    onRouteDrawn?.();
-                }}
-            />
-            )}
-            {loading && (
-                <div className="rounded-xl border border-emerald-200 bg-zinc-50 h-[280px] sm:h-[320px] flex items-center justify-center text-sm text-[#72796e]">
-                    Loading map…
-                </div>
-            )}
-
-            <div className="space-y-4">
+            <div className="flex flex-col gap-6">
+            <div className="order-1 space-y-4 lg:order-2">
                 <p className="text-xs font-bold uppercase tracking-wider text-[#72796e]">
                     {filteredShops.length} shop{filteredShops.length !== 1 ? "s" : ""} found
                 </p>
@@ -470,6 +451,30 @@ export function JunkshopsPanel({
                     </div>
                 )}
             </div>
+
+            {!loading && (
+                <div className="order-2 lg:order-1">
+                    <JunkshopsMap
+                        key={`junkshops-map-${filteredShops.length}`}
+                        shops={filteredShops}
+                        selectedId={expandedId}
+                        onSelectShop={setExpandedId}
+                        routingEnabled
+                        autoRouteShopId={effectiveRouteId}
+                        onRouteDrawn={() => {
+                            setPendingRouteId(null);
+                            onRouteDrawn?.();
+                        }}
+                        className="fluid-map-min-height w-full"
+                    />
+                </div>
+            )}
+            {loading && (
+                <div className="order-2 lg:order-1 rounded-xl border border-emerald-200 bg-zinc-50 fluid-map-min-height flex items-center justify-center text-sm text-[#72796e]">
+                    Loading map…
+                </div>
+            )}
+            </div>
         </div>
     );
 }
@@ -549,7 +554,7 @@ export function MaterialPricesPanel() {
                 {highlightRows.map(({ key, label, item }) => (
                     <div
                         key={key}
-                        className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 sm:p-4"
+                        className="min-w-0 bg-emerald-50 border border-emerald-100 rounded-xl p-3 sm:p-4"
                     >
                         <p className="text-[10px] uppercase tracking-wider font-bold text-[#72796e]">
                             {label}
@@ -592,7 +597,7 @@ export function MaterialPricesPanel() {
                     return (
                         <div
                             key={item.id}
-                            className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5"
+                            className="min-w-0 bg-white border border-zinc-200 rounded-xl p-4 sm:p-5"
                         >
                             <div className="flex justify-between items-start gap-2 mb-2">
                                 <div>

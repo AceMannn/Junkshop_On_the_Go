@@ -195,16 +195,10 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
 
     const validatePickupForm = () => {
         const errors = {};
-
-        if (pickupProfile.pickupServiceFee <= 0) {
-            errors.pickupServiceFee = "Home pickups need a service fee greater than ₱0.";
-        }
-
         const number = pickupProfile.gcashNumber.trim();
         if (number && !PH_GCASH_PATTERN.test(number)) {
             errors.gcashNumber = "Invalid mobile number format. Use 09XXXXXXXXX (11 digits).";
         }
-
         setPickupErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -220,13 +214,13 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
         setSavingPickup(true);
         try {
             const { user: updated } = await authApiExtended.updateProviderProfile({
-                pickupServiceFee: pickupProfile.pickupServiceFee,
+                pickupServiceFee: 0,
                 gcashNumber: pickupProfile.gcashNumber,
                 gcashQrUrl: pickupProfile.gcashQrUrl,
                 pickupEnabled: pickupProfile.pickupEnabled,
             });
             onUserUpdate?.(updated);
-            onNotify?.("Pickup & GCash settings saved.");
+            onNotify?.("GCash details saved.");
         } catch (err) {
             onNotify?.(err.message);
         } finally {
@@ -286,19 +280,11 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
             </div>
 
             <section className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 sm:p-6">
-                <h2 className="text-lg font-bold text-[#154212] mb-1">Pickup &amp; GCash</h2>
+                <h2 className="text-lg font-bold text-[#154212] mb-1">GCash (for paying customers)</h2>
                 <p className="text-sm text-[#72796e] mb-4">
-                    Shown to customers after you accept a home pickup. Drop-offs do not use this fee.
+                    Saved for when you pay customers for their recyclables. Pickups are free for customers — no service fee.
                 </p>
                 <form onSubmit={handleSavePickup} className="space-y-4 max-w-lg">
-                    <Field
-                        label="Service fee (₱)"
-                        type="number"
-                        min={1}
-                        value={String(pickupProfile.pickupServiceFee)}
-                        onChange={handleServiceFeeChange}
-                        error={pickupErrors.pickupServiceFee}
-                    />
                     <Field
                         label="GCash mobile number"
                         value={pickupProfile.gcashNumber}
@@ -324,7 +310,7 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                         disabled={savingPickup}
                         className="rounded-xl bg-[#154212] px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 disabled:opacity-60"
                     >
-                        {savingPickup ? "Saving..." : "Save pickup payment info"}
+                        {savingPickup ? "Saving..." : "Save GCash details"}
                     </button>
                 </form>
             </section>

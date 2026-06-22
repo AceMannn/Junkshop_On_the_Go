@@ -90,11 +90,6 @@ async function evaluateProviderProfile(user) {
       label: 'GCash mobile number',
       done: hasValidPhone(gcashNumber),
     },
-    {
-      id: 'serviceFee',
-      label: 'Pickup service fee set',
-      done: user.pickupServiceFee != null && Number(user.pickupServiceFee) > 0,
-    },
   ]);
 }
 

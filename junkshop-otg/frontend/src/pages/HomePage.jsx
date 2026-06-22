@@ -9,8 +9,7 @@ import ShopRating from '../components/ui/ShopRating';
 import ReviewSnippet from '../components/ui/ReviewSnippet';
 import { useCatalogJunkshops, useFeaturedMaterials } from '../hooks/useCatalogData';
 import LoadErrorBanner from '../components/ui/LoadErrorBanner';
-import { priceCategories } from '../data/prices';
-import { formatUpdatedDate } from '../utils/catalogMappers';
+import MaterialMarketplaceSection from '../components/marketplace/MaterialMarketplaceSection';
 import {
   materialGuides,
   previewRecyclingSteps,
@@ -18,6 +17,7 @@ import {
   recyclingDos,
   recyclingSteps,
 } from '../data/recyclingGuide';
+import { priceCategories } from '../data/prices';
 
 const DATE_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest first' },
@@ -36,7 +36,7 @@ function getPostedTime(value) {
   return Number.isFinite(time) ? time : 0;
 }
 
-export default function HomePage() {
+export default function HomePage({ onSignInToSell }) {
   const [activeModal, setActiveModal] = useState(null);
   const [materialCategoryFilter, setMaterialCategoryFilter] = useState('all');
   const [materialDateSort, setMaterialDateSort] = useState('newest');
@@ -102,37 +102,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="py-16 bg-gradient-to-br from-[#f8fcf8] via-white to-[#f2faf4]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SectionHeader title="What Can You Recycle?" description="Popular recyclable materials in your area" />
-          {materialsError && (
-            <LoadErrorBanner
-              message={materialsError}
-              onRetry={refreshMaterials}
-              className="mb-4"
-            />
-          )}
-          {materialsLoading ? (
-            <p className="text-center text-gray-500">Loading prices...</p>
-          ) : materials.length === 0 ? (
-            <EmptyState
-              icon={Package}
-              title="No price data yet"
-              description="Live partner prices appear when verified shops publish materials. Run npm run seed for reference catalog prices in areas still onboarding."
-            />
-          ) : (
-            <RecyclableMaterialsTable
-              materials={filteredMaterials}
-              categoryOptions={materialCategoryOptions}
-              categoryFilter={materialCategoryFilter}
-              dateSort={materialDateSort}
-              onCategoryChange={setMaterialCategoryFilter}
-              onDateSortChange={setMaterialDateSort}
-            />
-          )}
-          <SectionAction onClick={() => setActiveModal('prices')}>View all recyclables</SectionAction>
-        </div>
-      </section>
+      <MaterialMarketplaceSection
+        onSignInToSell={onSignInToSell}
+        onViewAllPrices={() => setActiveModal('prices')}
+      />
 
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -144,10 +117,10 @@ export default function HomePage() {
               className="mb-4"
             />
           )}
-          <div className="bg-[#f9faf9] rounded-[28px] shadow-lg overflow-hidden border border-gray-100">
-            <div className="grid lg:grid-cols-2">
-              <div className="p-6 sm:p-8 bg-white">
-                <div className="space-y-8">
+          <div className="bg-[#f9faf9] rounded-[28px] shadow-lg overflow-hidden border border-gray-100 min-w-0">
+            <div className="grid lg:grid-cols-2 min-w-0">
+              <div className="min-w-0 p-4 sm:p-6 lg:p-8 bg-white">
+                <div className="space-y-6 sm:space-y-8">
                   {shopsLoading ? (
                     <p className="text-gray-500">Loading shops...</p>
                   ) : previewShops.length === 0 ? (
@@ -159,16 +132,16 @@ export default function HomePage() {
                     />
                   ) : (
                     previewShops.map((shop, index) => (
-                      <article key={shop.id} className="flex gap-4 items-start">
+                      <article key={shop.id} className="flex min-w-0 gap-3 sm:gap-4 items-start">
                         <div className="flex flex-col items-center shrink-0">
                           <div className="w-10 h-10 rounded-full bg-eco-green flex items-center justify-center shadow-md">
                             <MapPin className="text-white" size={18} />
                           </div>
-                          {index !== previewShops.length - 1 && <div className="w-[2px] h-16 bg-gray-200 mt-2 rounded-full" />}
+                          {index !== previewShops.length - 1 && <div className="w-[2px] h-12 sm:h-16 bg-gray-200 mt-2 rounded-full" />}
                         </div>
-                        <div className="flex-1 pt-1">
-                          <h4 className="mb-2 text-charcoal">{shop.name}</h4>
-                          <p className="text-gray-600 text-base mb-2">
+                        <div className="min-w-0 flex-1 pt-1">
+                          <h4 className="mb-2 text-charcoal break-words">{shop.name}</h4>
+                          <p className="text-gray-600 text-sm sm:text-base mb-2 break-words">
                             {shop.address}, <span className="text-gray-700">{shop.distance}</span>
                           </p>
                           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -188,13 +161,13 @@ export default function HomePage() {
                   )}
                 </div>
               </div>
-              <div className="relative min-h-[320px] overflow-hidden bg-eco-green">
+              <div className="relative fluid-map-min-height min-h-0 overflow-hidden bg-eco-green">
                 {shopsLoading ? (
-                  <div className="flex min-h-[320px] h-full items-center justify-center p-6 sm:p-8">
+                  <div className="flex fluid-map-min-height h-full items-center justify-center p-4 sm:p-8">
                     <p className="text-sm text-white/80 animate-pulse">Loading map…</p>
                   </div>
                 ) : previewShops.length === 0 ? (
-                  <div className="flex min-h-[320px] h-full items-center justify-center p-6 sm:p-8">
+                  <div className="flex fluid-map-min-height h-full items-center justify-center p-4 sm:p-8">
                     <EmptyState
                       compact
                       inverted
@@ -299,8 +272,45 @@ function RecyclableMaterialsTable({
         </div>
       </div>
 
-      <div className="max-h-[34rem] overflow-auto border border-gray-100 [scrollbar-color:#9ca3af_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-400">
-        <table className="w-full min-w-[760px] text-left text-sm">
+      <div className="scroll-y-clean max-h-[34rem] border border-gray-100">
+        <div className="space-y-2 p-2 md:hidden">
+          {materials.map((item) => {
+            const shopName =
+              item.junkshop?.name || (item.source === 'catalog' ? 'Reference catalog' : 'Partner junkshop');
+            const shopAddress =
+              item.junkshop?.address || (item.source === 'catalog' ? 'Teresa, Sta. Mesa area' : 'Address not listed');
+            const postedDate = formatUpdatedDate(item.postedAt || item.updatedAt);
+
+            return (
+              <article
+                key={item.id}
+                className="rounded-[16px] border border-gray-100 bg-white p-3 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-charcoal break-words">{item.material}</p>
+                    {item.examples && (
+                      <p className="mt-1 text-xs leading-relaxed text-gray-500 break-words">{item.examples}</p>
+                    )}
+                  </div>
+                  <span className="shrink-0 inline-flex rounded-xl bg-sunny-yellow px-2.5 py-1 text-xs font-bold text-charcoal">
+                    {item.perKgPrice}/{item.unit || 'kg'}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600">
+                  <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 font-bold text-emerald-800">
+                    {formatCategoryLabel(item.category)}
+                  </span>
+                  <span className="break-words">{shopName}</span>
+                </div>
+                <p className="mt-1 text-xs text-gray-500 break-words">{shopAddress}</p>
+                <p className="mt-1 text-xs text-gray-500">Posted {postedDate}</p>
+              </article>
+            );
+          })}
+        </div>
+
+        <table className="hidden md:table w-full min-w-[640px] text-left text-sm">
           <thead className="sticky top-0 z-10 bg-[#f3f7f2] text-xs uppercase tracking-wide text-gray-500">
             <tr>
               <th className="px-4 py-3 font-bold">Material</th>
@@ -363,7 +373,7 @@ function SectionHeader({ title, description }) {
   return (
     <div className="text-center mb-12">
       <h2 className="mb-4">{title}</h2>
-      <p className="text-xl text-gray-600 max-w-3xl mx-auto">{description}</p>
+      <p className="text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">{description}</p>
     </div>
   );
 }
@@ -385,7 +395,13 @@ function SectionAction({ children, onClick, variant = 'primary' }) {
 
 function PricesModal({ isOpen, onClose, materials }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Recyclable Materials Price Guide" description="Reference prices for Teresa, Sta. Mesa. Actual prices may vary by junkshop and item condition.">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      mobileSheet
+      title="Recyclable Materials Price Guide"
+      description="Reference prices for Teresa, Sta. Mesa. Actual prices may vary by junkshop and item condition."
+    >
       <div className="space-y-8">
         {priceCategories.filter((category) => category.id !== 'all').map((category) => {
           const categoryPrices = materials.filter((item) => item.category === category.id);
@@ -393,23 +409,44 @@ function PricesModal({ isOpen, onClose, materials }) {
           return (
             <section key={category.id}>
               <h3 className="mb-4 capitalize text-eco-green">{category.label}</h3>
-              <div className="overflow-x-auto rounded-[16px] border border-gray-100">
-                <table className="w-full min-w-[480px] sm:min-w-[560px] text-left text-xs sm:text-sm">
+
+              <div className="space-y-2 md:hidden">
+                {categoryPrices.map((item) => (
+                  <article
+                    key={item.id}
+                    className="rounded-[16px] border border-gray-100 bg-white p-3 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-semibold text-charcoal">{item.material}</p>
+                      <p className="shrink-0 font-semibold text-eco-green">{item.perKgPrice}</p>
+                    </div>
+                    {item.examples && (
+                      <p className="mt-1 text-xs text-gray-600">{item.examples}</p>
+                    )}
+                    {item.notes && (
+                      <p className="mt-1 text-xs text-gray-500">{item.notes}</p>
+                    )}
+                  </article>
+                ))}
+              </div>
+
+              <div className="hidden md:block scroll-x-clean rounded-[16px] border border-gray-100">
+                <table className="w-full min-w-[560px] text-left text-sm">
                   <thead className="bg-light-gray text-charcoal">
                     <tr>
-                      <th className="px-2 py-2 sm:px-4 sm:py-3">Material</th>
-                      <th className="hidden sm:table-cell px-2 py-2 sm:px-4 sm:py-3">Examples</th>
-                      <th className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">Per kg</th>
-                      <th className="hidden md:table-cell px-2 py-2 sm:px-4 sm:py-3">Notes</th>
+                      <th className="px-4 py-3">Material</th>
+                      <th className="px-4 py-3">Examples</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Per kg</th>
+                      <th className="px-4 py-3">Notes</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {categoryPrices.map((item) => (
                       <tr key={item.id} className="align-top">
-                        <td className="px-2 py-2 sm:px-4 sm:py-3 font-semibold text-charcoal">{item.material}</td>
-                        <td className="hidden sm:table-cell px-2 py-2 sm:px-4 sm:py-3 text-gray-600">{item.examples || '—'}</td>
-                        <td className="px-2 py-2 sm:px-4 sm:py-3 font-semibold text-eco-green whitespace-nowrap">{item.perKgPrice}</td>
-                        <td className="hidden md:table-cell px-2 py-2 sm:px-4 sm:py-3 text-gray-600">{item.notes || '—'}</td>
+                        <td className="px-4 py-3 font-semibold text-charcoal">{item.material}</td>
+                        <td className="px-4 py-3 text-gray-600">{item.examples || '—'}</td>
+                        <td className="px-4 py-3 font-semibold text-eco-green whitespace-nowrap">{item.perKgPrice}</td>
+                        <td className="px-4 py-3 text-gray-600">{item.notes || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -425,21 +462,27 @@ function PricesModal({ isOpen, onClose, materials }) {
 
 function MapModal({ isOpen, onClose, shops }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Junkshops in Teresa, Sta. Mesa" description="Live junkshop pins from our database. Partner shops support in-app pickups." size="fullscreen">
-      <div className="grid h-full gap-4 md:grid-cols-[1fr_16rem] lg:grid-cols-[1fr_22rem]">
-        <JunkshopsMap shops={shops} className="min-h-[240px] sm:min-h-[300px] md:min-h-[360px]" />
-        <div className="space-y-3 overflow-y-auto max-h-[38vh] md:max-h-none pr-1">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      mobileSheet
+      title="Junkshops in Teresa, Sta. Mesa"
+      description="Live junkshop pins from our database. Partner shops support in-app pickups."
+      size="fullscreen"
+    >
+      <div className="flex h-full flex-col gap-4 md:grid md:grid-cols-[1fr_16rem] lg:grid-cols-[1fr_22rem]">
+        <div className="scroll-y-clean order-1 space-y-3 max-h-[42vh] md:order-2 md:max-h-none pr-1">
           {shops.map((shop) => (
             <article key={shop.id} className="rounded-[18px] border border-gray-100 bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <h4 className="text-charcoal">{shop.name}</h4>
                   <p className="mt-1 text-sm text-gray-600">{shop.address}</p>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${shop.status === 'Open' ? 'bg-eco-green/10 text-eco-green' : 'bg-gray-100 text-gray-500'}`}>{shop.status}</span>
+                <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${shop.status === 'Open' ? 'bg-eco-green/10 text-eco-green' : 'bg-gray-100 text-gray-500'}`}>{shop.status}</span>
               </div>
               <div className="mt-3 space-y-1 text-sm text-gray-600">
-                <p className="flex items-center gap-2">
+                <p className="flex flex-wrap items-center gap-2">
                   {shop.distance} away · <ShopRating shop={shop} />
                 </p>
                 <p>{shop.hours}</p>
@@ -457,6 +500,10 @@ function MapModal({ isOpen, onClose, shops }) {
             </article>
           ))}
         </div>
+        <JunkshopsMap
+          shops={shops}
+          className="order-2 fluid-map-height md:order-1"
+        />
       </div>
     </Modal>
   );
@@ -464,7 +511,13 @@ function MapModal({ isOpen, onClose, shops }) {
 
 function GuideModal({ isOpen, onClose }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Full Recycling Guide" description="Prepare recyclables correctly so junkshops can price them faster and contamination stays low.">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      mobileSheet
+      title="Full Recycling Guide"
+      description="Prepare recyclables correctly so junkshops can price them faster and contamination stays low."
+    >
       <div className="space-y-10">
         <section>
           <h3 className="mb-5 text-eco-green">5 Simple Steps</h3>

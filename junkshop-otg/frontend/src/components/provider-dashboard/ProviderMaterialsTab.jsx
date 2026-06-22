@@ -4,6 +4,7 @@ import { domainApi } from "../../services/api";
 import { useProviderMaterials } from "../../hooks/useProviderData";
 import NumberInput from "../ui/NumberInput";
 import Select from "../ui/Select";
+import { formatUpdatedDate } from "../../utils/catalogMappers";
 
 const CATEGORIES = ["plastic", "metal", "paper", "glass", "e-waste", "other"];
 
@@ -13,6 +14,10 @@ const FILTER_OPTIONS = [
 ];
 
 const CATEGORY_OPTIONS = CATEGORIES.map((cat) => ({ value: cat, label: cat }));
+const UNIT_OPTIONS = [
+    { value: "kg", label: "Per kg" },
+    { value: "piece", label: "Per piece" },
+];
 
 export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
     const { materials, loading, refresh } = useProviderMaterials({ autoRefresh: true });
@@ -63,8 +68,8 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!form.name.trim() || !form.price) {
-            onNotify?.("Name and price are required.");
+        if (!form.name.trim() || !form.price || Number(form.price) <= 0) {
+            onNotify?.("Name and a price greater than ₱0 are required.");
             return;
         }
         setSaving(true);
@@ -134,8 +139,8 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                 </button>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex items-center bg-white border border-zinc-200 rounded-xl px-4 py-2.5 flex-1 max-w-md">
+            <div className="flex min-w-0 flex-col sm:flex-row gap-3">
+                <div className="flex min-w-0 flex-1 items-center bg-white border border-zinc-200 rounded-xl px-4 py-2.5">
                     <Search size={18} className="text-[#72796e] mr-2 shrink-0" />
                     <input
                         value={search}
@@ -149,7 +154,7 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                     onChange={setCategoryFilter}
                     options={FILTER_OPTIONS}
                     ariaLabel="Filter by category"
-                    className="min-w-[160px] sm:min-w-[180px]"
+                    className="w-full sm:w-auto sm:min-w-[10rem]"
                 />
             </div>
 
@@ -170,7 +175,7 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                                 <div>
                                     <h3 className="font-bold text-[#191c1c]">{item.name}</h3>
                                     <p className="text-xs text-[#72796e] capitalize mt-0.5">
-                                        {item.category}
+                                        {item.category} · Posted {formatUpdatedDate(item.createdAt || item.updatedAt)}
                                     </p>
                                 </div>
                                 <span
@@ -216,10 +221,10 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
             )}
 
             {modalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40">
                     <form
                         onSubmit={handleSubmit}
-                        className="bg-white rounded-2xl border border-zinc-200 shadow-xl w-full max-w-md p-6 space-y-4"
+                        className="scroll-y-clean bg-white rounded-t-2xl sm:rounded-2xl border border-zinc-200 shadow-xl w-full sm:max-w-md max-h-[92dvh] p-6 space-y-4"
                     >
                         <h2 className="text-lg font-bold text-[#191c1c]">
                             {editing ? "Edit material" : "Add material"}
@@ -242,12 +247,23 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                                 ariaLabel="Material category"
                             />
                         </div>
+                        <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-[#42493e]">
+                                Unit
+                            </label>
+                            <Select
+                                value={form.unit}
+                                onChange={(unit) => setForm({ ...form, unit })}
+                                options={UNIT_OPTIONS}
+                                ariaLabel="Material unit"
+                            />
+                        </div>
                         <NumberInput
-                            min={0}
+                            min={0.01}
                             step={0.01}
                             value={form.price}
                             onChange={(v) => setForm({ ...form, price: v })}
-                            placeholder="Price per kg"
+                            placeholder={form.unit === "piece" ? "Price per piece" : "Price per kg"}
                             inputClassName="w-full border border-zinc-200 rounded-xl px-4 py-2.5 pr-11 text-sm outline-none focus:ring-2 focus:ring-[#154212]/20"
                             required
                         />

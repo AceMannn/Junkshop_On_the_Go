@@ -13,10 +13,11 @@ export const authLabelClass = 'block text-sm font-medium text-charcoal mb-1.5';
 export const authSubmitClass =
   'w-full h-11 bg-eco-green text-white rounded-lg font-semibold text-sm shadow-sm hover:bg-eco-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed';
 
-export const authRoleToggleWrapClass = 'bg-light-gray rounded-lg p-1 h-11 flex mb-2';
+export const authRoleToggleWrapClass =
+  'bg-light-gray rounded-lg p-1 flex items-stretch mb-2 min-h-11';
 
 export function authRoleTabClass(isActive) {
-  return `flex-1 rounded-md font-medium transition-colors text-sm ${
+  return `flex flex-1 min-w-0 items-center justify-center rounded-md px-2 py-2.5 text-center text-xs sm:text-sm font-medium leading-snug transition-colors ${
     isActive
       ? 'bg-white text-charcoal shadow-sm'
       : 'text-charcoal/60 hover:text-charcoal'
@@ -24,7 +25,7 @@ export function authRoleTabClass(isActive) {
 }
 
 export const authRoleHints = {
-  customer: 'Customer — Access recycling tools',
+  customer: 'Customer — Log in with your mobile number',
   provider: 'Junkshop Owner — Register your shop for admin verification',
 };
 
@@ -60,7 +61,7 @@ export function AuthErrorPopup({ message, onDismiss }) {
         <button
           type="button"
           onClick={onDismiss}
-          className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center text-charcoal transition-opacity hover:opacity-70"
+          className="absolute right-1 top-1 flex min-h-11 min-w-11 items-center justify-center rounded-full text-charcoal transition-opacity hover:bg-red-100/80 hover:opacity-100"
           aria-label="Dismiss error"
         >
           <X className="h-3.5 w-3.5" strokeWidth={2.5} />

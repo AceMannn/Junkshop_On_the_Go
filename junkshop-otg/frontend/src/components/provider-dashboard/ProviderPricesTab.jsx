@@ -124,7 +124,7 @@ export default function ProviderPricesTab({ onNotify }) {
                         ))}
                     </div>
 
-                    <div className="hidden md:block overflow-x-auto">
+                    <div className="hidden md:block scroll-x-clean">
                         <table className="w-full text-sm">
                             <thead className="bg-[#f3f4f3] text-[#42493e]">
                                 <tr>

@@ -96,10 +96,24 @@ function providerPlaceholderEmail(normalizedPhone) {
   return `${normalizedPhone}@provider.junkshop.internal`;
 }
 
+function customerPlaceholderEmail(normalizedPhone) {
+  return `${normalizedPhone}@customer.junkshop.internal`;
+}
+
+function isInternalAccountEmail(email) {
+  const value = String(email || '').toLowerCase();
+  return (
+    value.endsWith('@provider.junkshop.internal') ||
+    value.endsWith('@customer.junkshop.internal')
+  );
+}
+
 module.exports = {
   DAY_LABELS,
   DEFAULT_SCHEDULE,
   sanitizeOperatingHours,
   formatOperatingHoursSummary,
   providerPlaceholderEmail,
+  customerPlaceholderEmail,
+  isInternalAccountEmail,
 };

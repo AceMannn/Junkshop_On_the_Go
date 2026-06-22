@@ -3,7 +3,7 @@ const Junkshop = require('../models/Junkshop');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const Transaction = require('../models/Transaction');
-const { evaluateProfile } = require('../utils/profileCompletion');
+const { evaluateProfile, normalizePhone, hasValidPhone } = require('../utils/profileCompletion');
 const { syncJunkshopRating } = require('../utils/shopRatings');
 const { geocodeFirst } = require('../utils/mapService');
 const {
@@ -96,6 +96,7 @@ const serializeRequest = (doc) => {
     contactPhone: r.contactPhone,
     contactEmail: r.contactEmail,
     materials: r.materials,
+    materialPhotos: r.materialPhotos || [],
     estimatedWeightKg: r.estimatedWeightKg,
     address: r.address,
     pickupLocation: r.pickupLocation,
@@ -218,6 +219,7 @@ exports.createPickupRequest = async (req, res) => {
       contactPhone,
       contactEmail,
       materials,
+      materialPhotos,
       estimatedWeightKg,
       address,
       scheduledDate,
@@ -225,18 +227,58 @@ exports.createPickupRequest = async (req, res) => {
       notes,
     } = req.body;
 
-    if (!contactName?.trim() || !address?.trim() || !scheduledDate || !timeSlot) {
+    const isDropOff = requestType === 'drop_off';
+
+    if (!contactName?.trim() || !scheduledDate || !timeSlot) {
       return res.status(400).json({ message: 'Please complete all required booking fields.' });
     }
 
-    const weight = Number(estimatedWeightKg);
-    if (!weight || weight < 0.1) {
-      return res.status(400).json({ message: 'Estimated weight is required (min 0.1 kg).' });
+    if (!isDropOff && !address?.trim()) {
+      return res.status(400).json({ message: 'Pickup address is required.' });
+    }
+
+    const scheduleDate = new Date(`${scheduledDate}T12:00:00`);
+    if (Number.isNaN(scheduleDate.getTime())) {
+      return res.status(400).json({ message: 'Please choose a valid date.' });
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const maxDate = new Date(today);
+    maxDate.setDate(maxDate.getDate() + 7);
+    scheduleDate.setHours(0, 0, 0, 0);
+    if (scheduleDate < today || scheduleDate > maxDate) {
+      return res.status(400).json({ message: 'Choose a date within the next 7 days.' });
     }
 
     if (!Array.isArray(materials) || materials.length === 0) {
       return res.status(400).json({ message: 'Select at least one material.' });
     }
+
+    const normalizedMaterials = materials.map((item) => {
+      const quantity = Math.max(1, Math.floor(Number(item.quantity) || 0));
+      const unit = item.unit === 'piece' ? 'piece' : 'kg';
+      return {
+        catalogId: String(item.catalogId || ''),
+        name: String(item.name || '').trim(),
+        category: String(item.category || ''),
+        quantity,
+        unit,
+      };
+    });
+
+    if (normalizedMaterials.some((item) => !item.name)) {
+      return res.status(400).json({ message: 'Each material must have a name.' });
+    }
+
+    const photos = Array.isArray(materialPhotos) ? materialPhotos.slice(0, 3) : [];
+    if (photos.length < 1) {
+      return res.status(400).json({ message: 'Upload at least one photo of your materials.' });
+    }
+
+    const totalKg = normalizedMaterials
+      .filter((item) => item.unit === 'kg')
+      .reduce((sum, item) => sum + item.quantity, 0);
+    const weight = Number(estimatedWeightKg) || totalKg;
 
     let junkshop = null;
     if (assignmentMode === 'specific') {
@@ -260,7 +302,16 @@ exports.createPickupRequest = async (req, res) => {
     }
 
     const pickupAddress =
-      requestType === 'drop_off' && junkshop ? junkshop.address : address.trim();
+      isDropOff && junkshop ? junkshop.address : String(address || '').trim();
+
+    if (!pickupAddress) {
+      return res.status(400).json({ message: 'Address is required for this booking.' });
+    }
+
+    const normalizedPhone = normalizePhone(contactPhone || req.user.phone);
+    if (!isDropOff && !hasValidPhone(normalizedPhone)) {
+      return res.status(400).json({ message: 'Contact phone is required (09XXXXXXXXX).' });
+    }
 
     const pickupLocation = await resolvePickupLocation({
       requestType,
@@ -274,9 +325,14 @@ exports.createPickupRequest = async (req, res) => {
       assignmentMode,
       requestType,
       contactName: contactName.trim(),
-      contactPhone: contactPhone?.trim() || '',
+      contactPhone: normalizedPhone || contactPhone?.trim() || '',
       contactEmail: contactEmail?.trim() || '',
-      materials,
+      materials: normalizedMaterials,
+      materialPhotos: photos.map((photo) => ({
+        fileName: String(photo.fileName || 'photo.jpg').trim(),
+        mimeType: String(photo.mimeType || 'image/jpeg').trim(),
+        data: String(photo.data || ''),
+      })),
       estimatedWeightKg: weight,
       address: pickupAddress,
       pickupLocation: pickupLocation || undefined,
@@ -374,14 +430,7 @@ exports.acceptPickupRequest = async (req, res) => {
       });
     }
 
-    const serviceFee = Number(req.body.serviceFee ?? junkshop.pickupServiceFee ?? provider.pickupServiceFee ?? 0);
-
-    if (request.requestType === 'home_pickup' && serviceFee <= 0) {
-      return res.status(400).json({
-        message:
-          'Set a pickup service fee greater than ₱0 in Settings before accepting home pickups.',
-      });
-    }
+    const serviceFee = 0;
 
     request.status = 'accepted';
     request.provider = req.user._id;
@@ -389,8 +438,8 @@ exports.acceptPickupRequest = async (req, res) => {
     request.serviceFee = serviceFee;
     request.gcashNumber = provider.gcashNumber || '';
     request.gcashQrUrl = provider.gcashQrUrl || '';
-    request.serviceFeePaid = false;
-    request.serviceFeePaymentStatus = 'none';
+    request.serviceFeePaid = true;
+    request.serviceFeePaymentStatus = 'confirmed';
     request.paymentReference = '';
     request.paymentProofUrl = '';
     request.paymentSubmittedAt = undefined;
@@ -407,10 +456,8 @@ exports.acceptPickupRequest = async (req, res) => {
     let customerMessage;
     if (request.requestType === 'drop_off') {
       customerMessage = `${junkshop.name} accepted your drop-off. Visit the shop during your scheduled time.`;
-    } else if (serviceFee <= 0) {
-      customerMessage = `${junkshop.name} accepted your request. Confirm you're ready for pickup.`;
     } else {
-      customerMessage = `${junkshop.name} accepted your request. Pay the service fee via GCash.`;
+      customerMessage = `${junkshop.name} accepted your request. Wait for your scheduled pickup date.`;
     }
 
     await notifyUser(request.customer, {

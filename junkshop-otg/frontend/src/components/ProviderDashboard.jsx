@@ -7,7 +7,6 @@ import HelpModal from "./ui/HelpModal";
 import ProviderSidebar, { ProviderMobileNav } from "./provider-dashboard/ProviderSidebar";
 import ProviderOverviewTab from "./provider-dashboard/ProviderOverviewTab";
 import ProviderMaterialsTab from "./provider-dashboard/ProviderMaterialsTab";
-import ProviderPricesTab from "./provider-dashboard/ProviderPricesTab";
 import ProviderAvailabilityTab from "./provider-dashboard/ProviderAvailabilityTab";
 import ProviderSettingsTab from "./provider-dashboard/ProviderSettingsTab";
 import ProviderTransactionsTab from "./provider-dashboard/ProviderTransactionsTab";
@@ -152,9 +151,6 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                             onNotify={showNotification}
                             onRefreshProfile={refreshUser}
                         />
-                    )}
-                    {!accountView && activeTab === "prices" && (
-                        <ProviderPricesTab onNotify={showNotification} />
                     )}
                     {!accountView && activeTab === "availability" && (
                         <ProviderAvailabilityTab

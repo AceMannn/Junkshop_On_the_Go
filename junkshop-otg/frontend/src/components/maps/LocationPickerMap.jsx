@@ -188,7 +188,7 @@ export default function LocationPickerMap({
                 </div>
 
                 {suggestions.length > 0 && (
-                    <ul className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg">
+                    <ul className="scroll-y-clean absolute z-20 mt-1 w-full max-h-48 rounded-xl border border-zinc-200 bg-white shadow-lg">
                         {suggestions.map((item) => (
                             <li key={`${item.lat}-${item.lng}-${item.label}`}>
                                 <button

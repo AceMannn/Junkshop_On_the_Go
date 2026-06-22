@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
     LayoutDashboard,
     Package,
-    DollarSign,
     Clock,
     Truck,
     ReceiptText,
@@ -14,14 +13,13 @@ export const providerTabs = [
     { id: "dashboard", label: "Overview", icon: LayoutDashboard },
     { id: "verification", label: "Verification", icon: ShieldCheck },
     { id: "materials", label: "Materials", icon: Package },
-    { id: "prices", label: "Prices", icon: DollarSign },
     { id: "availability", label: "Availability", icon: Clock },
     { id: "requests", label: "Pickups", icon: Truck },
     { id: "transactions", label: "Transactions", icon: ReceiptText },
 ];
 
 const mobilePrimaryIds = ["dashboard", "verification", "requests", "materials"];
-const mobileMoreIds = ["prices", "availability", "transactions"];
+const mobileMoreIds = ["availability", "transactions", "settings"];
 
 const primarySidebarButtonClass =
     "w-full flex items-center justify-center gap-2.5 rounded-2xl border border-emerald-200/70 bg-emerald-100/80 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-sm hover:bg-emerald-100 hover:shadow transition-colors";
@@ -44,7 +42,7 @@ export default function ProviderSidebar({ activeTab, onNavigate }) {
                 </button>
             </div>
 
-            <nav className="flex flex-col gap-0.5 px-3 flex-1 overflow-y-auto">
+            <nav className="scroll-y-clean flex flex-col gap-0.5 px-3 flex-1">
                 {sidebarNavTabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -102,7 +100,7 @@ export function ProviderMobileNav({ activeTab, onNavigate }) {
                                 key={tab.id}
                                 type="button"
                                 onClick={() => handleNavigate(tab.id)}
-                                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold ${isActive
+                                className={`flex w-full min-h-11 items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold ${isActive
                                     ? "bg-emerald-100 text-emerald-800"
                                     : "text-[#191c1c] hover:bg-zinc-50"
                                     }`}
@@ -125,7 +123,7 @@ export function ProviderMobileNav({ activeTab, onNavigate }) {
                             key={tab.id}
                             type="button"
                             onClick={() => handleNavigate(tab.id)}
-                            className={`flex flex-1 flex-col items-center justify-center min-w-0 px-1 py-1.5 rounded-xl active:scale-95 transition-transform ${isActive
+                            className={`flex flex-1 flex-col items-center justify-center min-h-11 min-w-0 px-1 py-1.5 rounded-xl active:scale-95 transition-transform ${isActive
                                 ? "bg-emerald-100 text-emerald-800"
                                 : "text-zinc-500 hover:text-emerald-600"
                                 }`}
@@ -141,7 +139,7 @@ export function ProviderMobileNav({ activeTab, onNavigate }) {
                 <button
                     type="button"
                     onClick={() => setShowMore((open) => !open)}
-                    className={`flex flex-1 flex-col items-center justify-center min-w-0 px-1 py-1.5 rounded-xl active:scale-95 transition-transform ${moreActive || showMore
+                    className={`flex flex-1 flex-col items-center justify-center min-h-11 min-w-0 px-1 py-1.5 rounded-xl active:scale-95 transition-transform ${moreActive || showMore
                         ? "bg-emerald-100 text-emerald-800"
                         : "text-zinc-500 hover:text-emerald-600"
                         }`}

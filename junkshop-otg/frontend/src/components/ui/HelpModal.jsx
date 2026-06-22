@@ -28,7 +28,7 @@ export default function HelpModal({ isOpen, onClose, onContact }) {
             onClick={onClose}
         >
             <div
-                className="bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[85vh] overflow-y-auto"
+                className="scroll-y-clean bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[85vh]"
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-labelledby="help-modal-title"

@@ -429,7 +429,7 @@ export default function ProviderPickupRequests({
                             ))}
                         </div>
 
-                        <div className="hidden md:block overflow-x-auto">
+                        <div className="hidden md:block scroll-x-clean">
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-[#f3f4f3] text-[#72796e]">
                                     <tr>
@@ -758,7 +758,7 @@ function ProviderPickupDetailDrawer({
                 </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-5">
+            <div className="scroll-y-clean min-h-0 flex-1 overflow-x-hidden p-5 space-y-5">
                     <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[statusKey] || "bg-zinc-100"}`}>
                         {statusLabel}
                     </span>

@@ -25,20 +25,25 @@ export default function Header({
 
     useEffect(() => {
         const handleScroll = () => {
+            const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
             const currentScrollY = window.scrollY;
 
-            // Show header if scrolling up, hide if scrolling down
+            if (!isDesktop) {
+                setHeaderVisible(true);
+                setLastScrollY(currentScrollY);
+                return;
+            }
+
             if (currentScrollY > lastScrollY && currentScrollY > 100) {
-                setHeaderVisible(false); // scrolling down
+                setHeaderVisible(false);
             } else {
-                setHeaderVisible(true); // scrolling up
+                setHeaderVisible(true);
             }
 
             setLastScrollY(currentScrollY);
-
         };
 
-        window.addEventListener('scroll', handleScroll);
+        window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, [lastScrollY]);
 
@@ -118,7 +123,7 @@ export default function Header({
 
                         {/* Mobile Menu Toggle Button */}
                         <button
-                            className="lg:hidden p-2 text-charcoal"
+                            className="lg:hidden flex min-h-11 min-w-11 items-center justify-center rounded-full text-charcoal hover:bg-light-gray"
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                             aria-label="Toggle navigation menu"
                         >

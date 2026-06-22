@@ -255,7 +255,7 @@ function CustomerNotesSection() {
     }
 
     return (
-        <ul className="space-y-2 max-h-64 overflow-y-auto">
+        <ul className="scroll-y-clean space-y-2 max-h-64">
             {notes.map((note) => (
                 <li
                     key={note._id}

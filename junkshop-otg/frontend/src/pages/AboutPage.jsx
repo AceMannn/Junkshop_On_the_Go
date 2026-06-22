@@ -2,7 +2,7 @@ import { Target, Lightbulb, Users, Heart, BookOpen, Recycle } from 'lucide-react
 
 function StaticCard({ children, className = '' }) {
   return (
-    <div className={`bg-white rounded-[16px] p-6 ${className}`}>
+    <div className={`min-w-0 overflow-hidden bg-white rounded-[16px] p-4 sm:p-6 ${className}`}>
       {children}
     </div>
   );
@@ -121,9 +121,9 @@ export default function AboutPage({ onNavigate }) {
 
                 <div className="space-y-3">
                   {mission.problem.points.map((point, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0" />
-                      <p className="text-gray-700">{point}</p>
+                    <div key={index} className="flex min-w-0 items-start gap-3">
+                      <div className="w-2 h-2 bg-red-500 rounded-full mt-2 shrink-0" />
+                      <p className="min-w-0 flex-1 break-words text-gray-700">{point}</p>
                     </div>
                   ))}
                 </div>
@@ -144,9 +144,9 @@ export default function AboutPage({ onNavigate }) {
 
                 <div className="space-y-3">
                   {mission.solution.points.map((point, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-eco-green rounded-full mt-2 flex-shrink-0" />
-                      <p className="text-gray-700">{point}</p>
+                    <div key={index} className="flex min-w-0 items-start gap-3">
+                      <div className="w-2 h-2 bg-eco-green rounded-full mt-2 shrink-0" />
+                      <p className="min-w-0 flex-1 break-words text-gray-700">{point}</p>
                     </div>
                   ))}
                 </div>
@@ -194,19 +194,21 @@ export default function AboutPage({ onNavigate }) {
           <div className="space-y-8">
             {theories.map((theory, index) => (
               <div key={index}>
-                <StaticCard className="bg-gradient-to-br from-clean-blue/5 to-eco-green/5 border-2 border-eco-green/30">
+                <StaticCard className="min-w-0 overflow-hidden bg-gradient-to-br from-clean-blue/5 to-eco-green/5 border-2 border-eco-green/30">
                   <h3 className="mb-4 text-eco-green">{theory.title}</h3>
-                  <p className="text-gray-700 mb-6">{theory.description}</p>
+                  <p className="text-gray-700 mb-6 break-words">{theory.description}</p>
 
-                  <div className="bg-white rounded-lg p-6">
+                  <div className="min-w-0 overflow-hidden bg-white rounded-lg p-4 sm:p-6">
                     <h4 className="text-base mb-4">Key Principles:</h4>
-                    <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {theory.keyPoints.map((point, i) => (
-                        <div key={i} className="flex items-start gap-3">
-                          <div className="w-6 h-6 bg-eco-green rounded-full flex items-center justify-center flex-shrink-0">
+                        <div key={i} className="flex min-w-0 items-start gap-3">
+                          <div className="w-6 h-6 bg-eco-green rounded-full flex shrink-0 items-center justify-center">
                             <span className="text-white text-xs font-bold">{i + 1}</span>
                           </div>
-                          <p className="text-sm text-gray-700">{point}</p>
+                          <p className="min-w-0 flex-1 text-sm leading-relaxed text-gray-700 break-words">
+                            {point}
+                          </p>
                         </div>
                       ))}
                     </div>

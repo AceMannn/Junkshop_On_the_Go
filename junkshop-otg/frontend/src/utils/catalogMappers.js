@@ -37,6 +37,8 @@ export function normalizeJunkshop(shop) {
     isPartner: Boolean(shop.isPartner),
     distanceKm: shop.distanceKm,
     latestReview: shop.latestReview || null,
+    badges: shop.badges || [],
+    shopPhotoUrl: shop.shopPhotoUrl || '',
   };
 }
 
@@ -87,6 +89,8 @@ export function normalizeProviderMaterial(item) {
     previousPrice: item.previousPrice,
     unit: item.unit || 'kg',
     available: item.available !== false,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
   };
 }
 

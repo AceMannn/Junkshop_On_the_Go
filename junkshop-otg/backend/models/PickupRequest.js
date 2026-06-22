@@ -33,12 +33,21 @@ const pickupRequestSchema = new mongoose.Schema(
         catalogId: { type: String, default: '' },
         name: { type: String, required: true },
         category: { type: String, default: '' },
+        quantity: { type: Number, min: 1, default: 1 },
+        unit: { type: String, enum: ['kg', 'piece'], default: 'kg' },
+      },
+    ],
+    materialPhotos: [
+      {
+        fileName: { type: String, trim: true, default: '' },
+        mimeType: { type: String, trim: true, default: '' },
+        data: { type: String, default: '' },
       },
     ],
     estimatedWeightKg: {
       type: Number,
-      required: true,
-      min: 0.1,
+      min: 0,
+      default: 0,
     },
     address: {
       type: String,

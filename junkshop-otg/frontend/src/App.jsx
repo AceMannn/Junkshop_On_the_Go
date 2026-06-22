@@ -8,6 +8,7 @@ import LoginScreen from './components/LoginScreen';
 import SignUpModal from './components/SignUpModal';
 import ProviderDashboard from './components/ProviderDashboard';
 import CustomerDashboard from './components/CustomerDashboard';
+import PhoneSetupModal from './components/auth/PhoneSetupModal';
 import { authApi } from './services/api';
 import {
   clearSession,
@@ -18,8 +19,15 @@ import {
 } from './utils/authStorage';
 import { setAuthHandlers } from './utils/authEvents';
 
+const PUBLIC_SECTIONS = ['home', 'about', 'contact'];
+
+function getSectionFromHash() {
+  const hash = window.location.hash.slice(1);
+  return PUBLIC_SECTIONS.includes(hash) ? hash : 'home';
+}
+
 export default function App() {
-  const [activeSection, setActiveSection] = useState('home');
+  const [activeSection, setActiveSection] = useState(getSectionFromHash);
   const [user, setUser] = useState(() => getStoredUser());
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
@@ -28,15 +36,16 @@ export default function App() {
     role: 'customer',
     message: '',
   });
+  const [needsPhoneSetup, setNeedsPhoneSetup] = useState(false);
+  const [pickupWizardPrefill, setPickupWizardPrefill] = useState(null);
+  const [pickupWizardSignal, setPickupWizardSignal] = useState(0);
 
 
   const handleNavigate = (section) => {
-    const publicSections = ['home', 'about', 'contact'];
-    const nextSection = publicSections.includes(section) ? section : 'home';
+    const nextSection = PUBLIC_SECTIONS.includes(section) ? section : 'home';
 
     setActiveSection(nextSection);
     window.history.pushState(null, '', `#${nextSection}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const persistSession = ({ token, user: sessionUser }) => {
@@ -63,6 +72,9 @@ export default function App() {
 
     persistSession(session);
     setLoginPrefill({ email: '', role: 'customer', message: '' });
+    if (session?.user?.requiresPhoneSetup) {
+      setNeedsPhoneSetup(true);
+    }
   };
 
   const handleSignUpComplete = (result) => {
@@ -133,11 +145,21 @@ export default function App() {
     return () => setAuthHandlers({});
   }, [handleSessionExpired, handleAccountSuspended]);
 
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (user) return;
+    window.scrollTo(0, 0);
+  }, [activeSection, user]);
+
   // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
-      const hash = window.location.hash.slice(1) || 'home';
-      setActiveSection(hash);
+      setActiveSection(getSectionFromHash());
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -159,6 +181,9 @@ export default function App() {
 
         setUser(currentUser);
         setStoredUser(currentUser);
+        if (currentUser?.requiresPhoneSetup) {
+          setNeedsPhoneSetup(true);
+        }
       })
       .catch((error) => {
         if (error.sessionExpired || error.accountSuspended) return;
@@ -199,14 +224,36 @@ export default function App() {
     );
   } else if (isAuthenticated && !isProviderMode) {
     mainContent = (
-      <CustomerDashboard
-        onLogout={handleLogout}
-        user={user}
-        onUserUpdate={(updatedUser) => {
-          setUser(updatedUser);
-          setStoredUser(updatedUser);
-        }}
-      />
+      <>
+        <CustomerDashboard
+          onLogout={handleLogout}
+          user={user}
+          onUserUpdate={(updatedUser) => {
+            setUser(updatedUser);
+            setStoredUser(updatedUser);
+            if (!updatedUser?.requiresPhoneSetup) {
+              setNeedsPhoneSetup(false);
+            }
+          }}
+          onBookMaterial={(material) => {
+            setPickupWizardPrefill(material);
+            setPickupWizardSignal((value) => value + 1);
+          }}
+          onOpenAllPrices={() => {}}
+          pickupWizardPrefill={pickupWizardPrefill}
+          pickupWizardSignal={pickupWizardSignal}
+        />
+        {needsPhoneSetup && (
+          <PhoneSetupModal
+            user={user}
+            onComplete={(updatedUser) => {
+              setUser(updatedUser);
+              setStoredUser(updatedUser);
+              setNeedsPhoneSetup(false);
+            }}
+          />
+        )}
+      </>
     );
   } else {
     mainContent = (
@@ -223,7 +270,14 @@ export default function App() {
           onShowSignUp={() => setShowSignUpModal(true)}
         />
         <main>
-          {activeSection === 'home' && <HomePage />}
+          {activeSection === 'home' && (
+            <HomePage
+              onSignInToSell={() => {
+                setLoginPrefill({ email: '', role: 'customer', message: '' });
+                setShowLoginModal(true);
+              }}
+            />
+          )}
           {activeSection === 'about' && <AboutPage onNavigate={handleNavigate} />}
           {activeSection === 'contact' && <ContactPage />}
           {activeSection !== 'home' && activeSection !== 'about' && activeSection !== 'contact' && (

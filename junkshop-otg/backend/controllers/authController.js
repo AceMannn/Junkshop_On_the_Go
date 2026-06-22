@@ -33,6 +33,8 @@ const {
   sanitizeOperatingHours,
   formatOperatingHoursSummary,
   providerPlaceholderEmail,
+  customerPlaceholderEmail,
+  isInternalAccountEmail,
 } = require('../utils/operatingHours');
 
 const DEFAULT_SHOP_LOCATION = { lat: 14.5995, lng: 121.0055 };
@@ -75,6 +77,8 @@ const userPayload = (user) => ({
   verificationRejectNote: user.verificationRejectNote || '',
   badges: user.badges || [],
   emailVerified: isCustomerEmailVerified(user),
+  requiresPhoneSetup:
+    user.role === 'customer' && !hasValidPhone(user.phone),
 });
 
 async function buildUserResponse(user) {
@@ -84,6 +88,22 @@ async function buildUserResponse(user) {
     profileComplete: profileStatus.complete,
     profileStatus,
   };
+}
+
+async function findCustomerByPhone(rawPhone) {
+  const normalizedPhone = normalizePhone(rawPhone);
+  if (!hasValidPhone(normalizedPhone)) {
+    return null;
+  }
+
+  let user = await User.findOne({ phone: normalizedPhone, role: 'customer' });
+  if (user) return user;
+
+  const candidates = await User.find({ role: 'customer', phone: { $ne: '' } }).select('phone');
+  const match = candidates.find((row) => normalizePhone(row.phone) === normalizedPhone);
+  if (!match) return null;
+
+  return User.findById(match._id);
 }
 
 async function findProviderByPhone(rawPhone) {
@@ -156,62 +176,91 @@ const registerUser = async (req, res) => {
     }
 
     if (cleanedRole === 'customer') {
-      if (!cleanedEmail) {
-        return res.status(400).json({ message: 'Please fill in all required fields.' });
-      }
-
-      if (!emailRegex.test(cleanedEmail)) {
-        return res.status(400).json({ message: 'Please enter a valid email address.' });
-      }
-
-      if (cleanedPhone && !phoneRegex.test(cleanedPhone)) {
+      if (!cleanedPhone || !phoneRegex.test(cleanedPhone)) {
         return res.status(400).json({
-          message: 'Please enter a valid Philippine phone number.',
+          message: 'A valid mobile number (09XXXXXXXXX) is required.',
         });
       }
 
-      const existingUser = await User.findOne({ email: cleanedEmail });
-      if (existingUser) {
-        return res.status(409).json({ message: 'Email is already registered.' });
+      const normalizedPhone = normalizePhone(cleanedPhone);
+
+      if (cleanedEmail && !emailRegex.test(cleanedEmail)) {
+        return res.status(400).json({ message: 'Please enter a valid email address.' });
+      }
+
+      const existingPhone = await findCustomerByPhone(normalizedPhone);
+      if (existingPhone) {
+        return res.status(409).json({ message: 'This mobile number is already registered.' });
+      }
+
+      const resolvedEmail = cleanedEmail || customerPlaceholderEmail(normalizedPhone);
+
+      if (cleanedEmail) {
+        const existingEmail = await User.findOne({ email: cleanedEmail });
+        if (existingEmail) {
+          return res.status(409).json({ message: 'Email is already registered.' });
+        }
+      } else {
+        const existingPlaceholder = await User.findOne({ email: resolvedEmail });
+        if (existingPlaceholder) {
+          return res.status(409).json({ message: 'This mobile number is already registered.' });
+        }
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
+      const hasRealEmail = Boolean(cleanedEmail);
 
       const user = new User({
         role: cleanedRole,
         firstName: cleanedFirstName,
         middleName: cleanedMiddleName,
         lastName: cleanedLastName,
-        email: cleanedEmail,
-        phone: cleanedPhone ? normalizePhone(cleanedPhone) : '',
+        email: resolvedEmail,
+        phone: normalizedPhone,
         password: hashedPassword,
-        emailVerified: false,
+        emailVerified: !hasRealEmail,
       });
 
-      const verificationCode = assignEmailVerificationCode(user);
+      let verificationCode = null;
+      let delivery = { stub: true };
+
+      if (hasRealEmail) {
+        verificationCode = assignEmailVerificationCode(user);
+        delivery = await sendEmailVerificationEmail(
+          cleanedEmail,
+          verificationCode,
+          cleanedFirstName
+        );
+      }
+
       await user.save();
-
-      const delivery = await sendEmailVerificationEmail(
-        cleanedEmail,
-        verificationCode,
-        cleanedFirstName
-      );
-
       await syncProfileComplete(user._id);
 
-      const payload = maybeAttachDevVerificationCode(
-        {
-          message: delivery.stub
-            ? 'Account created. Use the dev verification code below (no email provider configured).'
-            : 'Account created. Check your email for a verification code.',
-          requiresEmailVerification: true,
-          email: cleanedEmail,
-        },
-        verificationCode,
-        delivery
-      );
+      if (hasRealEmail) {
+        const payload = maybeAttachDevVerificationCode(
+          {
+            message: delivery.stub
+              ? 'Account created. Use the dev verification code below (no email provider configured).'
+              : 'Account created. Check your email for a verification code.',
+            requiresEmailVerification: true,
+            email: cleanedEmail,
+            phone: normalizedPhone,
+          },
+          verificationCode,
+          delivery
+        );
 
-      return res.status(201).json(payload);
+        return res.status(201).json(payload);
+      }
+
+      const freshUser = await User.findById(user._id);
+      const token = createToken(freshUser);
+
+      return res.status(201).json({
+        message: 'Account created successfully.',
+        token,
+        user: await buildUserResponse(freshUser),
+      });
     }
 
     // Provider / junkshop owner registration
@@ -326,15 +375,26 @@ const loginUser = async (req, res) => {
         return res.status(401).json({ message: 'Invalid mobile number or password.' });
       }
     } else {
-      const cleanedEmail = loginId.toLowerCase();
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(cleanedEmail)) {
-        return res.status(400).json({ message: 'Please enter a valid email address.' });
-      }
+      const looksLikeEmail = loginId.includes('@');
 
-      user = await User.findOne({ email: cleanedEmail });
-      if (!user) {
-        return res.status(401).json({ message: 'Invalid email or password.' });
+      if (looksLikeEmail) {
+        if (!emailRegex.test(loginId.toLowerCase())) {
+          return res.status(400).json({ message: 'Please enter a valid email address.' });
+        }
+        user = await User.findOne({ email: loginId.toLowerCase(), role: 'customer' });
+        if (!user) {
+          return res.status(401).json({ message: 'Invalid login details or password.' });
+        }
+      } else {
+        const normalizedPhone = normalizePhone(loginId.replace(/\D/g, '').slice(0, 11));
+        if (!hasValidPhone(normalizedPhone)) {
+          return res.status(400).json({ message: 'Enter a valid mobile number (09XXXXXXXXX).' });
+        }
+        user = await findCustomerByPhone(normalizedPhone);
+        if (!user) {
+          return res.status(401).json({ message: 'Invalid mobile number or password.' });
+        }
       }
     }
 
@@ -362,13 +422,17 @@ const loginUser = async (req, res) => {
 
     if (!isPasswordCorrect) {
       const message =
-        cleanedRole === 'provider'
+        cleanedRole === 'provider' || !loginId.includes('@')
           ? 'Invalid mobile number or password.'
-          : 'Invalid email or password.';
+          : 'Invalid login details or password.';
       return res.status(401).json({ message });
     }
 
-    if (user.role === 'customer' && user.emailVerified === false) {
+    if (
+      user.role === 'customer' &&
+      user.emailVerified === false &&
+      !isInternalAccountEmail(user.email)
+    ) {
       return res.status(403).json({
         message: 'Verify your email before signing in. Check your inbox for the code.',
         requiresEmailVerification: true,
@@ -379,11 +443,15 @@ const loginUser = async (req, res) => {
     await syncProfileComplete(user._id);
     const freshUser = await User.findById(user._id);
     const token = createToken(freshUser);
+    const userResponse = await buildUserResponse(freshUser);
 
     res.status(200).json({
-      message: 'Login successful.',
+      message: userResponse.requiresPhoneSetup
+        ? 'Login successful. Add your mobile number to continue.'
+        : 'Login successful.',
       token,
-      user: await buildUserResponse(freshUser),
+      user: userResponse,
+      requiresPhoneSetup: userResponse.requiresPhoneSetup,
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error during login.' });
@@ -416,11 +484,6 @@ const updateProviderProfile = async (req, res) => {
 
     if (pickupServiceFee !== undefined) {
       const fee = Math.max(0, Number(pickupServiceFee) || 0);
-      if (req.user.role === 'provider' && fee <= 0) {
-        return res.status(400).json({
-          message: 'Home pickup service fee must be greater than ₱0.',
-        });
-      }
       req.user.pickupServiceFee = fee;
     }
     if (pickupEnabled !== undefined) {
@@ -507,12 +570,29 @@ const updateMe = async (req, res) => {
     }
     if (phone !== undefined) {
       const cleaned = normalizePhone(phone);
-      if (cleaned && !hasValidPhone(cleaned)) {
+      if (!hasValidPhone(cleaned)) {
         return res.status(400).json({
           message: 'Phone number must be 09XXXXXXXXX (11 digits).',
         });
       }
+
+      if (req.user.role === 'customer') {
+        const existing = await findCustomerByPhone(cleaned);
+        if (existing && existing._id.toString() !== req.user._id.toString()) {
+          return res.status(409).json({ message: 'This mobile number is already registered.' });
+        }
+      }
+
       req.user.phone = cleaned;
+
+      if (
+        req.user.role === 'customer' &&
+        isInternalAccountEmail(req.user.email) &&
+        !String(req.body.email || '').trim()
+      ) {
+        req.user.email = customerPlaceholderEmail(cleaned);
+        req.user.emailVerified = true;
+      }
     }
     if (address !== undefined) {
       req.user.address = String(address).trim();
