@@ -31,7 +31,7 @@ function sanitizeDocumentPayload(raw, allowedTypes) {
   }
 
   if (data.length > MAX_DOCUMENT_BYTES) {
-    return { error: 'Document image is too large. Try a smaller photo.' };
+    return { error: 'Document image is too large. Max 20MB per image.' };
   }
 
   if (!mimeType.startsWith('image/')) {
@@ -68,7 +68,7 @@ function sanitizeShopPhotos(rawPhotos) {
     const fileName = String(row.fileName || '').trim();
 
     if (data.length > MAX_DOCUMENT_BYTES) {
-      return { error: `${slotDef.label} is too large. Try a smaller photo.` };
+      return { error: `${slotDef.label} is too large. Max 20MB per image.` };
     }
 
     if (!mimeType.startsWith('image/')) {

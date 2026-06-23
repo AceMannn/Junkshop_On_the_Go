@@ -291,6 +291,7 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
                         label="ID photo"
                         preview={govPreview}
                         disabled={!canEdit}
+                        onError={setError}
                         onPreviewChange={(preview, fileName, mimeType) => {
                             setGovPreview(preview);
                             setGovFileName(fileName || "");
@@ -334,6 +335,7 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
                         label="Permit photo"
                         preview={permitPreview}
                         disabled={!canEdit}
+                        onError={setError}
                         onPreviewChange={(preview, fileName, mimeType) => {
                             setPermitPreview(preview);
                             setPermitFileName(fileName || "");
@@ -364,6 +366,7 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
                             <ImageDocumentUpload
                                 preview={photoPreviews[slotDef.slot]}
                                 disabled={!canEdit}
+                                onError={setError}
                                 onPreviewChange={(preview, fileName, mimeType) => {
                                     setPhotoPreviews((prev) => ({
                                         ...prev,

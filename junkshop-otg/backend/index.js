@@ -15,6 +15,7 @@ const mapRoutes = require('./routes/mapRoutes');
 const verificationRoutes = require('./routes/verificationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const { mapsLimiter } = require('./middlewares/rateLimiters');
+const { MAX_JSON_BODY } = require('./utils/verificationConstants');
 
 // =====================
 // Required environment
@@ -100,7 +101,7 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: MAX_JSON_BODY }));
 
 // =====================
 // Routes

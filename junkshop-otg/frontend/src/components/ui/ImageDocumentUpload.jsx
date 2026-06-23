@@ -1,12 +1,15 @@
 import { useRef } from "react";
 import { Camera, X } from "lucide-react";
 
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
 export default function ImageDocumentUpload({
     preview,
     onPreviewChange,
     onClear,
+    onError,
     label = "Upload image",
-    helperText = "Tap to upload a clear photo or scan",
+    helperText = "Tap to upload a clear photo or scan (max 20MB)",
     disabled = false,
     alt = "Document preview",
 }) {
@@ -15,6 +18,12 @@ export default function ImageDocumentUpload({
     const handleFile = (e) => {
         const file = e.target.files?.[0];
         if (!file || !file.type.startsWith("image/")) return;
+
+        if (file.size > MAX_FILE_BYTES) {
+            onError?.("Each image must be 20MB or smaller. Try a smaller photo.");
+            e.target.value = "";
+            return;
+        }
 
         const reader = new FileReader();
         reader.onload = () => onPreviewChange?.(reader.result, file.name, file.type);

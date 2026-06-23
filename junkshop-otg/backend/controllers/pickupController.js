@@ -15,6 +15,7 @@ const {
   assertCustomerCanSubmitPayment,
   MAX_PAYMENT_SUBMITS,
 } = require('../utils/pickupPayment');
+const { MAX_DOCUMENT_BYTES } = require('../utils/verificationConstants');
 const {
   canStartNewActivity,
   isBanned,
@@ -749,8 +750,8 @@ exports.submitPaymentProof = async (req, res) => {
     if (paymentReference.length < 4) {
       return res.status(400).json({ message: 'Enter a valid GCash reference number.' });
     }
-    if (paymentProofUrl.length > 900000) {
-      return res.status(400).json({ message: 'Payment screenshot is too large.' });
+    if (paymentProofUrl.length > MAX_DOCUMENT_BYTES) {
+      return res.status(400).json({ message: 'Payment screenshot is too large. Max 20MB.' });
     }
 
     request.paymentReference = paymentReference;
