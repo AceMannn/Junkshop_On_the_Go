@@ -778,8 +778,6 @@ function ApplicationModal({
                                 </div>
                             </div>
 
-                            </div>
-
                             {archive.length > 0 && (
                                 <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
                                     <h3 className="font-semibold">Archived submissions</h3>
