@@ -27,6 +27,7 @@ import { domainApi } from "../../services/api";
 import {
     formatUpdatedDate,
     getMaterialTrend,
+    shopStatusBadgeClass,
 } from "../../utils/catalogMappers";
 import {
     recyclingSteps,
@@ -297,10 +298,7 @@ export function JunkshopsPanel({
                                                 </button>
                                             )}
                                             <span
-                                                className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${isOpen
-                                                    ? "bg-emerald-100 text-emerald-800"
-                                                    : "bg-red-100 text-red-700"
-                                                    }`}
+                                                className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${shopStatusBadgeClass(shop.status)}`}
                                             >
                                                 {shop.status}
                                             </span>

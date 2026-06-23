@@ -75,7 +75,9 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
   const steps = isDropOff ? DROP_OFF_STEPS : PICKUP_STEPS;
 
   const openShops = shops.filter((shop) => {
-    const closed = String(shop.status).toLowerCase() === 'closed';
+    const status = String(shop.status).toLowerCase();
+    if (status === 'suspended') return false;
+    const closed = status === 'closed';
     return !closed || isDropOff;
   });
 

@@ -304,5 +304,12 @@ exports.serializeVerificationForAdmin = async (userId) => {
         }
       : null,
     verification: serializeVerification(user, { includeFiles: true }),
+    verificationArchive: (user.verificationArchive || []).map((entry) => ({
+      archivedAt: entry.archivedAt || null,
+      reason: entry.reason || '',
+      action: entry.action || '',
+      previousStatus: entry.previousStatus || '',
+      documents: entry.documents || null,
+    })),
   };
 };

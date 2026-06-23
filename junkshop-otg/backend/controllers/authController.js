@@ -36,6 +36,15 @@ const {
   customerPlaceholderEmail,
   isInternalAccountEmail,
 } = require('../utils/operatingHours');
+const {
+  findCustomerByPhone,
+  findProviderByPhone,
+  assertPhoneAvailable,
+  assertGcashAvailable,
+  assertEmailAvailable,
+  emailConflictMessage,
+} = require('../utils/accountIdentity');
+const { isBanned } = require('../utils/accountModeration');
 
 const DEFAULT_SHOP_LOCATION = { lat: 14.5995, lng: 121.0055 };
 const nameRegex = /^[A-Za-zÀ-ÿÑñ\s.'-]+$/;
@@ -88,38 +97,6 @@ async function buildUserResponse(user) {
     profileComplete: profileStatus.complete,
     profileStatus,
   };
-}
-
-async function findCustomerByPhone(rawPhone) {
-  const normalizedPhone = normalizePhone(rawPhone);
-  if (!hasValidPhone(normalizedPhone)) {
-    return null;
-  }
-
-  let user = await User.findOne({ phone: normalizedPhone, role: 'customer' });
-  if (user) return user;
-
-  const candidates = await User.find({ role: 'customer', phone: { $ne: '' } }).select('phone');
-  const match = candidates.find((row) => normalizePhone(row.phone) === normalizedPhone);
-  if (!match) return null;
-
-  return User.findById(match._id);
-}
-
-async function findProviderByPhone(rawPhone) {
-  const normalizedPhone = normalizePhone(rawPhone);
-  if (!hasValidPhone(normalizedPhone)) {
-    return null;
-  }
-
-  let user = await User.findOne({ phone: normalizedPhone, role: 'provider' });
-  if (user) return user;
-
-  const candidates = await User.find({ role: 'provider', phone: { $ne: '' } }).select('phone');
-  const match = candidates.find((row) => normalizePhone(row.phone) === normalizedPhone);
-  if (!match) return null;
-
-  return User.findById(match._id);
 }
 
 // Register new user
@@ -188,17 +165,22 @@ const registerUser = async (req, res) => {
         return res.status(400).json({ message: 'Please enter a valid email address.' });
       }
 
-      const existingPhone = await findCustomerByPhone(normalizedPhone);
-      if (existingPhone) {
-        return res.status(409).json({ message: 'This mobile number is already registered.' });
+      const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
+        intendedRole: 'customer',
+        context: 'signup',
+      });
+      if (phoneConflict) {
+        return res.status(phoneConflict.status).json({ message: phoneConflict.message });
       }
 
       const resolvedEmail = cleanedEmail || customerPlaceholderEmail(normalizedPhone);
 
       if (cleanedEmail) {
-        const existingEmail = await User.findOne({ email: cleanedEmail });
-        if (existingEmail) {
-          return res.status(409).json({ message: 'Email is already registered.' });
+        const emailConflict = await assertEmailAvailable(cleanedEmail, {
+          intendedRole: 'customer',
+        });
+        if (emailConflict) {
+          return res.status(emailConflict.status).json({ message: emailConflict.message });
         }
       } else {
         const existingPlaceholder = await User.findOne({ email: resolvedEmail });
@@ -286,14 +268,19 @@ const registerUser = async (req, res) => {
 
     const resolvedEmail = cleanedEmail || providerPlaceholderEmail(normalizedPhone);
 
-    const existingPhone = await findProviderByPhone(normalizedPhone);
-    if (existingPhone) {
-      return res.status(409).json({ message: 'This mobile number is already registered.' });
+    const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
+      intendedRole: 'provider',
+      context: 'signup',
+    });
+    if (phoneConflict) {
+      return res.status(phoneConflict.status).json({ message: phoneConflict.message });
     }
 
-    const existingEmail = await User.findOne({ email: resolvedEmail });
-    if (existingEmail) {
-      return res.status(409).json({ message: 'Email is already registered.' });
+    const emailConflict = await assertEmailAvailable(resolvedEmail, {
+      intendedRole: 'provider',
+    });
+    if (emailConflict) {
+      return res.status(emailConflict.status).json({ message: emailConflict.message });
     }
 
     const schedule = sanitizeOperatingHours(operatingHours);
@@ -372,6 +359,14 @@ const loginUser = async (req, res) => {
     if (cleanedRole === 'provider') {
       user = await findProviderByPhone(loginId);
       if (!user) {
+        const normalizedPhone = normalizePhone(loginId.replace(/\D/g, '').slice(0, 11));
+        const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
+          intendedRole: 'provider',
+          context: 'login',
+        });
+        if (phoneConflict && phoneConflict.status !== 401) {
+          return res.status(phoneConflict.status).json({ message: phoneConflict.message });
+        }
         return res.status(401).json({ message: 'Invalid mobile number or password.' });
       }
     } else {
@@ -388,6 +383,17 @@ const loginUser = async (req, res) => {
         if (!user && cleanedRole === 'customer') {
           user = await User.findOne({ email: normalizedEmail, role: 'admin' });
         }
+        if (!user && (cleanedRole === 'customer' || cleanedRole === 'provider')) {
+          const crossRoleUser = await User.findOne({
+            email: normalizedEmail,
+            role: cleanedRole === 'customer' ? 'provider' : 'customer',
+          });
+          if (crossRoleUser) {
+            return res.status(403).json({
+              message: emailConflictMessage(crossRoleUser.role),
+            });
+          }
+        }
         if (!user) {
           return res.status(401).json({ message: 'Invalid login details or password.' });
         }
@@ -398,6 +404,13 @@ const loginUser = async (req, res) => {
         }
         user = await findCustomerByPhone(normalizedPhone);
         if (!user) {
+          const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
+            intendedRole: 'customer',
+            context: 'login',
+          });
+          if (phoneConflict && phoneConflict.status !== 401) {
+            return res.status(phoneConflict.status).json({ message: phoneConflict.message });
+          }
           return res.status(401).json({ message: 'Invalid mobile number or password.' });
         }
       }
@@ -501,6 +514,16 @@ const updateProviderProfile = async (req, res) => {
           message: 'GCash number must be 09XXXXXXXXX (11 digits).',
         });
       }
+
+      if (cleaned) {
+        const gcashConflict = await assertGcashAvailable(cleaned, {
+          excludeUserId: req.user._id,
+        });
+        if (gcashConflict) {
+          return res.status(gcashConflict.status).json({ message: gcashConflict.message });
+        }
+      }
+
       req.user.gcashNumber = cleaned;
     }
     if (gcashQrUrl !== undefined) {
@@ -516,6 +539,18 @@ const updateProviderProfile = async (req, res) => {
           message: 'Phone number must be 09XXXXXXXXX (11 digits).',
         });
       }
+
+      if (cleaned) {
+        const phoneConflict = await assertPhoneAvailable(cleaned, {
+          intendedRole: 'provider',
+          excludeUserId: req.user._id,
+          context: 'update',
+        });
+        if (phoneConflict) {
+          return res.status(phoneConflict.status).json({ message: phoneConflict.message });
+        }
+      }
+
       req.user.phone = cleaned;
     }
     if (address !== undefined) {
@@ -581,11 +616,13 @@ const updateMe = async (req, res) => {
         });
       }
 
-      if (req.user.role === 'customer') {
-        const existing = await findCustomerByPhone(cleaned);
-        if (existing && existing._id.toString() !== req.user._id.toString()) {
-          return res.status(409).json({ message: 'This mobile number is already registered.' });
-        }
+      const phoneConflict = await assertPhoneAvailable(cleaned, {
+        intendedRole: 'customer',
+        excludeUserId: req.user._id,
+        context: 'update',
+      });
+      if (phoneConflict) {
+        return res.status(phoneConflict.status).json({ message: phoneConflict.message });
       }
 
       req.user.phone = cleaned;
@@ -660,10 +697,21 @@ const shopPublicId = (shop) => shop.slug || String(shop._id);
 
 const getFavorites = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).populate('favoriteShops');
+    const user = await User.findById(req.user._id).populate({
+      path: 'favoriteShops',
+      populate: { path: 'provider', select: 'status' },
+    });
+
     const favoriteShopIds = (user.favoriteShops || [])
-      .filter(Boolean)
+      .filter((shop) => {
+        if (!shop) return false;
+        if (shop.provider && isBanned(shop.provider.status)) {
+          return false;
+        }
+        return true;
+      })
       .map((shop) => shopPublicId(shop));
+
     res.json({ favoriteShopIds });
   } catch (error) {
     res.status(500).json({ message: 'Could not load favorites.' });
@@ -697,9 +745,18 @@ const toggleFavorite = async (req, res) => {
 
     await user.save();
 
-    const populated = await User.findById(user._id).populate('favoriteShops');
+    const populated = await User.findById(user._id).populate({
+      path: 'favoriteShops',
+      populate: { path: 'provider', select: 'status' },
+    });
     const favoriteShopIds = (populated.favoriteShops || [])
-      .filter(Boolean)
+      .filter((shop) => {
+        if (!shop) return false;
+        if (shop.provider && isBanned(shop.provider.status)) {
+          return false;
+        }
+        return true;
+      })
       .map((s) => shopPublicId(s));
 
     res.json({ favoriteShopIds, favorited: !exists });

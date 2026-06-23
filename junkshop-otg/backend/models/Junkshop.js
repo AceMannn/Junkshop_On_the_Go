@@ -89,6 +89,11 @@ const junkshopSchema = new mongoose.Schema(
       default: false,
     },
 
+    wasPublishedBeforeBan: {
+      type: Boolean,
+      default: false,
+    },
+
     pickupEnabled: {
       type: Boolean,
       default: true,

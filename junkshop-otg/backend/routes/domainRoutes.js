@@ -19,6 +19,14 @@ const {
   TRANSACTION_CREATE_KEYS,
   LOG_TRIP_KEYS,
 } = require('../utils/requestWhitelist');
+const {
+  isBanned,
+  isSuspended,
+  loadUserStatusMap,
+  applyJunkshopVisibility,
+  filterTransactionsForViewer,
+  canStartNewActivity,
+} = require('../utils/accountModeration');
 
 const CATALOG_PROVIDER_EMAIL = 'catalog@junkshop.internal';
 
@@ -42,8 +50,9 @@ router.get('/junkshops', async (req, res) => {
     const completeProviders = await User.find({
       role: 'provider',
       profileComplete: true,
+      status: { $ne: 'banned' },
     })
-      .select('_id')
+      .select('_id status')
       .lean();
     const providerIds = completeProviders.map((user) => user._id);
 
@@ -62,7 +71,16 @@ router.get('/junkshops', async (req, res) => {
     );
   }
 
-  junkshops = junkshops.map((shop) => {
+  const providerStatusMap = await loadUserStatusMap(
+    junkshops.map((shop) => shop.provider).filter(Boolean)
+  );
+
+  junkshops = junkshops
+    .filter((shop) => {
+      if (!shop.provider || shop.isCatalog) return true;
+      return !isBanned(providerStatusMap[String(shop.provider)]);
+    })
+    .map((shop) => {
     const row = {
       ...shop,
       isPartner: Boolean(shop.provider) && !shop.isCatalog,
@@ -72,6 +90,11 @@ router.get('/junkshops', async (req, res) => {
       const km = haversineKm(lat, lng, shop.location.lat, shop.location.lng);
       row.distanceKm = Math.round(km * 100) / 100;
       row.distance = formatDistanceKm(km);
+    }
+
+    const providerStatus = shop.provider ? providerStatusMap[String(shop.provider)] : null;
+    if (providerStatus && isSuspended(providerStatus)) {
+      return applyJunkshopVisibility(row, providerStatus);
     }
 
     return row;
@@ -203,6 +226,13 @@ router.get('/junkshops/:id/reviews', async (req, res) => {
     return res.status(404).json({ message: 'Junkshop not found.' });
   }
 
+  if (shop.provider) {
+    const providerUser = await User.findById(shop.provider).select('status');
+    if (!providerUser || isBanned(providerUser.status)) {
+      return res.status(404).json({ message: 'Junkshop not found.' });
+    }
+  }
+
   const limitRaw = Number(req.query.limit);
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 20) : 5;
 
@@ -287,10 +317,15 @@ router.get('/materials', async (req, res) => {
     const completeProviders = await User.find({
       role: 'provider',
       profileComplete: true,
+      status: { $ne: 'banned' },
     })
-      .select('_id')
+      .select('_id status')
       .lean();
     const providerIds = completeProviders.map((user) => user._id);
+    const providerStatusMap = completeProviders.reduce((acc, user) => {
+      acc[String(user._id)] = user.status;
+      return acc;
+    }, {});
 
     const partnerMaterials = providerIds.length
       ? await Material.find({
@@ -359,13 +394,17 @@ router.get('/materials', async (req, res) => {
 
     materials = materials.map((item) => {
       const shop = item.provider ? shopByProviderId[String(item.provider)] : null;
+      const providerStatus = item.provider ? providerStatusMap[String(item.provider)] : null;
+      const visibleShop = shop ? applyJunkshopVisibility(shop, providerStatus) : null;
       return {
         ...item,
-        junkshop: shop
+        junkshop: visibleShop
           ? {
-              id: String(shop._id),
-              name: shop.name,
-              address: shop.address,
+              id: String(visibleShop._id),
+              name: visibleShop.name,
+              address: visibleShop.address,
+              accountStatus: visibleShop.accountStatus,
+              moderationLabel: visibleShop.moderationLabel,
             }
           : null,
       };
@@ -494,11 +533,17 @@ router.get('/transactions', protect, async (req, res) => {
   }
 
   const transactions = await Transaction.find(query)
-    .populate('customer provider', 'firstName lastName email junkshopName')
+    .populate('customer provider', 'firstName lastName email junkshopName status role')
     .populate('pickupRequest', 'requestType status')
     .sort({ createdAt: -1 });
 
-  res.json({ transactions });
+  const statusMap = await loadUserStatusMap(
+    transactions.flatMap((row) => [row.customer?._id, row.provider?._id]).filter(Boolean)
+  );
+
+  res.json({
+    transactions: filterTransactionsForViewer(transactions, req.user.role, statusMap),
+  });
 });
 
 router.post('/transactions', protect, requireProvider, async (req, res) => {
@@ -553,6 +598,10 @@ router.post('/transactions/log-trip', protect, async (req, res) => {
     return res.status(403).json({ message: 'Customer account required.' });
   }
 
+  if (!canStartNewActivity(req.user.status)) {
+    return res.status(403).json({ message: 'Your account cannot log trips right now.' });
+  }
+
   const { junkshopId, material, weight, pricePerUnit } = pickAllowed(req.body, LOG_TRIP_KEYS);
 
   if (!material || !weight || !pricePerUnit) {
@@ -574,6 +623,10 @@ router.post('/transactions/log-trip', protect, async (req, res) => {
       : { slug: junkshopId };
     const shop = await Junkshop.findOne(shopQuery);
     if (shop?.provider) {
+      const providerUser = await User.findById(shop.provider).select('status');
+      if (!providerUser || isBanned(providerUser.status) || !canStartNewActivity(providerUser.status)) {
+        return res.status(400).json({ message: 'Could not link trip to a provider.' });
+      }
       providerId = shop.provider;
     }
   }

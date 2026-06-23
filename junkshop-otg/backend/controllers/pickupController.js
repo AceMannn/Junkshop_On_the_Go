@@ -16,12 +16,18 @@ const {
   MAX_PAYMENT_SUBMITS,
 } = require('../utils/pickupPayment');
 const {
+  canStartNewActivity,
+  isBanned,
+  loadUserStatusMap,
+  serializePickupForViewer,
+} = require('../utils/accountModeration');
+const {
   sendTransactionalEmail,
   sendTransactionalSms,
 } = require('../utils/deliveryService');
 
 const POPULATE_FIELDS =
-  'firstName lastName email phone junkshopName name address pickupServiceFee gcashNumber gcashQrUrl pickupEnabled';
+  'firstName lastName email phone junkshopName name address pickupServiceFee gcashNumber gcashQrUrl pickupEnabled status role';
 
 const REJECT_PRESETS = [
   'We cannot accept this pickup right now.',
@@ -83,48 +89,38 @@ const resolvePickupLocation = async ({ requestType, address, junkshop }) => {
   return null;
 };
 
-const serializeRequest = (doc) => {
-  const r = doc.toObject ? doc.toObject() : doc;
+const serializeRequest = (doc, viewerRole, statusMap = {}) =>
+  serializePickupForViewer(doc, viewerRole, statusMap);
+
+const collectPickupStatusIds = (requests) => {
+  const ids = [];
+  for (const request of requests) {
+    if (request.customer?._id) ids.push(request.customer._id);
+    if (request.provider?._id) ids.push(request.provider._id);
+  }
+  return ids;
+};
+
+const filterPickupQueryForModeration = async (query, viewerRole) => {
+  if (viewerRole !== 'provider') {
+    return query;
+  }
+
+  const bannedCustomerIds = await User.find({
+    role: 'customer',
+    status: 'banned',
+  })
+    .select('_id')
+    .lean();
+
+  const bannedIds = bannedCustomerIds.map((row) => row._id);
+  if (bannedIds.length === 0) {
+    return query;
+  }
+
   return {
-    id: r._id?.toString?.() || String(r._id),
-    customer: r.customer,
-    provider: r.provider,
-    junkshop: r.junkshop,
-    assignmentMode: r.assignmentMode,
-    requestType: r.requestType,
-    contactName: r.contactName,
-    contactPhone: r.contactPhone,
-    contactEmail: r.contactEmail,
-    materials: r.materials,
-    materialPhotos: r.materialPhotos || [],
-    estimatedWeightKg: r.estimatedWeightKg,
-    address: r.address,
-    pickupLocation: r.pickupLocation,
-    scheduledDate: r.scheduledDate,
-    timeSlot: r.timeSlot,
-    scheduledAt: r.scheduledAt,
-    status: r.status,
-    serviceFee: r.serviceFee,
-    gcashNumber: r.gcashNumber,
-    gcashQrUrl: r.gcashQrUrl,
-    serviceFeePaid: r.serviceFeePaid,
-    serviceFeePaymentStatus: r.serviceFeePaymentStatus || 'none',
-    paymentReference: r.paymentReference || '',
-    paymentProofUrl: r.paymentProofUrl || '',
-    paymentSubmittedAt: r.paymentSubmittedAt,
-    paymentConfirmedAt: r.paymentConfirmedAt,
-    paymentSubmitCount: r.paymentSubmitCount || 0,
-    paymentCooldownUntil: r.paymentCooldownUntil,
-    paymentRejectNote: r.paymentRejectNote || '',
-    actualWeightKg: r.actualWeightKg,
-    pointsAwarded: r.pointsAwarded || 0,
-    rejectReason: r.rejectReason,
-    rejectMessage: r.rejectMessage,
-    notes: r.notes,
-    providerLocation: r.providerLocation,
-    rating: r.rating,
-    createdAt: r.createdAt,
-    updatedAt: r.updatedAt,
+    ...query,
+    customer: { $nin: bannedIds },
   };
 };
 
@@ -152,6 +148,7 @@ exports.listPickupRequests = async (req, res) => {
           { status: 'pending', junkshop: { $in: shopIds }, provider: null },
         ],
       };
+      query = await filterPickupQueryForModeration(query, req.user.role);
     } else if (req.user.role === 'admin') {
       query = {};
     } else {
@@ -161,10 +158,31 @@ exports.listPickupRequests = async (req, res) => {
     const requests = await PickupRequest.find(query)
       .populate('customer', POPULATE_FIELDS)
       .populate('provider', POPULATE_FIELDS)
-      .populate('junkshop', 'name address phone status rating')
+      .populate('junkshop', 'name address phone status rating provider')
       .sort({ createdAt: -1 });
 
-    res.json({ requests: requests.map(serializeRequest) });
+    const junkshopProviderIds = requests
+      .map((request) => request.junkshop?.provider)
+      .filter(Boolean);
+    const statusMap = await loadUserStatusMap([
+      ...collectPickupStatusIds(requests),
+      ...junkshopProviderIds,
+    ]);
+
+    const visible = requests
+      .map((request) => {
+        const providerId =
+          request.provider?._id?.toString?.() ||
+          request.junkshop?.provider?.toString?.() ||
+          String(request.junkshop?.provider || '');
+        if (req.user.role === 'customer' && providerId && isBanned(statusMap[providerId])) {
+          return null;
+        }
+        return serializeRequest(request, req.user.role, statusMap);
+      })
+      .filter(Boolean);
+
+    res.json({ requests: visible });
   } catch (error) {
     res.status(500).json({ message: 'Could not load pickup requests.' });
   }
@@ -175,7 +193,7 @@ exports.getPickupRequest = async (req, res) => {
     const request = await PickupRequest.findById(req.params.id)
       .populate('customer', POPULATE_FIELDS)
       .populate('provider', POPULATE_FIELDS)
-      .populate('junkshop', 'name address phone status rating location');
+      .populate('junkshop', 'name address phone status rating location provider');
 
     if (!request) {
       return res.status(404).json({ message: 'Pickup request not found.' });
@@ -191,7 +209,22 @@ exports.getPickupRequest = async (req, res) => {
       return res.status(403).json({ message: 'Not allowed to view this request.' });
     }
 
-    res.json({ request: serializeRequest(request) });
+    const providerId =
+      request.provider?._id?.toString?.() ||
+      request.junkshop?.provider?.toString?.() ||
+      String(request.junkshop?.provider || '');
+    const statusMap = await loadUserStatusMap([
+      request.customer._id,
+      request.provider?._id,
+      providerId,
+    ]);
+
+    const serialized = serializeRequest(request, req.user.role, statusMap);
+    if (!serialized) {
+      return res.status(404).json({ message: 'Pickup request not found.' });
+    }
+
+    res.json({ request: serialized });
   } catch (error) {
     res.status(500).json({ message: 'Could not load pickup request.' });
   }
@@ -201,6 +234,12 @@ exports.createPickupRequest = async (req, res) => {
   try {
     if (req.user.role !== 'customer') {
       return res.status(403).json({ message: 'Only customers can book pickups.' });
+    }
+
+    if (!canStartNewActivity(req.user.status)) {
+      return res.status(403).json({
+        message: 'Your account cannot book pickups right now.',
+      });
     }
 
     const customerProfile = await evaluateProfile(req.user);
@@ -288,6 +327,17 @@ exports.createPickupRequest = async (req, res) => {
       junkshop = await Junkshop.findById(junkshopId);
       if (!junkshop) {
         return res.status(404).json({ message: 'Junkshop not found.' });
+      }
+      if (junkshop.provider) {
+        const providerUser = await User.findById(junkshop.provider).select('status');
+        if (!providerUser || isBanned(providerUser.status)) {
+          return res.status(404).json({ message: 'Junkshop not found.' });
+        }
+        if (!canStartNewActivity(providerUser.status)) {
+          return res.status(400).json({
+            message: 'This shop is not accepting requests right now. Choose another shop.',
+          });
+        }
       }
       if (junkshop.provider && junkshop.isPublished === false) {
         return res.status(400).json({

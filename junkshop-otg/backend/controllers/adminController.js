@@ -1,8 +1,15 @@
 const User = require('../models/User');
 const ContactMessage = require('../models/ContactMessage');
 const { syncProfileComplete } = require('../utils/profileCompletion');
+const { applyStatusSideEffects } = require('../utils/accountModeration');
 const { BADGE_OPTIONS } = require('../utils/verificationConstants');
 const { serializeVerificationForAdmin } = require('./verificationController');
+const {
+  emptyVerificationDocuments,
+  cloneVerificationDocuments,
+  hasVerificationFiles,
+  notifyProviderVerification,
+} = require('../utils/verificationNotifications');
 
 const ALLOWED_BADGES = BADGE_OPTIONS.map((item) => item.id);
 
@@ -112,6 +119,12 @@ exports.approveApplication = async (req, res) => {
     await user.save();
     await syncProfileComplete(user._id);
 
+    await notifyProviderVerification(user, {
+      title: 'Junkshop verification approved',
+      message:
+        'Your verification documents were approved. Your shop can appear on the public map once profile setup is complete.',
+    });
+
     const application = await serializeVerificationForAdmin(user._id);
 
     res.json({
@@ -145,6 +158,11 @@ exports.rejectApplication = async (req, res) => {
     await user.save();
     await syncProfileComplete(user._id);
 
+    await notifyProviderVerification(user, {
+      title: 'Verification needs updates',
+      message: note,
+    });
+
     const application = await serializeVerificationForAdmin(user._id);
 
     res.json({
@@ -153,6 +171,96 @@ exports.rejectApplication = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not reject application.' });
+  }
+};
+
+exports.requestReVerification = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user || user.role !== 'provider') {
+      return res.status(404).json({ message: 'Application not found.' });
+    }
+
+    if (user.verificationStatus === 'pending') {
+      return res.status(400).json({
+        message: 'Use Reject while the application is pending review.',
+      });
+    }
+
+    const note =
+      String(req.body.note || '').trim() ||
+      'Please review your verification documents and submit again.';
+
+    user.verificationStatus = 'rejected';
+    user.verificationRejectNote = note;
+    user.verificationReviewedAt = new Date();
+    user.badges = (user.badges || []).filter((badge) => badge !== 'verified');
+    await user.save();
+    await syncProfileComplete(user._id);
+
+    await notifyProviderVerification(user, {
+      title: 'Re-verification required',
+      message: note,
+    });
+
+    const application = await serializeVerificationForAdmin(user._id);
+
+    res.json({
+      message: 'Provider must re-verify. Their shop is hidden until approved again.',
+      application,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not request re-verification.' });
+  }
+};
+
+exports.hardResetVerification = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user || user.role !== 'provider') {
+      return res.status(404).json({ message: 'Application not found.' });
+    }
+
+    const note =
+      String(req.body.note || '').trim() ||
+      'Your verification was reset by an admin. Upload your documents again.';
+
+    if (hasVerificationFiles(user.verificationDocuments)) {
+      if (!Array.isArray(user.verificationArchive)) {
+        user.verificationArchive = [];
+      }
+
+      user.verificationArchive.push({
+        archivedAt: new Date(),
+        reason: note,
+        action: 'hard_reset',
+        previousStatus: user.verificationStatus || 'draft',
+        documents: cloneVerificationDocuments(user.verificationDocuments),
+      });
+    }
+
+    user.verificationDocuments = emptyVerificationDocuments();
+    user.verificationStatus = 'draft';
+    user.verificationRejectNote = note;
+    user.verificationSubmittedAt = null;
+    user.verificationReviewedAt = new Date();
+    user.badges = (user.badges || []).filter((badge) => badge !== 'verified');
+    await user.save();
+    await syncProfileComplete(user._id);
+
+    await notifyProviderVerification(user, {
+      title: 'Verification reset',
+      message: note,
+    });
+
+    const application = await serializeVerificationForAdmin(user._id);
+
+    res.json({
+      message: 'Verification documents cleared. Previous files are kept for admin audit.',
+      application,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not reset verification.' });
   }
 };
 
@@ -231,8 +339,15 @@ exports.updateUserStatus = async (req, res) => {
       return res.status(400).json({ message: 'Invalid account status.' });
     }
 
+    const previousStatus = user.status;
     user.status = nextStatus;
+
+    if (req.body.note !== undefined) {
+      user.moderationNote = String(req.body.note || '').trim();
+    }
+
     await user.save();
+    await applyStatusSideEffects(user, previousStatus, nextStatus);
 
     if (user.role === 'provider') {
       await syncProfileComplete(user._id);
@@ -243,6 +358,7 @@ exports.updateUserStatus = async (req, res) => {
       user: {
         id: String(user._id),
         status: user.status,
+        moderationNote: user.moderationNote || '',
       },
     });
   } catch (error) {

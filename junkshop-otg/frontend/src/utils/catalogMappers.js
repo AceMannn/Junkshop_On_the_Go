@@ -12,21 +12,27 @@ export function shopDirectionsUrl(shop) {
 
 export function normalizeJunkshop(shop) {
   const statusRaw = String(shop.status || '').toLowerCase();
+  const accountStatus = shop.accountStatus || null;
+  const isSuspended = accountStatus === 'suspended';
 
   return {
     id: shop.slug || shop._id,
     _id: shop._id,
     name: shop.name,
     address: shop.address,
-    phone: shop.phone || '',
+    phone: isSuspended ? '' : shop.phone || '',
     hours: shop.hours || '',
     distance: shop.distance || '—',
     status:
-      statusRaw === 'open'
+      isSuspended
+        ? 'Suspended'
+        : statusRaw === 'open'
         ? 'Open'
         : statusRaw === 'closed'
           ? 'Closed'
           : shop.status || 'Open',
+    accountStatus,
+    moderationLabel: shop.moderationLabel || (isSuspended ? 'Suspended' : ''),
     rating: shop.rating ?? 0,
     reviewCount: shop.reviewCount ?? 0,
     materials: shop.materials || [],
@@ -79,6 +85,16 @@ export function formatUpdatedDate(value) {
   });
 }
 
+export function shopStatusBadgeClass(status) {
+  if (status === 'Suspended') {
+    return 'bg-amber-100 text-amber-900';
+  }
+  if (status === 'Open') {
+    return 'bg-emerald-100 text-emerald-800';
+  }
+  return 'bg-red-100 text-red-700';
+}
+
 export function normalizeProviderMaterial(item) {
   return {
     id: item._id,
@@ -114,6 +130,56 @@ export function normalizeProviderJunkshop(shop) {
 
 export function normalizeTransaction(row) {
   const provider = row.provider;
+  const customer = row.customer;
+
+  if (provider?.accountStatus === 'suspended') {
+    return {
+      id: row._id,
+      date: new Date(row.createdAt).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      material: row.material,
+      weightKg: Number(row.weight) || 0,
+      weightUnit: row.unit || 'kg',
+      weight: `${row.weight} ${row.unit || 'kg'}`,
+      amount: `₱${Number(row.totalAmount).toFixed(2)}`,
+      shop: 'Suspended Junkshop Owner',
+      status:
+        row.status === 'completed'
+          ? 'Completed'
+          : row.status === 'processing'
+            ? 'Processing'
+            : row.status,
+      accountStatus: 'suspended',
+    };
+  }
+
+  if (customer?.accountStatus === 'suspended') {
+    return {
+      id: row._id,
+      date: new Date(row.createdAt).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      material: row.material,
+      weightKg: Number(row.weight) || 0,
+      weightUnit: row.unit || 'kg',
+      weight: `${row.weight} ${row.unit || 'kg'}`,
+      amount: `₱${Number(row.totalAmount).toFixed(2)}`,
+      shop: 'Suspended Customer',
+      status:
+        row.status === 'completed'
+          ? 'Completed'
+          : row.status === 'processing'
+            ? 'Processing'
+            : row.status,
+      accountStatus: 'suspended',
+    };
+  }
+
   const shopLabel =
     provider?.junkshopName ||
     [provider?.firstName, provider?.lastName].filter(Boolean).join(' ') ||

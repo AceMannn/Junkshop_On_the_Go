@@ -127,7 +127,8 @@ async function syncProfileComplete(userId) {
       const verificationBlocked = ['draft', 'pending', 'rejected'].includes(
         user.verificationStatus
       );
-      shop.isPublished = !verificationBlocked && status.complete;
+      const accountBanned = user.status === 'banned';
+      shop.isPublished = !accountBanned && !verificationBlocked && status.complete;
       await shop.save();
     }
 

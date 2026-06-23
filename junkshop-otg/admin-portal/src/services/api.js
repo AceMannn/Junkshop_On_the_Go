@@ -84,6 +84,18 @@ export const adminApi = {
       body: JSON.stringify({ note }),
     });
   },
+  requestReVerification(id, note) {
+    return request(`/api/admin/applications/${id}/request-reverification`, {
+      method: 'PATCH',
+      body: JSON.stringify({ note }),
+    });
+  },
+  hardResetVerification(id, note) {
+    return request(`/api/admin/applications/${id}/reset-verification`, {
+      method: 'PATCH',
+      body: JSON.stringify({ note }),
+    });
+  },
   listUsers(role) {
     const params = role ? `?role=${encodeURIComponent(role)}` : '';
     return request(`/api/admin/users${params}`);
@@ -94,10 +106,10 @@ export const adminApi = {
       body: JSON.stringify({ badges }),
     });
   },
-  updateUserStatus(id, status) {
+  updateUserStatus(id, status, note) {
     return request(`/api/admin/users/${id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, note }),
     });
   },
   listContactMessages() {

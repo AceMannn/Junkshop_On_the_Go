@@ -8,7 +8,8 @@
     "dev": "nodemon index.js",
     "seed": "node scripts/seed.js",
     "smoke": "node scripts/smokeVerificationFlow.js",
-    "ratings:backfill": "node scripts/backfillRatings.js"
+    "ratings:backfill": "node scripts/backfillRatings.js",
+    "dedupe:phones": "node scripts/dedupePhones.js"
   },
   "keywords": [],
   "author": "",

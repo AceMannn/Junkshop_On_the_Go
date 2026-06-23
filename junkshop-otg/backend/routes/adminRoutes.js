@@ -12,6 +12,8 @@ router.get('/applications', adminController.listApplications);
 router.get('/applications/:id', adminController.getApplication);
 router.patch('/applications/:id/approve', adminController.approveApplication);
 router.patch('/applications/:id/reject', adminController.rejectApplication);
+router.patch('/applications/:id/request-reverification', adminController.requestReVerification);
+router.patch('/applications/:id/reset-verification', adminController.hardResetVerification);
 router.get('/users', adminController.listUsers);
 router.patch('/users/:id/badges', adminController.updateUserBadges);
 router.patch('/users/:id/status', adminController.updateUserStatus);

@@ -164,6 +164,51 @@ export default function AdminDashboard({ user, onLogout }) {
         }
     };
 
+    const handleRequestReVerification = async () => {
+        if (!selectedApplicationId) return;
+        setActionLoading(true);
+        setError("");
+        try {
+            const { application } = await adminApi.requestReVerification(
+                selectedApplicationId,
+                rejectNote.trim()
+            );
+            setApplicationDetail(application);
+            await loadApplications(applicationFilter);
+            await loadUsers(userRoleFilter);
+            await loadOverview();
+        } catch (actionError) {
+            setError(actionError.message || "Could not request re-verification.");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleHardReset = async () => {
+        if (!selectedApplicationId) return;
+        const confirmed = window.confirm(
+            "Clear all verification documents for this provider? Previous files will be kept for admin audit only."
+        );
+        if (!confirmed) return;
+
+        setActionLoading(true);
+        setError("");
+        try {
+            const { application } = await adminApi.hardResetVerification(
+                selectedApplicationId,
+                rejectNote.trim()
+            );
+            setApplicationDetail(application);
+            await loadApplications(applicationFilter);
+            await loadUsers(userRoleFilter);
+            await loadOverview();
+        } catch (actionError) {
+            setError(actionError.message || "Could not reset verification.");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const handleBadgeToggle = async (userId, badgeId, currentBadges) => {
         const next = currentBadges.includes(badgeId)
             ? currentBadges.filter((item) => item !== badgeId)
@@ -181,7 +226,19 @@ export default function AdminDashboard({ user, onLogout }) {
 
     const handleUserStatus = async (userId, status) => {
         try {
-            await adminApi.updateUserStatus(userId, status);
+            let note;
+            if (status === "suspended" || status === "banned") {
+                const entered = window.prompt(
+                    "Optional note for this action (leave blank to skip):",
+                    ""
+                );
+                if (entered === null) {
+                    return;
+                }
+                note = entered.trim();
+            }
+
+            await adminApi.updateUserStatus(userId, status, note);
             setUsers((prev) =>
                 prev.map((row) => (row.id === userId ? { ...row, status } : row))
             );
@@ -326,6 +383,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                     badgeOptions={badgeOptions}
                                     onBadgeToggle={handleBadgeToggle}
                                     onStatusChange={handleUserStatus}
+                                    onOpenVerification={openApplication}
                                 />
                             )}
 
@@ -349,6 +407,8 @@ export default function AdminDashboard({ user, onLogout }) {
                     onClose={closeApplication}
                     onApprove={handleApprove}
                     onReject={handleReject}
+                    onRequestReVerification={handleRequestReVerification}
+                    onHardReset={handleHardReset}
                     actionLoading={actionLoading}
                 />
             )}
@@ -410,7 +470,7 @@ function ApplicationsPanel({ applications, filter, onFilterChange, onOpen }) {
                                 onClick={() => onOpen(row.id)}
                                 className="flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-200 text-sm font-semibold hover:bg-zinc-50"
                             >
-                                Review
+                                View
                             </button>
                         </article>
                     ))
@@ -451,7 +511,7 @@ function ApplicationsPanel({ applications, filter, onFilterChange, onOpen }) {
                                                 onClick={() => onOpen(row.id)}
                                                 className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold hover:bg-zinc-50"
                                             >
-                                                Review
+                                                View
                                             </button>
                                         </td>
                                     </tr>
@@ -472,6 +532,7 @@ function UsersPanel({
     badgeOptions,
     onBadgeToggle,
     onStatusChange,
+    onOpenVerification,
 }) {
     return (
         <div className="space-y-4">
@@ -521,6 +582,18 @@ function UsersPanel({
                                     <option value="suspended">Suspended</option>
                                     <option value="banned">Banned</option>
                                 </select>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                {row.role === "provider" && onOpenVerification && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onOpenVerification(row.id)}
+                                        className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-zinc-50"
+                                    >
+                                        View verification
+                                    </button>
+                                )}
                             </div>
 
                             {row.role === "provider" && badgeOptions.length > 0 && (
@@ -607,17 +680,21 @@ function ApplicationModal({
     onClose,
     onApprove,
     onReject,
+    onRequestReVerification,
+    onHardReset,
     actionLoading,
 }) {
     const docs = application?.verification?.documents;
+    const archive = application?.verificationArchive || [];
     const canDecide = application?.verificationStatus === "pending";
+    const canModerate = application && !canDecide;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
             <div className="scroll-y-clean max-h-[92vh] w-full max-w-4xl rounded-t-2xl sm:rounded-2xl bg-white shadow-xl">
                 <div className="sticky top-0 flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-4 sm:px-6">
                     <div>
-                        <h2 className="text-lg font-bold">Review application</h2>
+                        <h2 className="text-lg font-bold">Verification details</h2>
                         {application && (
                             <p className="text-sm text-zinc-500">
                                 {application.junkshopName} · {application.ownerName}
@@ -642,6 +719,15 @@ function ApplicationModal({
                         </div>
                     ) : (
                         <>
+                            {application.verificationRejectNote && (
+                                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                                    <p className="font-semibold">Latest admin note</p>
+                                    <p className="mt-1 whitespace-pre-wrap">
+                                        {application.verificationRejectNote}
+                                    </p>
+                                </div>
+                            )}
+
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <InfoRow label="Phone" value={application.phone} />
                                 <InfoRow label="Email" value={application.email} />
@@ -692,6 +778,38 @@ function ApplicationModal({
                                 </div>
                             </div>
 
+                            </div>
+
+                            {archive.length > 0 && (
+                                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
+                                    <h3 className="font-semibold">Archived submissions</h3>
+                                    <p className="text-sm text-zinc-600">
+                                        Previous verification files kept for admin audit. Providers cannot see these.
+                                    </p>
+                                    {archive.map((entry, index) => (
+                                        <div
+                                            key={`${entry.archivedAt || "archive"}-${index}`}
+                                            className="rounded-lg border border-zinc-200 bg-white p-3 text-sm"
+                                        >
+                                            <p className="font-medium capitalize">
+                                                {entry.action?.replace(/_/g, " ") || "Archived"}
+                                                {entry.previousStatus
+                                                    ? ` · was ${entry.previousStatus}`
+                                                    : ""}
+                                            </p>
+                                            <p className="text-xs text-zinc-500 mt-1">
+                                                {formatDate(entry.archivedAt)}
+                                            </p>
+                                            {entry.reason && (
+                                                <p className="mt-2 text-zinc-700 whitespace-pre-wrap">
+                                                    {entry.reason}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             {canDecide && (
                                 <div className="space-y-3 border-t border-zinc-200 pt-4">
                                     <label className="block text-sm font-semibold">
@@ -720,6 +838,39 @@ function ApplicationModal({
                                             className="rounded-xl bg-[#154212] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0f3310] disabled:opacity-60"
                                         >
                                             Approve
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {canModerate && (
+                                <div className="space-y-3 border-t border-zinc-200 pt-4">
+                                    <label className="block text-sm font-semibold">
+                                        Message to owner (optional)
+                                    </label>
+                                    <textarea
+                                        value={rejectNote}
+                                        onChange={(e) => onRejectNoteChange(e.target.value)}
+                                        rows={3}
+                                        className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#154212]"
+                                        placeholder="Explain why re-verification is needed..."
+                                    />
+                                    <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={onHardReset}
+                                            disabled={actionLoading}
+                                            className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                                        >
+                                            Hard reset
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={onRequestReVerification}
+                                            disabled={actionLoading}
+                                            className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                                        >
+                                            Request re-verification
                                         </button>
                                     </div>
                                 </div>

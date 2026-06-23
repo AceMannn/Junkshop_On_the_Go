@@ -18,6 +18,7 @@ import {
   recyclingSteps,
 } from '../data/recyclingGuide';
 import { priceCategories } from '../data/prices';
+import { shopStatusBadgeClass } from '../utils/catalogMappers';
 
 const DATE_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest first' },
@@ -146,7 +147,7 @@ export default function HomePage({ onSignInToSell }) {
                           </p>
                           <div className="flex flex-wrap items-center gap-2 text-sm">
                             <ShopRating shop={shop} />
-                            <span className={shop.status === 'Open' ? 'text-eco-green' : 'text-gray-500'}>{shop.status}</span>
+                            <span className={shop.status === 'Open' ? 'text-eco-green' : shop.status === 'Suspended' ? 'text-amber-700' : 'text-gray-500'}>{shop.status}</span>
                             <span className="text-gray-600">{shop.topPrice}</span>
                             {shop.isPartner && (
                               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Partner</span>
@@ -479,7 +480,7 @@ function MapModal({ isOpen, onClose, shops }) {
                   <h4 className="text-charcoal">{shop.name}</h4>
                   <p className="mt-1 text-sm text-gray-600">{shop.address}</p>
                 </div>
-                <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${shop.status === 'Open' ? 'bg-eco-green/10 text-eco-green' : 'bg-gray-100 text-gray-500'}`}>{shop.status}</span>
+                <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${shopStatusBadgeClass(shop.status)}`}>{shop.status}</span>
               </div>
               <div className="mt-3 space-y-1 text-sm text-gray-600">
                 <p className="flex flex-wrap items-center gap-2">

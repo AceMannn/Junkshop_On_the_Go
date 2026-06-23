@@ -98,6 +98,41 @@ const userSchema = new mongoose.Schema(
       ],
     },
 
+    verificationArchive: [
+      {
+        archivedAt: { type: Date, default: Date.now },
+        reason: { type: String, trim: true, default: '' },
+        action: { type: String, trim: true, default: '' },
+        previousStatus: { type: String, trim: true, default: '' },
+        documents: {
+          governmentId: {
+            docType: { type: String, trim: true, default: '' },
+            fileName: { type: String, trim: true, default: '' },
+            mimeType: { type: String, trim: true, default: '' },
+            data: { type: String, default: '' },
+            uploadedAt: Date,
+          },
+          businessPermit: {
+            docType: { type: String, trim: true, default: '' },
+            fileName: { type: String, trim: true, default: '' },
+            mimeType: { type: String, trim: true, default: '' },
+            data: { type: String, default: '' },
+            uploadedAt: Date,
+          },
+          shopPhotos: [
+            {
+              slot: { type: Number, min: 1, max: 3 },
+              label: { type: String, trim: true, default: '' },
+              fileName: { type: String, trim: true, default: '' },
+              mimeType: { type: String, trim: true, default: '' },
+              data: { type: String, default: '' },
+              uploadedAt: Date,
+            },
+          ],
+        },
+      },
+    ],
+
     phone: {
       type: String,
       trim: true,
@@ -125,6 +160,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ['active', 'suspended', 'banned'],
       default: 'active',
+    },
+
+    moderationNote: {
+      type: String,
+      trim: true,
+      default: '',
     },
 
     pickupServiceFee: {
