@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
     History,
@@ -40,13 +41,18 @@ import CustomerTopbar from "./customer-dashboard/CustomerTopbar";
 import HelpModal from "./ui/HelpModal";
 import EmptyState from "./ui/EmptyState";
 import ShopRating from "./ui/ShopRating";
-import ShopBadges from "./ui/ShopBadges";
-import ReviewSnippet from "./ui/ReviewSnippet";
 import {
     ViewProfilePage,
     AccountSettingsPage,
     DeactivateAccountModal,
 } from "./customer-dashboard/CustomerAccountViews";
+import CustomerShopProfile from "./customer-dashboard/CustomerShopProfile";
+import CustomerShopSummaryCard from "./customer-dashboard/CustomerShopSummaryCard";
+import {
+    buildCustomerPath,
+    parseCustomerPath,
+} from "../utils/dashboardRoutes";
+import { getCustomerNotificationTarget } from "../utils/notificationNavigation";
 
 const navTabs = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -66,6 +72,26 @@ const primarySidebarButtonClass =
 const SHOP_IMAGE =
     "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?q=80&w=1000&auto=format&fit=crop";
 
+function getTimeGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+}
+
+const ACTIVITY_STYLES = [
+    { icon: Recycle,     iconBg: "bg-emerald-100", iconText: "text-emerald-700" },
+    { icon: ReceiptText, iconBg: "bg-blue-100",     iconText: "text-blue-700"   },
+    { icon: Store,       iconBg: "bg-amber-100",    iconText: "text-amber-700"  },
+];
+
+const STAT_COLORS = {
+    green: { iconBg: "bg-emerald-100", iconText: "text-emerald-700", border: "border-t-emerald-400" },
+    amber: { iconBg: "bg-amber-100",   iconText: "text-amber-700",   border: "border-t-amber-400"   },
+    blue:  { iconBg: "bg-blue-100",    iconText: "text-blue-700",    border: "border-t-blue-400"    },
+    teal:  { iconBg: "bg-teal-100",    iconText: "text-teal-700",    border: "border-t-teal-400"    },
+};
+
 export default function CustomerDashboard({
     onLogout,
     user,
@@ -77,6 +103,8 @@ export default function CustomerDashboard({
 }) {
     const { shops } = useCatalogJunkshops({ partnersOnly: true });
     const { favoriteIds, toggleFavorite } = useFavorites();
+    const navigate = useNavigate();
+    const location = useLocation();
     const [activeTab, setActiveTab] = useState("overview");
     const [overviewPanel, setOverviewPanel] = useState(null);
     const [junkshopFocusId, setJunkshopFocusId] = useState(null);
@@ -95,6 +123,8 @@ export default function CustomerDashboard({
     const [pickupsTabMounted, setPickupsTabMounted] = useState(
         () => activeTab === "pickups"
     );
+    const [shopProfile, setShopProfile] = useState(null);
+    const [shopProfileBackLabel, setShopProfileBackLabel] = useState("Back");
 
     useEffect(() => {
         if (activeTab === "pickups") {
@@ -102,63 +132,112 @@ export default function CustomerDashboard({
         }
     }, [activeTab]);
 
-    const openOverviewPanel = (panelId, shopId = null) => {
-        setAccountView(null);
-        setOverviewPanel(panelId);
-        setJunkshopFocusId(shopId || null);
-        setFabOpen(false);
-    };
-
-    const closeOverviewPanel = () => {
-        setOverviewPanel(null);
-        setJunkshopFocusId(null);
-        setRouteToShopId(null);
-    };
-
-    const handleTabChange = (tabId) => {
-        setActiveTab(tabId);
-        setAccountView(null);
-        setShowProfileMenu(false);
-        setOpenPickupWizard(false);
-        setOverviewPanel(null);
-        setJunkshopFocusId(null);
-        setRouteToShopId(null);
-    };
-
-    const openPickupsTab = (withWizard = false) => {
-        setAccountView(null);
-        setOverviewPanel(null);
-        setActiveTab("pickups");
-        setOpenPickupWizard(withWizard && Boolean(user?.profileComplete));
-        setFabOpen(false);
-        if (withWizard && !user?.profileComplete) {
-            showNotification("Add your mobile number in Profile Settings before booking a pickup.");
-            openAccountView("profile");
+    useEffect(() => {
+        const path = location.pathname.replace(/\/+$/, "");
+        if (path === "/customer") {
+            navigate("/customer/overview", { replace: true });
+            return;
         }
-    };
 
-    const handleNotificationNavigate = (pickupId) => {
-        setAccountView(null);
-        setShowProfileMenu(false);
-        setOverviewPanel(null);
-        setJunkshopFocusId(null);
-        setRouteToShopId(null);
-        setOpenPickupWizard(false);
-        setActiveTab("pickups");
-        setPickupsTabMounted(true);
-        setFocusPickupId(pickupId);
-    };
+        const parsed = parseCustomerPath(location.pathname);
+        setActiveTab(parsed.tab);
+        setOverviewPanel(parsed.panel);
+        setAccountView(parsed.accountView);
+        setJunkshopFocusId(parsed.junkshopFocusId);
+        setRouteToShopId(location.state?.routeToShopId || null);
+        setFabOpen(false);
 
-    const openAccountView = (view) => {
-        setAccountView(view);
-        setOverviewPanel(null);
-        setShowProfileMenu(false);
-    };
+        if (parsed.shopId) {
+            const found = shops.find(
+                (shop) =>
+                    String(shop.id) === parsed.shopId ||
+                    String(shop._id) === parsed.shopId
+            );
+            setShopProfile(found || null);
+            setShopProfileBackLabel(location.state?.backLabel || "Back");
+        } else {
+            setShopProfile(null);
+        }
+
+        if (location.state?.focusPickupId) {
+            setPickupsTabMounted(true);
+            setFocusPickupId(location.state.focusPickupId);
+        }
+
+        if (parsed.tab === "pickups") {
+            setPickupsTabMounted(true);
+            if (location.state?.openWizard) {
+                setOpenPickupWizard(Boolean(user?.profileComplete));
+            }
+        }
+
+        if (location.state?.openWizard && !user?.profileComplete) {
+            setOpenPickupWizard(false);
+        }
+    }, [location.pathname, location.state, shops, navigate, user?.profileComplete]);
 
     const showNotification = (message) => {
         setToastMessage(message);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3200);
+    };
+
+    const openOverviewPanel = (panelId, shopId = null) => {
+        navigate(
+            buildCustomerPath({
+                panel: panelId,
+                junkshopFocusId: shopId,
+            })
+        );
+    };
+
+    const closeOverviewPanel = () => {
+        navigate(buildCustomerPath({ tab: "overview" }));
+    };
+
+    const openShopProfile = (shop, backLabel = "Back to Find a Shop") => {
+        const shopId = shop?.id || shop?._id;
+        if (!shopId) return;
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        navigate(buildCustomerPath({ shopId }), {
+            state: {
+                backLabel,
+                returnTo: location.pathname,
+            },
+        });
+    };
+
+    const closeShopProfile = () => {
+        navigate(location.state?.returnTo || buildCustomerPath({ tab: "overview" }));
+    };
+
+    const handleTabChange = (tabId) => {
+        navigate(buildCustomerPath({ tab: tabId }));
+    };
+
+    const openPickupsTab = (withWizard = false) => {
+        if (withWizard && !user?.profileComplete) {
+            showNotification("Add your mobile number in Profile Settings before booking a pickup.");
+            navigate(buildCustomerPath({ accountView: "profile" }));
+            return;
+        }
+        navigate(buildCustomerPath({ tab: "pickups" }), {
+            state: withWizard ? { openWizard: true } : undefined,
+        });
+    };
+
+    const handleNotificationNavigate = (notification) => {
+        const target = getCustomerNotificationTarget(notification);
+        if (!target) return;
+
+        setPickupsTabMounted(true);
+        navigate(buildCustomerPath({ tab: "pickups" }), {
+            state: { focusPickupId: target.focusPickupId },
+        });
+    };
+
+    const openAccountView = (view) => {
+        navigate(buildCustomerPath({ accountView: view }));
     };
 
     const refreshUser = useCallback(async () => {
@@ -248,17 +327,36 @@ export default function CustomerDashboard({
 
     const openShopRoute = (shop) => {
         if (!shop?.id) return;
-        openOverviewPanel("junkshops", shop.id);
-        setRouteToShopId(shop.id);
+        navigate(
+            buildCustomerPath({
+                panel: "junkshops",
+                junkshopFocusId: shop.id,
+            }),
+            { state: { routeToShopId: shop.id } }
+        );
     };
 
     const showFab =
         activeTab === "overview" && !overviewPanel && !accountView;
 
-    const isSidePanelOpen = !accountView && overviewPanel !== null;
+    const isSidePanelOpen = !accountView && (overviewPanel !== null || shopProfile !== null);
+
+    useEffect(() => {
+        if (!isSidePanelOpen) return;
+        const html = document.documentElement;
+        const prevOverflow = html.style.overflow;
+        html.style.overflow = "hidden";
+        return () => {
+            html.style.overflow = prevOverflow;
+        };
+    }, [isSidePanelOpen]);
 
     return (
-        <div className="min-h-screen bg-[#f9f9f8] text-[#191c1c] font-sans overflow-x-hidden">
+        <div
+            className={`min-h-screen bg-[#f9f9f8] text-[#191c1c] font-sans overflow-x-hidden ${
+                isSidePanelOpen ? "h-dvh overflow-hidden" : ""
+            }`}
+        >
             <CustomerTopbar
                 user={user}
                 showProfileMenu={showProfileMenu}
@@ -291,18 +389,10 @@ export default function CustomerDashboard({
 
             <main
                 className={`md:pl-56 pt-16 min-h-screen ${
-                    isSidePanelOpen
-                        ? "flex flex-col h-screen overflow-hidden bg-white"
-                        : "pb-28 md:pb-8"
+                    isSidePanelOpen ? "bg-white" : "pb-28 md:pb-8"
                 }`}
             >
-                <div
-                    className={
-                        isSidePanelOpen
-                            ? "flex flex-1 flex-col min-h-0 w-full"
-                            : dashboardMainPaddingClass
-                    }
-                >
+                <div className={isSidePanelOpen ? undefined : dashboardMainPaddingClass}>
                     {showToast && (
                         <div className="fixed top-20 right-4 left-4 sm:left-auto z-50 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 sm:px-5 rounded-xl shadow-lg max-w-md sm:ml-auto">
                             <CheckCircle size={20} className="text-emerald-600 shrink-0" />
@@ -310,7 +400,7 @@ export default function CustomerDashboard({
                         </div>
                     )}
 
-                    {!accountView && (
+                    {!accountView && !isSidePanelOpen && (
                         <ProfileCompletionBanner
                             user={user}
                             role="customer"
@@ -322,7 +412,7 @@ export default function CustomerDashboard({
                     {accountView === "profile" && (
                         <ViewProfilePage
                             user={user}
-                            onBack={() => setAccountView(null)}
+                            onBack={() => navigate(buildCustomerPath({ tab: activeTab }))}
                             onUserUpdate={onUserUpdate}
                             onSaveSuccess={() =>
                                 showNotification("Profile updated successfully")
@@ -333,13 +423,25 @@ export default function CustomerDashboard({
                     {accountView === "settings" && (
                         <AccountSettingsPage
                             user={user}
-                            onBack={() => setAccountView(null)}
+                            onBack={() => navigate(buildCustomerPath({ tab: activeTab }))}
                             onNotify={showNotification}
                             onUserUpdate={onUserUpdate}
                         />
                     )}
 
-                    {!accountView && overviewPanel && (
+                    {!accountView && shopProfile && (
+                        <CustomerShopProfile
+                            key={shopProfile.id || shopProfile._id || shopProfile.name}
+                            shop={shopProfile}
+                            favoriteIds={favoriteIds}
+                            onToggleFavorite={handleToggleFavorite}
+                            onBack={closeShopProfile}
+                            backLabel={shopProfileBackLabel}
+                            onBookPickup={() => openPickupsTab(true)}
+                        />
+                    )}
+
+                    {!accountView && overviewPanel && !shopProfile && (
                         <CustomerSidePanel
                             panelId={overviewPanel}
                             shops={shops}
@@ -353,10 +455,11 @@ export default function CustomerDashboard({
                             onQuickAdd={handleQuickAdd}
                             onScanPhoto={handleScanPhoto}
                             onNotify={showNotification}
+                            onViewShopProfile={(shop) => openShopProfile(shop, "Back to Find a Shop")}
                         />
                     )}
 
-                    {!accountView && !overviewPanel && activeTab === "overview" && (
+                    {!accountView && !overviewPanel && !shopProfile && activeTab === "overview" && (
                         <OverviewTab
                             user={user}
                             shops={shops}
@@ -376,7 +479,7 @@ export default function CustomerDashboard({
                             }}
                         />
                     )}
-                    {!accountView && !overviewPanel && pickupsTabMounted && (
+                    {!accountView && !overviewPanel && !shopProfile && pickupsTabMounted && (
                         <div
                             className={activeTab === "pickups" ? "" : "hidden"}
                             aria-hidden={activeTab !== "pickups"}
@@ -394,7 +497,7 @@ export default function CustomerDashboard({
                             />
                         </div>
                     )}
-                    {!accountView && !overviewPanel && activeTab === "history" && (
+                    {!accountView && !overviewPanel && !shopProfile && activeTab === "history" && (
                         <HistoryTab
                             historyRows={historyRows}
                             loading={historyLoading}
@@ -405,13 +508,13 @@ export default function CustomerDashboard({
                             onRefresh={loadHistory}
                         />
                     )}
-                    {!accountView && !overviewPanel && activeTab === "favorites" && (
+                    {!accountView && !overviewPanel && !shopProfile && activeTab === "favorites" && (
                         <FavoritesTab
                             shops={shops}
                             favoriteIds={favoriteIds}
                             onToggleFavorite={handleToggleFavorite}
                             onFindShops={() => openOverviewPanel("junkshops")}
-                            onViewShop={(shopId) => openOverviewPanel("junkshops", shopId)}
+                            onViewProfile={(shop) => openShopProfile(shop, "Back to Favorites")}
                             onRouteShop={openShopRoute}
                         />
                     )}
@@ -655,6 +758,7 @@ function CustomerSidePanel({
     onQuickAdd,
     onScanPhoto,
     onNotify,
+    onViewShopProfile,
 }) {
     const fabPanel = FAB_PANEL_CONFIG[panelId];
     if (fabPanel) {
@@ -687,6 +791,7 @@ function CustomerSidePanel({
                             initialShopId: junkshopFocusId,
                             autoRouteShopId: routeToShopId,
                             onRouteDrawn,
+                            onViewProfile: onViewShopProfile,
                         }
                         : {})}
                 />
@@ -715,8 +820,8 @@ function OverviewTab({
     const nearbyShops = useMemo(
         () =>
             shops
-                .filter((shop) => shop.isPartner)
-                .slice(0, 3)
+                .filter((shop) => shop.isPartner && (shop.distanceKm == null || shop.distanceKm <= 5))
+                .slice(0, 5)
                 .map((shop) => ({
                     ...shop,
                     location: shop.address,
@@ -751,7 +856,7 @@ function OverviewTab({
                 shop: row.shop,
                 amount: row.amount,
                 weight: row.weight,
-                icon: index % 2 === 0 ? Recycle : Store,
+                ...ACTIVITY_STYLES[index % ACTIVITY_STYLES.length],
             })),
         [historyRows]
     );
@@ -770,12 +875,19 @@ function OverviewTab({
             </section>
 
             <section>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-[#191c1c]">
-                    Welcome back, {welcomeName}!
-                </h1>
-                <p className="mt-1.5 text-sm sm:text-base text-[#72796e]">
-                    Ready to recycle today?
-                </p>
+                <div className="rounded-2xl bg-gradient-to-br from-[#154212] via-[#1e5a1a] to-[#3DA35D] p-4 sm:p-5 text-white shadow-[0_4px_20px_rgba(21,66,18,0.22)] relative overflow-hidden">
+                    <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+                    <div className="absolute bottom-0 right-8 w-20 h-20 rounded-full bg-white/5 pointer-events-none" />
+                    <p className="text-xs sm:text-sm font-medium text-white/70 mb-0.5 relative">
+                        {getTimeGreeting()},
+                    </p>
+                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight relative">{welcomeName}!</h1>
+                    <p className="mt-1.5 text-xs sm:text-sm text-white/75 relative">
+                        {Number(overviewStats.totalKg) > 0
+                            ? `You've recycled ${overviewStats.totalKg} kg · ₱${overviewStats.totalEarnings} earned`
+                            : "Start recycling to track your impact."}
+                    </p>
+                </div>
             </section>
 
             <OverviewQuickAccess onOpenPanel={onOpenPanel} />
@@ -795,26 +907,30 @@ function OverviewTab({
                     label="Total Recycled"
                     value={overviewStats.totalKg}
                     unit="kg"
+                    icon={Recycle}
                     helper="From your logged trips and transactions"
+                    accentColor="green"
                 />
-
                 <StatCard
                     label="Total Earnings"
                     value={`₱${overviewStats.totalEarnings}`}
+                    icon={DollarSign}
                     helper="Total from your recycling history"
+                    accentColor="amber"
                 />
-
                 <StatCard
                     label="Transactions"
                     value={String(overviewStats.transactions)}
+                    icon={ReceiptText}
                     helper="Trips recorded in your account"
+                    accentColor="blue"
                 />
-
                 <StatCard
                     label="Trees Saved"
                     value={String(overviewStats.trees)}
                     icon={TreePine}
                     helper="Estimated environmental impact"
+                    accentColor="teal"
                 />
             </section>
 
@@ -835,25 +951,28 @@ function OverviewTab({
                         </button>
                     </div>
 
+                    <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#f9f9f8] to-transparent z-10" aria-hidden="true" />
                     <div className="scroll-x-clean flex gap-4 sm:gap-6 pb-2 -mx-1 px-1 snap-x snap-mandatory">
                         {nearbyShops.length === 0 ? (
                             <EmptyState
                                 compact
-                                title="No partner shops yet"
-                                description="When a junkshop owner completes their profile, they'll show up here and on the map."
+                                title="No junkshops within range"
                             />
                         ) : (
                             nearbyShops.map((shop) => (
-                                <NearbyShopCard
+                                <CustomerShopSummaryCard
                                     key={shop.id}
                                     shop={shop}
                                     isFavorite={isFavoriteShopId(shop.id, favoriteIds)}
                                     onToggleFavorite={() => onToggleFavorite(shop.id)}
-                                    onViewDetails={() => onOpenPanel("junkshops", shop.id)}
+                                    onViewProfile={() => openShopProfile(shop, "Back to Overview")}
                                     onRoute={() => onOpenShopRoute(shop)}
+                                    className="w-[min(100%,18rem)] min-w-[min(72vw,15rem)] sm:min-w-[16rem] max-w-[18rem] shrink-0 snap-start"
                                 />
                             ))
                         )}
+                    </div>
                     </div>
                 </div>
 
@@ -875,24 +994,24 @@ function OverviewTab({
                             return (
                                 <button
                                     key={activity.id}
-                                    className="w-full p-4 hover:bg-zinc-50 transition-colors text-left"
+                                    className="w-full p-3 sm:p-4 hover:bg-zinc-50/80 transition-colors text-left"
                                 >
-                                    <div className="flex items-center gap-4">
-                                        <div className="bg-emerald-100 p-3 rounded-lg">
-                                            <Icon size={22} className="text-emerald-700" />
+                                    <div className="flex items-center gap-3 sm:gap-4">
+                                        <div className={`${activity.iconBg} p-2.5 sm:p-3 rounded-xl shrink-0`}>
+                                            <Icon size={20} className={activity.iconText} />
                                         </div>
 
-                                        <div className="flex-1">
-                                            <h5 className="font-bold text-[#191c1c]">
+                                        <div className="flex-1 min-w-0">
+                                            <h5 className="font-bold text-[#191c1c] text-sm truncate">
                                                 {activity.material}
                                             </h5>
-                                            <p className="text-xs text-[#72796e]">
-                                                {activity.date} • {activity.shop}
+                                            <p className="text-xs text-[#72796e] truncate">
+                                                {activity.date} · {activity.shop}
                                             </p>
                                         </div>
 
-                                        <div className="text-right">
-                                            <p className="font-bold text-emerald-700">
+                                        <div className="text-right shrink-0">
+                                            <p className="font-bold text-emerald-700 text-sm">
                                                 {activity.amount}
                                             </p>
                                             <p className="text-xs text-[#72796e]">
@@ -948,127 +1067,26 @@ function OverviewQuickAccess({ onOpenPanel }) {
     );
 }
 
-function StatCard({ label, value, unit, icon: Icon, helper }) {
+function StatCard({ label, value, unit, icon: Icon, helper, accentColor = "green" }) {
+    const c = STAT_COLORS[accentColor] || STAT_COLORS.green;
     return (
-        <div className="bg-white p-4 sm:p-5 rounded-xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.12)]">
-            <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] sm:text-xs text-[#72796e] uppercase tracking-wider font-semibold">
+        <div className={`bg-white p-4 sm:p-5 rounded-xl border border-zinc-200 border-t-2 ${c.border} shadow-[0_4px_12px_rgba(141,170,145,0.12)] flex flex-col gap-3`}>
+            <div className="flex items-start justify-between">
+                {Icon ? (
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${c.iconBg} ${c.iconText}`}>
+                        <Icon size={18} />
+                    </div>
+                ) : <div />}
+                <Info size={15} className="text-zinc-400 cursor-help shrink-0" title={helper} />
+            </div>
+            <div>
+                <p className="text-[10px] sm:text-xs text-[#72796e] uppercase tracking-wider font-semibold mb-1">
                     {label}
                 </p>
-
-                <Info
-                    size={18}
-                    className="text-emerald-600 cursor-help shrink-0"
-                >
-                    <title>{helper}</title>
-                </Info>
-            </div>
-
-            <p className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-900 flex items-center gap-1.5 flex-wrap">
-                {value}
-                {unit && <span className="text-xs sm:text-sm font-semibold">{unit}</span>}
-                {Icon && <Icon size={20} className="text-emerald-500" />}
-            </p>
-        </div>
-    );
-}
-
-function NearbyShopCard({
-    shop,
-    isFavorite,
-    onToggleFavorite,
-    onViewDetails,
-    onRoute,
-}) {
-    return (
-        <div className="w-[min(100%,20rem)] min-w-[min(72vw,16rem)] sm:min-w-[18rem] max-w-[20rem] snap-start bg-white rounded-xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.15)] overflow-hidden shrink-0 group">
-            <div className="h-36 bg-zinc-200 overflow-hidden relative">
-                <img
-                    alt={shop.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    src={shop.shopPhotoUrl || shop.image}
-                />
-
-                <div className="absolute top-3 right-3">
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleFavorite?.();
-                        }}
-                        className={`bg-white/90 p-2 rounded-full active:scale-90 transition-transform ${isFavorite ? "text-red-600" : "text-zinc-400"
-                            }`}
-                    >
-                        <Heart
-                            size={18}
-                            fill={isFavorite ? "currentColor" : "none"}
-                        />
-                    </button>
-                </div>
-            </div>
-
-            <div className="p-5 space-y-4">
-                <div className="flex justify-between items-start gap-3">
-                    <div>
-                        <h4 className="font-bold text-[#191c1c]">
-                            {shop.name}
-                        </h4>
-                        <ShopBadges badges={shop.badges} className="mt-1" />
-                        <p className="text-xs text-[#72796e] mt-1">
-                            {shop.distance} • {shop.location}
-                        </p>
-                    </div>
-
-                    <span
-                        className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
-                            shop.status === "Open"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-red-100 text-red-700"
-                        }`}
-                    >
-                        {shop.status}
-                    </span>
-                </div>
-
-                <ShopRating shop={shop} className="mb-1" />
-                {shop.latestReview && (
-                    <ReviewSnippet review={shop.latestReview} maxLength={80} />
-                )}
-
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                    {shop.materials.length > 0 ? (
-                        shop.materials.map((material) => (
-                            <span
-                                key={material}
-                                className="bg-[#c9e7cc] text-[#4e6953] px-2 py-0.5 rounded-md text-[10px] font-medium"
-                            >
-                                {material}
-                            </span>
-                        ))
-                    ) : (
-                        <span className="text-[10px] text-[#72796e] italic">
-                            Materials not listed yet
-                        </span>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                    <button
-                        type="button"
-                        onClick={onViewDetails}
-                        className="py-2 border border-[#154212] text-[#154212] rounded-lg text-sm font-bold hover:bg-[#154212] hover:text-white transition-colors"
-                    >
-                        View Details
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={onRoute}
-                        className="py-2 border border-zinc-300 text-[#154212] rounded-lg text-sm font-bold hover:bg-zinc-50 transition-colors"
-                    >
-                        Route
-                    </button>
-                </div>
+                <p className="text-xl sm:text-2xl font-bold text-[#191c1c] flex items-end gap-1.5 flex-wrap">
+                    {value}
+                    {unit && <span className="text-xs sm:text-sm font-semibold text-[#72796e] pb-0.5">{unit}</span>}
+                </p>
             </div>
         </div>
     );
@@ -1270,28 +1288,38 @@ function HistoryTab({
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-white px-3 py-2.5 rounded-xl border shadow-sm">
-                    <p className="text-[11px] text-[#72796e] leading-tight">Trips</p>
-                    <p className="text-[10px] text-[#72796e]/80 leading-tight mb-0.5">matching filters</p>
-                    <p className="text-lg font-bold text-emerald-700 leading-tight">
-                        {filteredRows.length} / {historyRows.length}
-                    </p>
+                <div className="bg-white px-4 py-3 rounded-xl border border-t-2 border-t-emerald-400 shadow-sm flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <ReceiptText size={18} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-[#72796e] uppercase tracking-wide font-semibold">Trips</p>
+                        <p className="text-lg font-bold text-[#191c1c] leading-tight">
+                            {filteredRows.length} <span className="text-xs font-medium text-[#72796e]">/ {historyRows.length}</span>
+                        </p>
+                    </div>
                 </div>
 
-                <div className="bg-white px-3 py-2.5 rounded-xl border shadow-sm">
-                    <p className="text-[11px] text-[#72796e] leading-tight">Earned</p>
-                    <p className="text-[10px] text-[#72796e]/80 leading-tight mb-0.5">from filtered trips</p>
-                    <p className="text-lg font-bold text-emerald-700 leading-tight">
-                        ₱{totalEarnings.toFixed(2)}
-                    </p>
+                <div className="bg-white px-4 py-3 rounded-xl border border-t-2 border-t-amber-400 shadow-sm flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                        <DollarSign size={18} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-[#72796e] uppercase tracking-wide font-semibold">Earned</p>
+                        <p className="text-lg font-bold text-[#191c1c] leading-tight">₱{totalEarnings.toFixed(2)}</p>
+                    </div>
                 </div>
 
-                <div className="bg-white px-3 py-2.5 rounded-xl border shadow-sm">
-                    <p className="text-[11px] text-[#72796e] leading-tight">Weight recycled</p>
-                    <p className="text-[10px] text-[#72796e]/80 leading-tight mb-0.5">from filtered trips</p>
-                    <p className="text-lg font-bold text-emerald-700 leading-tight">
-                        {totalWeightKg.toFixed(1)} kg
-                    </p>
+                <div className="bg-white px-4 py-3 rounded-xl border border-t-2 border-t-teal-400 shadow-sm flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                        <Recycle size={18} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-[#72796e] uppercase tracking-wide font-semibold">Weight recycled</p>
+                        <p className="text-lg font-bold text-[#191c1c] leading-tight">
+                            {totalWeightKg.toFixed(1)} <span className="text-xs font-medium text-[#72796e]">kg</span>
+                        </p>
+                    </div>
                 </div>
             </div>
 
@@ -1436,7 +1464,7 @@ function FavoritesTab({
     favoriteIds,
     onToggleFavorite,
     onFindShops,
-    onViewShop,
+    onViewProfile,
     onRouteShop,
 }) {
     const favoriteShops = useMemo(
@@ -1467,19 +1495,20 @@ function FavoritesTab({
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid w-full gap-4 sm:gap-6 grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))]">
                 {favoriteShops.map((shop) => (
-                    <FavoriteShopCard
+                    <CustomerShopSummaryCard
                         key={shop.id}
-                        shop={{ ...shop, image: SHOP_IMAGE }}
-                        onRemove={() => onToggleFavorite(shop.id)}
-                        onViewDetails={() => onViewShop(shop.id)}
+                        shop={shop}
+                        isFavorite={true}
+                        onToggleFavorite={() => onToggleFavorite(shop.id)}
+                        onViewProfile={() => onViewProfile(shop)}
                         onRoute={() => onRouteShop(shop)}
                     />
                 ))}
 
                 {favoriteShops.length === 0 && (
-                    <div className="md:col-span-2 xl:col-span-3 bg-emerald-50/50 border-2 border-dashed border-emerald-200 rounded-xl flex flex-col items-center justify-center p-6 sm:p-8 text-center min-h-[280px] sm:min-h-[320px]">
+                    <div className="col-span-full bg-emerald-50/50 border-2 border-dashed border-emerald-200 rounded-xl flex flex-col items-center justify-center p-6 sm:p-8 text-center min-h-[min(50vh,20rem)]">
                         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
                             <Search size={42} className="text-emerald-600" />
                         </div>
@@ -1507,79 +1536,3 @@ function FavoritesTab({
     );
 }
 
-function FavoriteShopCard({ shop, onRemove, onViewDetails, onRoute }) {
-    return (
-        <div className="bg-white border border-[#c2c9bb] rounded-xl overflow-hidden shadow-[0_4px_12px_rgba(141,170,145,0.15)] flex flex-col group">
-            <div className="relative h-40">
-                <img
-                    alt={shop.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    src={shop.image}
-                />
-
-                <button
-                    type="button"
-                    onClick={onRemove}
-                    className="absolute top-3 right-3 bg-white/90 backdrop-blur p-2 rounded-full text-red-600 transition-transform hover:scale-110 active:scale-90"
-                    aria-label="Remove from favorites"
-                >
-                    <Heart size={18} fill="currentColor" />
-                </button>
-            </div>
-
-            <div className="p-5 flex-1">
-                <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-bold text-[#154212]">{shop.name}</h3>
-
-                    <ShopRating shop={shop} showCount={false} />
-                </div>
-
-                <div className="space-y-2 mb-6">
-                    <div className="flex items-center gap-2 text-[#42493e] text-sm">
-                        <MapPin size={16} />
-                        {shop.distance} · {shop.address}
-                    </div>
-                    {shop.latestReview && (
-                        <ReviewSnippet review={shop.latestReview} maxLength={80} />
-                    )}
-
-                    <div className="flex flex-wrap gap-1">
-                        {(shop.materials || []).slice(0, 3).map((m) => (
-                            <span
-                                key={m}
-                                className="bg-[#c9e7cc] text-[#4e6953] px-2 py-0.5 rounded text-[10px] font-medium"
-                            >
-                                {m}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                    <button
-                        type="button"
-                        onClick={onViewDetails}
-                        className="flex items-center justify-center gap-1 py-2 px-3 border border-[#c2c9bb] rounded-lg text-sm font-semibold hover:bg-[#edeeed] transition-colors"
-                    >
-                        <Info size={15} />
-                        Details
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={onRoute}
-                        className="flex items-center justify-center gap-1 py-2 px-3 border border-[#c2c9bb] rounded-lg text-sm font-semibold hover:bg-[#edeeed] transition-colors"
-                    >
-                        <Navigation size={15} />
-                        Route
-                    </button>
-
-                    <button className="col-span-2 flex items-center justify-center gap-1 py-2 px-3 bg-[#4a654f] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
-                        <DollarSign size={15} />
-                        View Prices
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}

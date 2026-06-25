@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Eye, EyeOff, Layers } from "lucide-react";
 import { domainApi } from "../../services/api";
 import { useProviderMaterials } from "../../hooks/useProviderData";
 import NumberInput from "../ui/NumberInput";
@@ -7,6 +7,15 @@ import Select from "../ui/Select";
 import { formatUpdatedDate } from "../../utils/catalogMappers";
 
 const CATEGORIES = ["plastic", "metal", "paper", "glass", "e-waste", "other"];
+
+const CATEGORY_COLORS = {
+    plastic:   { chip: "bg-blue-100 text-blue-700",    border: "border-t-blue-400"   },
+    metal:     { chip: "bg-amber-100 text-amber-700",   border: "border-t-amber-400"  },
+    paper:     { chip: "bg-emerald-100 text-emerald-700", border: "border-t-emerald-400" },
+    glass:     { chip: "bg-teal-100 text-teal-700",    border: "border-t-teal-400"   },
+    "e-waste": { chip: "bg-purple-100 text-purple-700", border: "border-t-purple-400" },
+    other:     { chip: "bg-zinc-100 text-zinc-600",    border: "border-t-zinc-300"   },
+};
 
 const FILTER_OPTIONS = [
     { value: "all", label: "All categories" },
@@ -161,62 +170,77 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
             {loading ? (
                 <p className="text-sm text-[#72796e]">Loading materials...</p>
             ) : filtered.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-xl border border-zinc-200 text-[#72796e]">
-                    No materials yet. Add your first listing.
+                <div className="text-center py-16 bg-white rounded-xl border border-zinc-200 flex flex-col items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-zinc-100 flex items-center justify-center">
+                        <Layers size={26} className="text-zinc-400" />
+                    </div>
+                    <p className="text-[#191c1c] font-semibold">No materials found</p>
+                    <p className="text-sm text-[#72796e]">Add your first listing to start accepting pickups.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filtered.map((item) => (
-                        <article
-                            key={item.id}
-                            className="bg-white rounded-xl border border-zinc-200 p-4 sm:p-5 shadow-sm"
-                        >
-                            <div className="flex justify-between items-start gap-3">
-                                <div>
-                                    <h3 className="font-bold text-[#191c1c]">{item.name}</h3>
-                                    <p className="text-xs text-[#72796e] capitalize mt-0.5">
-                                        {item.category} · Posted {formatUpdatedDate(item.createdAt || item.updatedAt)}
-                                    </p>
+                    {filtered.map((item) => {
+                        const catKey = item.category?.toLowerCase() || "other";
+                        const cat = CATEGORY_COLORS[catKey] || CATEGORY_COLORS.other;
+                        return (
+                            <article
+                                key={item.id}
+                                className={`bg-white rounded-xl border border-zinc-200 border-t-2 ${cat.border} p-4 sm:p-5 shadow-sm`}
+                            >
+                                <div className="flex justify-between items-start gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${cat.chip}`}>
+                                                {item.category || "Other"}
+                                            </span>
+                                            <span
+                                                className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${item.available
+                                                    ? "bg-emerald-100 text-emerald-800"
+                                                    : "bg-zinc-200 text-zinc-500"
+                                                }`}
+                                            >
+                                                {item.available ? "Available" : "Hidden"}
+                                            </span>
+                                        </div>
+                                        <h3 className="font-bold text-[#191c1c] mt-1">{item.name}</h3>
+                                        <p className="text-xs text-[#72796e] mt-0.5">
+                                            Posted {formatUpdatedDate(item.createdAt || item.updatedAt)}
+                                        </p>
+                                    </div>
+                                    <div className="shrink-0 text-right">
+                                        <p className="text-xl font-bold text-emerald-700">₱{item.price}</p>
+                                        <p className="text-xs text-[#72796e]">per {item.unit}</p>
+                                    </div>
                                 </div>
-                                <span
-                                    className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${item.available
-                                        ? "bg-emerald-100 text-emerald-800"
-                                        : "bg-zinc-200 text-zinc-600"
-                                        }`}
-                                >
-                                    {item.available ? "Available" : "Hidden"}
-                                </span>
-                            </div>
-                            <p className="text-lg font-bold text-emerald-800 mt-3">
-                                ₱{item.price}
-                                <span className="text-sm font-medium text-[#72796e]">/{item.unit}</span>
-                            </p>
-                            <div className="flex flex-wrap gap-2 mt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => openEdit(item)}
-                                    className="text-sm font-semibold text-[#154212] hover:underline"
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => toggleAvailability(item)}
-                                    className="text-sm font-semibold text-[#72796e] hover:underline"
-                                >
-                                    {item.available ? "Hide" : "Show"}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleDelete(item._id)}
-                                    className="text-sm font-semibold text-red-600 hover:underline inline-flex items-center gap-1"
-                                >
-                                    <Trash2 size={14} />
-                                    Delete
-                                </button>
-                            </div>
-                        </article>
-                    ))}
+                                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-100">
+                                    <button
+                                        type="button"
+                                        onClick={() => openEdit(item)}
+                                        className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#154212] text-white px-3 py-1.5 rounded-lg"
+                                    >
+                                        <Pencil size={13} />
+                                        Edit
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleAvailability(item)}
+                                        className="inline-flex items-center gap-1.5 text-xs font-semibold border border-zinc-300 text-[#42493e] px-3 py-1.5 rounded-lg"
+                                    >
+                                        {item.available ? <EyeOff size={13} /> : <Eye size={13} />}
+                                        {item.available ? "Hide" : "Show"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDelete(item._id)}
+                                        className="inline-flex items-center gap-1.5 text-xs font-semibold border border-red-200 text-red-600 px-3 py-1.5 rounded-lg ml-auto"
+                                    >
+                                        <Trash2 size={13} />
+                                        Delete
+                                    </button>
+                                </div>
+                            </article>
+                        );
+                    })}
                 </div>
             )}
 

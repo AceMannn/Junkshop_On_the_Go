@@ -20,6 +20,10 @@ const {
   LOG_TRIP_KEYS,
 } = require('../utils/requestWhitelist');
 const {
+  sanitizeOperatingHours,
+  formatOperatingHoursSummary,
+} = require('../utils/operatingHours');
+const {
   isBanned,
   isSuspended,
   loadUserStatusMap,
@@ -153,6 +157,10 @@ router.get('/junkshops', async (req, res) => {
   }
 
   junkshops = junkshops.map((shop) => {
+    if (Array.isArray(shop.operatingHours)) {
+      shop.operatingHours = sanitizeOperatingHours(shop.operatingHours);
+    }
+
     if (!shop.provider || shop.isCatalog) {
       return shop;
     }
@@ -284,6 +292,13 @@ router.post('/junkshops', protect, requireProvider, async (req, res) => {
 
 router.patch('/junkshops/:id', protect, requireProvider, async (req, res) => {
   const data = pickAllowed(req.body, JUNKSHOP_WRITE_KEYS);
+
+  if (Array.isArray(data.operatingHours)) {
+    const schedule = sanitizeOperatingHours(data.operatingHours);
+    data.operatingHours = schedule;
+    data.hours = formatOperatingHoursSummary(schedule);
+  }
+
   const junkshop = await Junkshop.findOneAndUpdate(
     { _id: req.params.id, provider: req.user._id },
     data,

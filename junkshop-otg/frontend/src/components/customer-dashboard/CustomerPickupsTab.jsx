@@ -22,11 +22,21 @@ import {
 import { formatReviewDate } from "../../utils/reviewFormat";
 import PickupTrackingMap, { formatLastUpdated } from "../maps/PickupTrackingMap";
 import PickupDetailDrawerShell from "../ui/PickupDetailDrawerShell";
+import PickupMaterialPhotosGallery from "../ui/PickupMaterialPhotosGallery";
 import {
     estimateDropOffPoints,
     formatPoints,
     POINTS_PER_KG,
 } from "../../utils/pickupPoints";
+
+const STATUS_BORDER_STYLES = {
+    pending:    "border-l-amber-400",
+    accepted:   "border-l-emerald-500",
+    in_transit: "border-l-blue-400",
+    completed:  "border-l-zinc-300",
+    cancelled:  "border-l-red-300",
+    rejected:   "border-l-red-300",
+};
 
 export default function CustomerPickupsTab({
     user,
@@ -144,37 +154,53 @@ export default function CustomerPickupsTab({
             </div>
 
             {loading && requests.length === 0 ? (
-                <p className="text-sm text-[#72796e] animate-pulse">Loading pickupsâ€¦</p>
+                <p className="text-sm text-[#72796e] animate-pulse">Loading pickups…</p>
             ) : filtered.length === 0 ? (
-                <div className="bg-white border border-zinc-200 rounded-2xl p-10 text-center">
-                    <Truck className="mx-auto text-emerald-700 mb-3" size={40} />
-                    <p className="font-semibold text-[#191c1c]">No {filter} pickups yet</p>
-                    <p className="text-sm text-[#72796e] mt-1">Book your first scheduled pickup.</p>
+                <div className="bg-white border border-zinc-200 rounded-2xl p-8 sm:p-10 text-center">
+                    <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Truck className="text-emerald-700" size={28} />
+                    </div>
+                    <p className="font-bold text-lg text-[#191c1c]">No {filter} pickups</p>
+                    <p className="text-sm text-[#72796e] mt-1 mb-5 max-w-xs mx-auto">
+                        {filter === "active"
+                            ? "Book a home pickup or drop off at a partner junkshop."
+                            : "Completed pickups will appear here."}
+                    </p>
+                    {filter === "active" && (
+                        <button
+                            type="button"
+                            onClick={startWizard}
+                            className="inline-flex items-center gap-2 bg-[#154212] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-900 transition-colors"
+                        >
+                            <Plus size={16} />
+                            Book your first pickup
+                        </button>
+                    )}
                 </div>
             ) : (
-                <div className="grid gap-4">
+                <div className="grid gap-3 sm:gap-4">
                     {filtered.map((req) => (
                         <button
                             key={req.id}
                             type="button"
                             onClick={() => setSelectedId(req.id)}
-                            className="text-left bg-white border border-zinc-200 rounded-2xl p-5 hover:border-emerald-300 hover:shadow-md transition-all"
+                            className={`text-left bg-white border border-zinc-200 border-l-4 ${STATUS_BORDER_STYLES[req.status] || "border-l-zinc-200"} rounded-2xl p-4 sm:p-5 hover:shadow-md transition-all`}
                         >
                             <div className="flex flex-wrap items-start justify-between gap-2">
-                                <div>
-                                    <p className="font-bold text-[#191c1c]">{getShopName(req)}</p>
+                                <div className="min-w-0">
+                                    <p className="font-bold text-[#191c1c] truncate">{getShopName(req)}</p>
                                     <p className="text-xs text-[#72796e] mt-0.5">
-                                        {formatPickupSchedule(req)} Â· {req.requestType === "drop_off" ? "Drop-off" : "Home pickup"}
+                                        {formatPickupSchedule(req)} · {req.requestType === "drop_off" ? "Drop-off" : "Home pickup"}
                                     </p>
                                 </div>
                                 <span
-                                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[req.status] || ""}`}
+                                    className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${STATUS_STYLES[req.status] || ""}`}
                                 >
                                     {STATUS_LABELS[req.status] || req.status}
                                 </span>
                             </div>
                             <p className="text-sm text-[#42493e] mt-2 line-clamp-1">
-                                {materialsSummary(req.materials)} Â· {req.estimatedWeightKg} kg
+                                {materialsSummary(req.materials)} · {req.estimatedWeightKg} kg
                             </p>
                         </button>
                     ))}
@@ -290,12 +316,16 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate
             </div>
 
             <div className="scroll-y-clean min-h-0 flex-1 overflow-x-hidden p-5 space-y-5">
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[live.status]}`}>
-                        {STATUS_LABELS[live.status]}
-                    </span>
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold text-lg text-[#191c1c] truncate min-w-0">
+                            {getShopName(live)}
+                        </p>
+                        <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[live.status]}`}>
+                            {STATUS_LABELS[live.status]}
+                        </span>
+                    </div>
 
                     <div className="space-y-1 text-sm">
-                        <p className="font-semibold text-lg">{getShopName(live)}</p>
                         <p className="text-[#72796e]">{formatPickupSchedule(live)}</p>
                         <p>{materialsSummary(live.materials)} Â· {live.estimatedWeightKg} kg</p>
                         <p className="flex items-start gap-1 text-[#42493e]">
@@ -303,6 +333,8 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate
                             {live.address}
                         </p>
                     </div>
+
+                    <PickupMaterialPhotosGallery photos={live.materialPhotos} title="Your material photos" />
 
                     {showTrackingMap && (
                         <div className="rounded-xl border border-zinc-200 bg-white p-3 space-y-2">

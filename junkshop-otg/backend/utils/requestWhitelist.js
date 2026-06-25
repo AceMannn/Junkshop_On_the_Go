@@ -5,6 +5,7 @@ const JUNKSHOP_WRITE_KEYS = [
   'address',
   'phone',
   'hours',
+  'operatingHours',
   'status',
   'location',
   'pickupEnabled',

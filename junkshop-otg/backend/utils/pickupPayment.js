@@ -8,15 +8,7 @@ const isZeroServiceFee = (request) => Number(request.serviceFee || 0) <= 0;
 
 const isPaymentConfirmed = (request) => {
   if (!isHomePickup(request)) return true;
-  if (isZeroServiceFee(request)) return true;
-  if (request.serviceFeePaymentStatus === 'confirmed') return true;
-  if (
-    request.serviceFeePaid &&
-    (!request.serviceFeePaymentStatus || request.serviceFeePaymentStatus === 'none')
-  ) {
-    return true;
-  }
-  return false;
+  return true;
 };
 
 const dropOffPoints = (weightKg) => {

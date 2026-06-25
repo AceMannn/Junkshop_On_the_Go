@@ -8,7 +8,24 @@ import {
     MapPin,
     Star,
     X,
+    TrendingUp,
 } from "lucide-react";
+
+const REQUEST_STAT_COLORS = {
+    amber: { iconBg: "bg-amber-100",   iconText: "text-amber-700",   border: "border-t-amber-400"   },
+    blue:  { iconBg: "bg-blue-100",    iconText: "text-blue-700",    border: "border-t-blue-400"    },
+    green: { iconBg: "bg-emerald-100", iconText: "text-emerald-700", border: "border-t-emerald-400" },
+    teal:  { iconBg: "bg-teal-100",    iconText: "text-teal-700",    border: "border-t-teal-400"    },
+};
+
+const REQUEST_STATUS_BORDERS = {
+    "Pending":    "border-l-amber-400",
+    "Accepted":   "border-l-blue-400",
+    "In Transit": "border-l-indigo-400",
+    "Completed":  "border-l-emerald-500",
+    "Declined":   "border-l-red-300",
+    "Cancelled":  "border-l-zinc-300",
+};
 import { pickupApi } from "../../services/api";
 import { REFRESH_INTERVAL_MS, REFRESH_INTERVAL_FAST_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
 import {
@@ -20,6 +37,7 @@ import {
 } from "../../utils/pickupHelpers";
 import PickupTrackingMap, { formatLastUpdated } from "../maps/PickupTrackingMap";
 import NumberInput from "../ui/NumberInput";
+import PickupMaterialPhotosGallery from "../ui/PickupMaterialPhotosGallery";
 import {
     estimateDropOffPoints,
     formatPoints,
@@ -198,7 +216,7 @@ export default function ProviderPickupRequests({
     const handleAccept = async (id) => {
         try {
             await pickupApi.accept(id);
-            showToast("Request accepted. Customer can pay service fee via GCash.");
+            showToast("Request accepted.");
             load();
         } catch (err) {
             showToast(err.message);
@@ -220,32 +238,22 @@ export default function ProviderPickupRequests({
         }
     };
 
-    const handleConfirmPayment = async (id) => {
-        try {
-            await pickupApi.confirmPayment(id);
-            showToast("Payment confirmed. You can start the pickup.");
-            load();
-            await refreshDetail();
-        } catch (err) {
-            showToast(err.message);
-        }
-    };
-
-    const handleRejectPayment = async (id, note) => {
-        try {
-            await pickupApi.rejectPayment(id, { note });
-            showToast("Payment marked as not verified.");
-            load();
-            await refreshDetail();
-        } catch (err) {
-            showToast(err.message);
-        }
-    };
-
     const handleCompleteDropOff = async (id, actualWeight) => {
         try {
             await pickupApi.updateStatus(id, "completed", { actualWeight });
             showToast("Drop-off completed. Points awarded to the customer.");
+            setTrackingId(null);
+            load();
+            closeDetail();
+        } catch (err) {
+            showToast(err.message);
+        }
+    };
+
+    const handleCompleteHomePickup = async (id, { actualWeight, totalAmount }) => {
+        try {
+            await pickupApi.updateStatus(id, "completed", { actualWeight, totalAmount });
+            showToast("Pickup completed. Transaction recorded.");
             setTrackingId(null);
             load();
             closeDetail();
@@ -347,10 +355,10 @@ export default function ProviderPickupRequests({
             </section>
 
             <section className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                <RequestStatCard title="Pending" value={pendingCount} unit="requests" />
-                <RequestStatCard title="In Transit" value={inTransitCount} unit="requests" />
-                <RequestStatCard title="Completed" value={completedTodayCount} unit="requests" />
-                <RequestStatCard title="Total Volume" value={totalVolumeLabel} unit="kg" />
+                <RequestStatCard title="Pending" value={pendingCount} unit="requests" icon={Clock3} accentColor="amber" />
+                <RequestStatCard title="In Transit" value={inTransitCount} unit="requests" icon={Truck} accentColor="blue" />
+                <RequestStatCard title="Completed" value={completedTodayCount} unit="requests" icon={CheckCircle} accentColor="green" />
+                <RequestStatCard title="Total Volume" value={totalVolumeLabel} unit="kg" icon={TrendingUp} accentColor="teal" />
             </section>
 
             <section className="rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
@@ -386,7 +394,7 @@ export default function ProviderPickupRequests({
                     <>
                         <div className="md:hidden divide-y divide-zinc-100">
                             {filteredRequests.map((request) => (
-                                <div key={request.id} className="p-4 space-y-3">
+                                <div key={request.id} className={`p-4 space-y-3 border-l-4 ${REQUEST_STATUS_BORDERS[request.status] || "border-l-zinc-200"}`}>
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <p className="font-semibold text-[#191c1c]">{request.customer}</p>
@@ -429,24 +437,24 @@ export default function ProviderPickupRequests({
                             ))}
                         </div>
 
-                        <div className="hidden md:block scroll-x-clean">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-[#f3f4f3] text-[#72796e]">
-                                    <tr>
-                                        <th className="px-6 py-4 font-semibold">Customer</th>
-                                        <th className="px-6 py-4 font-semibold">Materials</th>
-                                        <th className="px-6 py-4 font-semibold">Weight</th>
-                                        <th className="px-6 py-4 font-semibold">Location</th>
-                                        <th className="px-6 py-4 font-semibold">Date & Time</th>
-                                        <th className="px-6 py-4 font-semibold">Status</th>
-                                        <th className="px-6 py-4 font-semibold">Rating</th>
-                                        <th className="px-6 py-4 text-right font-semibold">Actions</th>
+                        <div className="hidden md:block scroll-x-clean overflow-hidden">
+                            <table className="w-full text-left text-sm border-separate border-spacing-0">
+                                <thead>
+                                    <tr className="bg-[#f3f4f3] text-[#72796e]">
+                                        <th className="px-6 py-4 font-semibold rounded-tl-2xl bg-[#f3f4f3]">Customer</th>
+                                        <th className="px-6 py-4 font-semibold bg-[#f3f4f3]">Materials</th>
+                                        <th className="px-6 py-4 font-semibold bg-[#f3f4f3]">Weight</th>
+                                        <th className="px-6 py-4 font-semibold bg-[#f3f4f3]">Location</th>
+                                        <th className="px-6 py-4 font-semibold bg-[#f3f4f3]">Date & Time</th>
+                                        <th className="px-6 py-4 font-semibold whitespace-nowrap bg-[#f3f4f3]">Status</th>
+                                        <th className="px-6 py-4 font-semibold bg-[#f3f4f3]">Rating</th>
+                                        <th className="px-6 py-4 text-right font-semibold rounded-tr-2xl bg-[#f3f4f3]">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-zinc-100">
                                     {filteredRequests.map((request) => (
                                         <tr key={request.id} className="hover:bg-[#f9f9f8]">
-                                            <td className="px-6 py-4">
+                                            <td className={`px-6 py-4 border-l-4 ${REQUEST_STATUS_BORDERS[request.status] || "border-l-zinc-200"}`}>
                                                 <p className="font-semibold text-[#191c1c]">{request.customer}</p>
                                                 <p className="text-xs text-[#72796e]">
                                                     {request.raw.requestType === "drop_off" ? "Drop-off" : "Pickup"}
@@ -463,7 +471,7 @@ export default function ProviderPickupRequests({
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-[#42493e]">{request.dateTime}</td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 <ProviderStatusBadge status={request.status} />
                                             </td>
                                             <td className="px-6 py-4">
@@ -504,9 +512,8 @@ export default function ProviderPickupRequests({
                         setRejectingId(detailId);
                     }}
                     onUpdateStatus={handleStatus}
-                    onConfirmPayment={handleConfirmPayment}
-                    onRejectPayment={handleRejectPayment}
                     onCompleteDropOff={handleCompleteDropOff}
+                    onCompleteHomePickup={handleCompleteHomePickup}
                 />
             )}
 
@@ -555,16 +562,24 @@ export default function ProviderPickupRequests({
     );
 }
 
-function RequestStatCard({ title, value, unit }) {
+function RequestStatCard({ title, value, unit, icon: Icon, accentColor = "green" }) {
+    const c = REQUEST_STAT_COLORS[accentColor] || REQUEST_STAT_COLORS.green;
     return (
-        <div className="bg-white p-4 sm:p-5 rounded-xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.12)]">
-            <p className="text-[10px] sm:text-xs text-[#72796e] uppercase tracking-wider font-semibold">
-                {title}
-            </p>
-            <h3 className="mt-1 text-xl sm:text-2xl font-bold text-emerald-900">
-                {value}
-                <span className="ml-1 text-xs sm:text-sm font-semibold">{unit}</span>
-            </h3>
+        <div className={`bg-white p-4 sm:p-5 rounded-xl border border-zinc-200 border-t-2 ${c.border} shadow-[0_4px_12px_rgba(141,170,145,0.12)] flex flex-col gap-3`}>
+            {Icon && (
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${c.iconBg} ${c.iconText}`}>
+                    <Icon size={18} />
+                </div>
+            )}
+            <div>
+                <p className="text-[10px] sm:text-xs text-[#72796e] uppercase tracking-wider font-semibold">
+                    {title}
+                </p>
+                <h3 className="mt-1 text-xl sm:text-2xl font-bold text-[#191c1c]">
+                    {value}
+                    <span className="ml-1 text-xs sm:text-sm font-semibold text-[#72796e]">{unit}</span>
+                </h3>
+            </div>
         </div>
     );
 }
@@ -585,7 +600,9 @@ function ProviderStatusBadge({ status }) {
                     : "cancelled";
 
     return (
-        <span className={`rounded-full px-3 py-1 text-xs font-bold ${STATUS_STYLES[apiKey] || "bg-zinc-100"}`}>
+        <span
+            className={`inline-flex shrink-0 whitespace-nowrap items-center rounded-full px-3 py-1 text-xs font-bold ${STATUS_STYLES[apiKey] || "bg-zinc-100"}`}
+        >
             {status}
         </span>
     );
@@ -593,9 +610,6 @@ function ProviderStatusBadge({ status }) {
 
 function ProviderRequestActions({ request, onAccept, onReject, onUpdateStatus, onViewDetails }) {
     const isDropOff = request.raw?.requestType === "drop_off";
-    const paymentStatus = request.raw?.serviceFeePaymentStatus || "none";
-    const paymentConfirmed = paymentStatus === "confirmed";
-    const paymentPending = paymentStatus === "submitted";
 
     const detailsBtn = (
         <button
@@ -633,23 +647,12 @@ function ProviderRequestActions({ request, onAccept, onReject, onUpdateStatus, o
     }
 
     if (request.status === "Accepted") {
-        if (isDropOff || paymentPending) {
+        if (isDropOff) {
             return (
                 <div className="flex flex-wrap justify-start md:justify-end gap-2">
                     {detailsBtn}
                     <span className="inline-flex items-center text-xs font-semibold text-amber-700">
-                        {isDropOff ? "Complete in details" : "Review payment in details"}
-                    </span>
-                </div>
-            );
-        }
-
-        if (!paymentConfirmed) {
-            return (
-                <div className="flex flex-wrap justify-start md:justify-end gap-2">
-                    {detailsBtn}
-                    <span className="inline-flex items-center text-xs text-[#72796e]">
-                        Awaiting customer payment
+                        Complete in details
                     </span>
                 </div>
             );
@@ -674,14 +677,9 @@ function ProviderRequestActions({ request, onAccept, onReject, onUpdateStatus, o
         return (
             <div className="flex flex-wrap justify-start md:justify-end gap-2">
                 {detailsBtn}
-                <button
-                    type="button"
-                    onClick={() => onUpdateStatus(request.id, "Completed")}
-                    className="inline-flex items-center gap-1 rounded-xl bg-[#154212] px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-900"
-                >
-                    <CheckCircle size={14} />
-                    Mark Completed
-                </button>
+                <span className="inline-flex items-center text-xs font-semibold text-amber-700">
+                    Complete in details
+                </span>
             </div>
         );
     }
@@ -706,25 +704,20 @@ function ProviderPickupDetailDrawer({
     onAccept,
     onReject,
     onUpdateStatus,
-    onConfirmPayment,
-    onRejectPayment,
     onCompleteDropOff,
+    onCompleteHomePickup,
 }) {
-    const [rejectNote, setRejectNote] = useState("");
     const [actualWeight, setActualWeight] = useState(
         String(request.estimatedWeightKg || "")
     );
+    const [cashPaid, setCashPaid] = useState("");
     const [completingDropOff, setCompletingDropOff] = useState(false);
+    const [completingHomePickup, setCompletingHomePickup] = useState(false);
 
     const statusKey = request.status;
     const statusLabel = STATUS_LABELS[statusKey] || statusKey;
     const isHomePickup = request.requestType !== "drop_off";
     const isDropOff = !isHomePickup;
-    const serviceFee = Number(request.serviceFee || 0);
-    const isZeroFee = serviceFee <= 0;
-    const paymentStatus = request.serviceFeePaymentStatus || "none";
-    const paymentConfirmed = paymentStatus === "confirmed";
-    const paymentPending = paymentStatus === "submitted";
     const estimatedPoints = estimateDropOffPoints(actualWeight || request.estimatedWeightKg);
 
     const showMap = isHomePickup && ["accepted", "in_transit"].includes(statusKey);
@@ -746,6 +739,19 @@ function ProviderPickupDetailDrawer({
         }
     };
 
+    const handleCompleteHomePickup = async () => {
+        const weight = Number(actualWeight);
+        const totalAmount = Number(cashPaid);
+        if (!weight || weight < 0.1) return;
+        if (!Number.isFinite(totalAmount) || totalAmount < 0) return;
+        setCompletingHomePickup(true);
+        try {
+            await onCompleteHomePickup(request.id, { actualWeight: weight, totalAmount });
+        } finally {
+            setCompletingHomePickup(false);
+        }
+    };
+
     return (
         <PickupDetailDrawerShell onClose={onClose}>
             <div className="md:hidden flex justify-center pt-2.5 pb-1 shrink-0">
@@ -759,9 +765,14 @@ function ProviderPickupDetailDrawer({
             </div>
 
             <div className="scroll-y-clean min-h-0 flex-1 overflow-x-hidden p-5 space-y-5">
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[statusKey] || "bg-zinc-100"}`}>
-                        {statusLabel}
-                    </span>
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold text-lg text-[#191c1c] truncate min-w-0">
+                            {customerName}
+                        </p>
+                        <span className={`inline-flex shrink-0 whitespace-nowrap items-center text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[statusKey] || "bg-zinc-100"}`}>
+                            {statusLabel}
+                        </span>
+                    </div>
 
                     {isSharingLocation && statusKey === "in_transit" && (
                         <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800 flex items-center gap-2">
@@ -771,7 +782,6 @@ function ProviderPickupDetailDrawer({
                     )}
 
                     <div className="space-y-1 text-sm">
-                        <p className="font-semibold text-lg">{customerName}</p>
                         <p className="text-[#72796e]">{formatPickupSchedule(request)}</p>
                         <p>
                             {materialsSummary(request.materials)} · {formatWeightKg(request.estimatedWeightKg)} kg
@@ -784,6 +794,11 @@ function ProviderPickupDetailDrawer({
                             <p className="text-[#72796e]">Phone: {request.contactPhone}</p>
                         )}
                     </div>
+
+                    <PickupMaterialPhotosGallery
+                        photos={request.materialPhotos}
+                        title="Customer material photos"
+                    />
 
                     {showMap && (
                         <div className="rounded-xl border border-zinc-200 bg-[#f9f9f8] p-3 space-y-2">
@@ -831,66 +846,6 @@ function ProviderPickupDetailDrawer({
                         </div>
                     )}
 
-                    {isHomePickup && paymentPending && statusKey === "accepted" && (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-                            <p className="text-sm font-semibold text-amber-900">
-                                {isZeroFee ? "Customer ready confirmation" : "Service fee payment"}
-                            </p>
-                            {!isZeroFee && (
-                                <>
-                                    <p className="text-sm">
-                                        Amount: <strong>₱{serviceFee}</strong>
-                                    </p>
-                                    <p className="text-sm">
-                                        Reference: <strong>{request.paymentReference}</strong>
-                                    </p>
-                                    {request.paymentProofUrl && (
-                                        <img
-                                            src={request.paymentProofUrl}
-                                            alt="Payment proof"
-                                            className="max-w-full max-h-48 rounded-lg border"
-                                        />
-                                    )}
-                                </>
-                            )}
-                            {isZeroFee && (
-                                <p className="text-sm text-amber-900">
-                                    Customer confirmed they are ready for this free pickup.
-                                </p>
-                            )}
-                            <textarea
-                                rows={2}
-                                value={rejectNote}
-                                onChange={(e) => setRejectNote(e.target.value)}
-                                placeholder="Optional note if rejecting"
-                                className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
-                            />
-                            <div className="flex gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        onConfirmPayment(request.id);
-                                        onRefresh();
-                                    }}
-                                    className="flex-1 py-2.5 rounded-xl bg-[#154212] text-white text-sm font-semibold"
-                                >
-                                    {isZeroFee ? "Confirm ready" : "Confirm payment"}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        onRejectPayment(request.id, rejectNote);
-                                        setRejectNote("");
-                                        onRefresh();
-                                    }}
-                                    className="flex-1 py-2.5 rounded-xl bg-red-100 text-red-700 text-sm font-semibold"
-                                >
-                                    Reject
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
                     {isDropOff && statusKey === "accepted" && (
                         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
                             <p className="text-sm font-semibold text-emerald-900">Complete drop-off</p>
@@ -922,6 +877,45 @@ function ProviderPickupDetailDrawer({
                         </div>
                     )}
 
+                    {isHomePickup && statusKey === "in_transit" && (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
+                            <p className="text-sm font-semibold text-emerald-900">Complete pickup</p>
+                            <p className="text-xs text-[#72796e]">
+                                Weigh the materials on-site and record how much cash you paid the customer.
+                            </p>
+                            <div className="space-y-1">
+                                <label className="block text-xs font-semibold text-[#42493e]">
+                                    Actual weight (kg)
+                                </label>
+                                <NumberInput
+                                    value={actualWeight}
+                                    onChange={setActualWeight}
+                                    min={0.1}
+                                    step={0.1}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="block text-xs font-semibold text-[#42493e]">
+                                    Cash paid to customer (₱)
+                                </label>
+                                <NumberInput
+                                    value={cashPaid}
+                                    onChange={setCashPaid}
+                                    min={0}
+                                    step={1}
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                disabled={completingHomePickup}
+                                onClick={handleCompleteHomePickup}
+                                className="w-full py-2.5 rounded-xl bg-[#154212] text-white text-sm font-semibold disabled:opacity-50"
+                            >
+                                {completingHomePickup ? "Completing…" : "Complete pickup"}
+                            </button>
+                        </div>
+                    )}
+
                     <div className="flex flex-wrap gap-2 pt-2">
                         {statusKey === "pending" && (
                             <>
@@ -944,7 +938,7 @@ function ProviderPickupDetailDrawer({
                                 </button>
                             </>
                         )}
-                        {statusKey === "accepted" && isHomePickup && paymentConfirmed && (
+                        {statusKey === "accepted" && isHomePickup && (
                             <button
                                 type="button"
                                 onClick={() => {
@@ -954,23 +948,6 @@ function ProviderPickupDetailDrawer({
                                 className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold"
                             >
                                 Mark In Transit
-                            </button>
-                        )}
-                        {statusKey === "accepted" && isHomePickup && !paymentConfirmed && !paymentPending && (
-                            <p className="w-full text-xs text-center text-[#72796e] py-2">
-                                Waiting for customer to submit payment proof.
-                            </p>
-                        )}
-                        {statusKey === "in_transit" && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onUpdateStatus(request.id, "Completed");
-                                    onClose();
-                                }}
-                                className="w-full py-2.5 rounded-xl bg-[#154212] text-white text-sm font-semibold"
-                            >
-                                Mark Completed
                             </button>
                         )}
                     </div>

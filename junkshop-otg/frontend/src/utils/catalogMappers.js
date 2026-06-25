@@ -1,3 +1,5 @@
+import { getShopStatusLabel } from './operatingHours';
+
 export function shopDirectionsUrl(shop) {
   const lat = Number(shop?.lat);
   const lng = Number(shop?.lng);
@@ -11,28 +13,21 @@ export function shopDirectionsUrl(shop) {
 }
 
 export function normalizeJunkshop(shop) {
-  const statusRaw = String(shop.status || '').toLowerCase();
   const accountStatus = shop.accountStatus || null;
-  const isSuspended = accountStatus === 'suspended';
+  const availabilityStatus =
+    shop.status === 'open' || shop.status === 'closed' ? shop.status : 'open';
 
-  return {
+  const normalized = {
     id: shop.slug || shop._id,
     _id: shop._id,
     name: shop.name,
     address: shop.address,
-    phone: isSuspended ? '' : shop.phone || '',
+    phone: accountStatus === 'suspended' ? '' : shop.phone || '',
     hours: shop.hours || '',
+    operatingHours: shop.operatingHours || [],
     distance: shop.distance || '—',
-    status:
-      isSuspended
-        ? 'Suspended'
-        : statusRaw === 'open'
-        ? 'Open'
-        : statusRaw === 'closed'
-          ? 'Closed'
-          : shop.status || 'Open',
     accountStatus,
-    moderationLabel: shop.moderationLabel || (isSuspended ? 'Suspended' : ''),
+    moderationLabel: shop.moderationLabel || (accountStatus === 'suspended' ? 'Suspended' : ''),
     rating: shop.rating ?? 0,
     reviewCount: shop.reviewCount ?? 0,
     materials: shop.materials || [],
@@ -45,7 +40,12 @@ export function normalizeJunkshop(shop) {
     latestReview: shop.latestReview || null,
     badges: shop.badges || [],
     shopPhotoUrl: shop.shopPhotoUrl || '',
+    availabilityStatus,
   };
+
+  normalized.status = getShopStatusLabel(normalized);
+
+  return normalized;
 }
 
 export function normalizeMaterial(item) {
@@ -89,8 +89,11 @@ export function shopStatusBadgeClass(status) {
   if (status === 'Suspended') {
     return 'bg-amber-100 text-amber-900';
   }
-  if (status === 'Open') {
+  if (status === 'Open' || status === 'Open now') {
     return 'bg-emerald-100 text-emerald-800';
+  }
+  if (status === 'Closed now') {
+    return 'bg-zinc-100 text-zinc-600';
   }
   return 'bg-red-100 text-red-700';
 }
@@ -118,6 +121,7 @@ export function normalizeProviderJunkshop(shop) {
     address: shop.address,
     phone: shop.phone || '',
     hours: shop.hours || '',
+    operatingHours: shop.operatingHours || [],
     status: shop.status || 'open',
     lat: shop.location?.lat,
     lng: shop.location?.lng,

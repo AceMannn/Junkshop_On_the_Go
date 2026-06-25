@@ -1,13 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { Camera, Store, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Store } from "lucide-react";
 import { authApiExtended, domainApi, authApi } from "../../services/api";
 import { useProviderJunkshop } from "../../hooks/useProviderData";
 import NumberInput from "../ui/NumberInput";
 import LocationPickerMap from "../maps/LocationPickerMap";
 import ShopRating from "../ui/ShopRating";
 import PartnerReviews from "../ui/PartnerReviews";
-
-const PH_GCASH_PATTERN = /^09\d{9}$/;
 
 function Field({ label, value, onChange, type = "text", required, min, max, step, maxLength, inputMode, placeholder, error }) {
     const inputClassName = `w-full bg-[#f9f9f8] border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#154212] ${
@@ -45,94 +43,8 @@ function Field({ label, value, onChange, type = "text", required, min, max, step
     );
 }
 
-function GcashQrUpload({ preview, onPreviewChange, onClear }) {
-    const inputRef = useRef(null);
-
-    const handleFile = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        if (!file.type.startsWith("image/")) {
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = () => onPreviewChange(reader.result);
-        reader.readAsDataURL(file);
-        e.target.value = "";
-    };
-
-    const openPicker = () => inputRef.current?.click();
-
-    return (
-        <div className="space-y-2">
-            <label className="block text-sm font-semibold text-[#42493e]">
-                GCash QR image (optional)
-            </label>
-            <p className="text-xs text-[#72796e]">
-                Upload your GCash QR code. Saved with your pickup payment info.
-            </p>
-
-            <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFile}
-            />
-
-            {preview ? (
-                <div className="relative w-full max-w-[220px]">
-                    <div className="aspect-square w-full rounded-xl border border-[#c2c9bb] bg-white overflow-hidden flex items-center justify-center p-2">
-                        <img
-                            src={preview}
-                            alt="GCash QR preview"
-                            className="max-w-full max-h-full w-auto h-auto object-contain"
-                        />
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClear}
-                        className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white shadow-md hover:bg-red-700"
-                        aria-label="Remove QR image"
-                    >
-                        <X size={14} />
-                    </button>
-                </div>
-            ) : (
-                <button
-                    type="button"
-                    onClick={openPicker}
-                    className="flex flex-col items-center justify-center gap-2 w-full max-w-[220px] aspect-square rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/40 cursor-pointer hover:bg-emerald-50/70 transition-colors"
-                >
-                    <Camera className="w-8 h-8 text-emerald-700" />
-                    <span className="text-xs font-semibold text-[#154212] text-center px-3">
-                        Tap to upload QR image
-                    </span>
-                </button>
-            )}
-
-            {preview && (
-                <button
-                    type="button"
-                    onClick={openPicker}
-                    className="text-xs font-semibold text-emerald-700 hover:underline"
-                >
-                    Replace image
-                </button>
-            )}
-        </div>
-    );
-}
-
 export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
     const { shop, refresh } = useProviderJunkshop();
-    const [pickupProfile, setPickupProfile] = useState({
-        pickupServiceFee: user?.pickupServiceFee ?? 0,
-        gcashNumber: user?.gcashNumber || "",
-        gcashQrUrl: user?.gcashQrUrl || "",
-        pickupEnabled: user?.pickupEnabled !== false,
-    });
     const [shopForm, setShopForm] = useState({
         name: user?.junkshopName || "",
         phone: user?.phone || "",
@@ -141,10 +53,7 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
         lat: "14.5995",
         lng: "121.0055",
     });
-    const [savingPickup, setSavingPickup] = useState(false);
     const [savingShop, setSavingShop] = useState(false);
-    const [pickupErrors, setPickupErrors] = useState({});
-    const [gcashQrPreview, setGcashQrPreview] = useState(null);
 
     useEffect(() => {
         if (shop) {
@@ -158,75 +67,6 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
             });
         }
     }, [shop]);
-
-    useEffect(() => {
-        setPickupProfile({
-            pickupServiceFee: user?.pickupServiceFee ?? 0,
-            gcashNumber: user?.gcashNumber || "",
-            gcashQrUrl: user?.gcashQrUrl || "",
-            pickupEnabled: user?.pickupEnabled !== false,
-        });
-        if (user?.gcashQrUrl) {
-            setGcashQrPreview(user.gcashQrUrl);
-        }
-    }, [user]);
-
-    const handleServiceFeeChange = (raw) => {
-        if (raw === "" || raw === "-") {
-            setPickupProfile({ ...pickupProfile, pickupServiceFee: 0 });
-            return;
-        }
-
-        const parsed = Number(raw);
-        if (Number.isNaN(parsed)) return;
-
-        setPickupProfile({
-            ...pickupProfile,
-            pickupServiceFee: Math.max(0, parsed),
-        });
-        setPickupErrors((prev) => ({ ...prev, pickupServiceFee: "" }));
-    };
-
-    const handleGcashNumberChange = (raw) => {
-        const digits = raw.replace(/\D/g, "").slice(0, 11);
-        setPickupProfile({ ...pickupProfile, gcashNumber: digits });
-        setPickupErrors((prev) => ({ ...prev, gcashNumber: "" }));
-    };
-
-    const validatePickupForm = () => {
-        const errors = {};
-        const number = pickupProfile.gcashNumber.trim();
-        if (number && !PH_GCASH_PATTERN.test(number)) {
-            errors.gcashNumber = "Invalid mobile number format. Use 09XXXXXXXXX (11 digits).";
-        }
-        setPickupErrors(errors);
-        return Object.keys(errors).length === 0;
-    };
-
-    const handleSavePickup = async (e) => {
-        e.preventDefault();
-
-        if (!validatePickupForm()) {
-            onNotify?.("Please fix the errors before saving.");
-            return;
-        }
-
-        setSavingPickup(true);
-        try {
-            const { user: updated } = await authApiExtended.updateProviderProfile({
-                pickupServiceFee: 0,
-                gcashNumber: pickupProfile.gcashNumber,
-                gcashQrUrl: pickupProfile.gcashQrUrl,
-                pickupEnabled: pickupProfile.pickupEnabled,
-            });
-            onUserUpdate?.(updated);
-            onNotify?.("GCash details saved.");
-        } catch (err) {
-            onNotify?.(err.message);
-        } finally {
-            setSavingPickup(false);
-        }
-    };
 
     const handleSaveShop = async (e) => {
         e.preventDefault();
@@ -278,42 +118,6 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                     Shop details appear on the customer dashboard map and shop list.
                 </p>
             </div>
-
-            <section className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 sm:p-6">
-                <h2 className="text-lg font-bold text-[#154212] mb-1">GCash (for paying customers)</h2>
-                <p className="text-sm text-[#72796e] mb-4">
-                    Saved for when you pay customers for their recyclables. Pickups are free for customers — no service fee.
-                </p>
-                <form onSubmit={handleSavePickup} className="space-y-4 max-w-lg">
-                    <Field
-                        label="GCash mobile number"
-                        value={pickupProfile.gcashNumber}
-                        onChange={handleGcashNumberChange}
-                        inputMode="numeric"
-                        maxLength={11}
-                        placeholder="09XXXXXXXXX"
-                        error={pickupErrors.gcashNumber}
-                    />
-                    <GcashQrUpload
-                        preview={gcashQrPreview}
-                        onPreviewChange={(dataUrl) => {
-                            setGcashQrPreview(dataUrl);
-                            setPickupProfile((prev) => ({ ...prev, gcashQrUrl: dataUrl }));
-                        }}
-                        onClear={() => {
-                            setGcashQrPreview(null);
-                            setPickupProfile((prev) => ({ ...prev, gcashQrUrl: "" }));
-                        }}
-                    />
-                    <button
-                        type="submit"
-                        disabled={savingPickup}
-                        className="rounded-xl bg-[#154212] px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 disabled:opacity-60"
-                    >
-                        {savingPickup ? "Saving..." : "Save GCash details"}
-                    </button>
-                </form>
-            </section>
 
             <section className="rounded-xl border border-zinc-200 bg-white p-5 sm:p-6 shadow-sm">
                 <div className="flex items-center gap-3 mb-5">

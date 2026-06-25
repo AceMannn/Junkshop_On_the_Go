@@ -54,7 +54,9 @@ export function useCatalogJunkshops({ autoRefresh = true, partnersOnly = false }
         setError(null);
       } catch (err) {
         setError(err.message);
-        setShops([]);
+        if (!silent) {
+          setShops([]);
+        }
       } finally {
         if (!silent) setLoading(false);
       }
@@ -91,7 +93,9 @@ export function useCatalogMaterials({ autoRefresh = true } = {}) {
       setError(null);
     } catch (err) {
       setError(err.message);
-      setMaterials([]);
+      if (!silent) {
+        setMaterials([]);
+      }
     } finally {
       if (!silent) setLoading(false);
     }

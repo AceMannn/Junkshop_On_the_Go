@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
 import { authApi } from "../services/api";
 import ProviderPickupRequests from "./provider-dashboard/ProviderPickupRequests";
@@ -19,8 +20,12 @@ import {
     DeactivateAccountModal,
 } from "./customer-dashboard/CustomerAccountViews";
 import { dashboardMainPaddingClass } from "./dashboard/dashboardTopbarUi";
+import { buildProviderPath, parseProviderPath } from "../utils/dashboardRoutes";
+import { getProviderNotificationTarget } from "../utils/notificationNavigation";
 
 export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
+    const navigate = useNavigate();
+    const location = useLocation();
     const [activeTab, setActiveTab] = useState("dashboard");
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
@@ -29,6 +34,22 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     const [focusRequestId, setFocusRequestId] = useState(null);
     const [accountView, setAccountView] = useState(null);
     const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+
+    useEffect(() => {
+        const path = location.pathname.replace(/\/+$/, "");
+        if (path === "/provider") {
+            navigate("/provider/dashboard", { replace: true });
+            return;
+        }
+
+        const parsed = parseProviderPath(location.pathname);
+        setActiveTab(parsed.tab);
+        setAccountView(parsed.accountView);
+
+        if (location.state?.focusRequestId) {
+            setFocusRequestId(location.state.focusRequestId);
+        }
+    }, [location.pathname, location.state, navigate]);
 
     const refreshUser = useCallback(async () => {
         try {
@@ -40,14 +61,11 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     }, [onUserUpdate]);
 
     const handleNavigate = (tabId) => {
-        setAccountView(null);
-        setActiveTab(tabId);
-        setShowProfileMenu(false);
+        navigate(buildProviderPath({ tab: tabId }));
     };
 
     const openAccountView = (view) => {
-        setAccountView(view);
-        setShowProfileMenu(false);
+        navigate(buildProviderPath({ accountView: view }));
     };
 
     const handleDeactivateConfirm = () => {
@@ -56,11 +74,18 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
         onLogout();
     };
 
-    const handleNotificationNavigate = (pickupId) => {
-        setAccountView(null);
-        setShowProfileMenu(false);
-        setActiveTab("requests");
-        setFocusRequestId(pickupId);
+    const handleNotificationNavigate = (notification) => {
+        const target = getProviderNotificationTarget(notification);
+        if (!target) return;
+
+        if (target.focusRequestId) {
+            navigate(buildProviderPath({ tab: "requests" }), {
+                state: { focusRequestId: target.focusRequestId },
+            });
+            return;
+        }
+
+        navigate(buildProviderPath({ tab: target.tab }));
     };
 
     const showNotification = (message) => {
@@ -125,7 +150,7 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                     {accountView === "profile" && (
                         <ViewProfilePage
                             user={user}
-                            onBack={() => setAccountView(null)}
+                            onBack={() => navigate(buildProviderPath({ tab: activeTab }))}
                             onUserUpdate={onUserUpdate}
                             onSaveSuccess={() =>
                                 showNotification("Profile updated successfully")
@@ -137,14 +162,14 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                         <AccountSettingsPage
                             user={user}
                             variant="provider"
-                            onBack={() => setAccountView(null)}
+                            onBack={() => navigate(buildProviderPath({ tab: activeTab }))}
                             onNotify={showNotification}
                             onUserUpdate={onUserUpdate}
                         />
                     )}
 
                     {!accountView && activeTab === "dashboard" && (
-                        <ProviderOverviewTab onNavigate={handleNavigate} />
+                        <ProviderOverviewTab user={user} onNavigate={handleNavigate} />
                     )}
                     {!accountView && activeTab === "materials" && (
                         <ProviderMaterialsTab

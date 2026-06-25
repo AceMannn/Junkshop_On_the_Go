@@ -16,7 +16,7 @@ import { useCatalogJunkshops } from '../hooks/useCatalogData';
 import LoadErrorBanner from '../components/ui/LoadErrorBanner';
 import EmptyState from '../components/ui/EmptyState';
 import ShopRating from '../components/ui/ShopRating';
-import PartnerReviews from '../components/ui/PartnerReviews';
+import { siteCardClass, siteContainerClass, siteHeroGradientClass, siteInputClass, sitePageClass, siteBtnPrimaryClass } from '../components/ui/siteUi';
 
 const AVATAR_STYLES = [
   'bg-emerald-50 text-emerald-700',
@@ -41,7 +41,7 @@ const FAQ_ITEMS = [
   {
     question: 'How do I find the nearest junkshop?',
     answer:
-      "Use the Map tab on the left — or browse the full directory below. You can also tap 'Browse partner shops' in the banner above.",
+      "Use the Partners or Map tab below — or tap 'Browse partner shops' in the banner above.",
   },
   {
     question: 'What materials can I recycle?',
@@ -67,12 +67,11 @@ const CONTACT_ROWS = [
   { icon: MapPin, label: 'Location', value: 'Teresa, Sta. Mesa, Manila', href: null },
 ];
 
-const inputClass =
-  'w-full text-[13px] px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 focus:border-eco-green focus:outline-none transition-colors';
+const inputClass = siteInputClass;
 
 function ContactCard({ children, className = '', id }) {
   return (
-    <div id={id} className={`min-w-0 overflow-hidden bg-white rounded-xl border border-gray-200 p-4 sm:p-6 ${className}`}>
+    <div id={id} className={`${siteCardClass} p-4 sm:p-6 ${className}`}>
       {children}
     </div>
   );
@@ -80,7 +79,7 @@ function ContactCard({ children, className = '', id }) {
 
 function SectionLabel({ children }) {
   return (
-    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-4">{children}</p>
+    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-4">{children}</p>
   );
 }
 
@@ -168,7 +167,8 @@ export default function ContactPage() {
 
   const handleHeroAction = (item) => {
     if (item.id === 'browse') {
-      scrollToSection('partner-directory');
+      scrollToSection('partner-preview');
+      setActiveTab('partners');
       return;
     }
     openSupportForm(item.subject);
@@ -200,29 +200,30 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 pb-16">
-      {/* Section 1 — Hero */}
-      <section className="px-4 pt-28 pb-6 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl rounded-xl bg-eco-green px-6 py-10 text-center sm:px-10">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/70">
-            JunkShop On-The-Go
-          </p>
-          <h1 className="mt-3 text-[26px] font-medium text-white sm:text-3xl">Let&apos;s connect</h1>
-          <p className="mx-auto mt-3 max-w-xl text-sm text-white/70 sm:text-base">
-            Browse verified partners, share feedback, or reach our team.
-          </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-            {HERO_PILLS.map((pill) => (
-              <button
-                key={pill.id}
-                type="button"
-                onClick={() => handleHeroAction(pill)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs sm:text-[13px] text-white transition-colors hover:bg-white/25 sm:px-4"
-              >
-                <pill.icon size={15} />
-                {pill.label}
-              </button>
-            ))}
+    <div className={`${sitePageClass} pb-16`}>
+      <section className={`${siteHeroGradientClass} px-4 pt-28 pb-8 sm:px-6 lg:px-8`}>
+        <div className={`${siteContainerClass} max-w-5xl`}>
+          <div className="rounded-2xl border border-emerald-200/60 bg-white/90 backdrop-blur-sm px-6 py-10 text-center sm:px-10 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-700">
+              JunkShop On-The-Go
+            </p>
+            <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-[#191c1c]">Let&apos;s connect</h1>
+            <p className="mx-auto mt-3 max-w-xl text-sm sm:text-base text-[#72796e]">
+              Browse verified partners, share feedback, or reach our team.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              {HERO_PILLS.map((pill) => (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => handleHeroAction(pill)}
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs sm:text-sm font-semibold text-[#154212] transition-colors hover:bg-emerald-100 sm:px-4"
+                >
+                  <pill.icon size={15} />
+                  {pill.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -281,7 +282,7 @@ export default function ContactPage() {
 
             {isSubmitted ? (
               <div className="py-8 text-center">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-eco-green">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#154212]">
                   <Send className="text-white" size={26} />
                 </div>
                 <h3 className="mb-2 text-eco-green">Message sent!</h3>
@@ -367,7 +368,7 @@ export default function ContactPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-eco-green py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#358F52] disabled:opacity-60"
+                  className={`${siteBtnPrimaryClass} w-full disabled:opacity-60`}
                 >
                   <Send size={16} />
                   {isSubmitting ? 'Sending…' : 'Send to platform support'}
@@ -378,7 +379,7 @@ export default function ContactPage() {
         </div>
 
         {/* Section 3 — Tabs + FAQ */}
-        <div ref={tabsRef} className="grid gap-4 scroll-mt-24 md:grid-cols-2">
+        <div id="partner-preview" ref={tabsRef} className="grid gap-4 scroll-mt-24 md:grid-cols-2">
           <ContactCard>
             <div className="mb-4 flex border-b border-gray-200">
               {['partners', 'map'].map((tab) => (
@@ -421,13 +422,6 @@ export default function ContactPage() {
                     <PartnerPreviewRow key={shop.id} shop={shop} index={index} />
                   ))
                 )}
-                <button
-                  type="button"
-                  onClick={() => scrollToSection('partner-directory')}
-                  className="mt-3 w-full rounded-lg border border-gray-200 py-1.5 text-xs text-gray-600 transition-colors hover:border-gray-300 hover:text-charcoal"
-                >
-                  View full directory →
-                </button>
               </div>
             ) : (
               <div className="space-y-3">
@@ -482,65 +476,6 @@ export default function ContactPage() {
             </div>
           </ContactCard>
         </div>
-
-        {/* Full partner directory */}
-        <section id="partner-directory" className="scroll-mt-24 pt-2">
-          <ContactCard>
-            <div className="mb-6">
-              <h2 className="mb-1 text-lg font-semibold text-charcoal">Verified partner directory</h2>
-              <p className="text-sm text-gray-600">
-                Full listings with ratings and customer feedback from completed pickups.
-              </p>
-            </div>
-            {shopsLoading ? (
-              <p className="text-sm text-gray-500">Loading verified partners…</p>
-            ) : shops.length === 0 ? (
-              <EmptyState
-                icon={MapPin}
-                title="No verified partners yet"
-                description="Partner listings appear once providers complete setup and publish their shop."
-              />
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {shops.map((shop) => {
-                  const isOpen = shop.status === 'Open';
-                  return (
-                    <div
-                      key={shop.id}
-                      className="rounded-xl border border-gray-200 bg-gray-50 p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h4 className="font-semibold text-charcoal">{shop.name}</h4>
-                          <p className="mt-1 text-xs text-gray-600">{shop.address}</p>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
-                          Verified
-                        </span>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <ShopRating shop={shop} />
-                        <span
-                          className={`text-[10px] rounded-full px-2 py-0.5 font-bold uppercase ${
-                            isOpen
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {shop.status}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-gray-700">
-                        {shop.phone || 'No contact number yet'}
-                      </p>
-                      <PartnerReviews shop={shop} />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </ContactCard>
-        </section>
       </div>
     </div>
   );

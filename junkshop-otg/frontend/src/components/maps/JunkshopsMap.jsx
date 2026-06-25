@@ -150,20 +150,8 @@ export default function JunkshopsMap({
         });
     }, []);
 
-    // Init only after shop pins exist — container is not mounted while shops are still loading.
+    // Always init map — empty state is no pins, not a blank placeholder.
     useLayoutEffect(() => {
-        if (!hasMappableShops) {
-            if (mapRef.current) {
-                mapRef.current.remove();
-                mapRef.current = null;
-                markersRef.current = [];
-                originMarkerRef.current = null;
-                routeLayerRef.current = null;
-                setMapReady(false);
-            }
-            return;
-        }
-
         const container = containerRef.current;
         if (!container || mapRef.current) return;
 
@@ -196,7 +184,7 @@ export default function JunkshopsMap({
             routeLayerRef.current = null;
             setMapReady(false);
         };
-    }, [hasMappableShops, refreshMapSize]);
+    }, [refreshMapSize]);
 
     useEffect(() => {
         const map = mapRef.current;
@@ -209,9 +197,17 @@ export default function JunkshopsMap({
         const observer = new ResizeObserver(refreshMapSize);
         observer.observe(container);
 
+        const onVisibility = () => {
+            if (!document.hidden) {
+                refreshMapSize();
+            }
+        };
+        document.addEventListener("visibilitychange", onVisibility);
+
         return () => {
             window.clearTimeout(timeout);
             observer.disconnect();
+            document.removeEventListener("visibilitychange", onVisibility);
         };
     }, [mapReady, refreshMapSize]);
 
@@ -223,7 +219,7 @@ export default function JunkshopsMap({
         markersRef.current = [];
 
         mappableShops.forEach((shop) => {
-            const isOpen = String(shop.status).toLowerCase() === "open";
+            const isOpen = shop.status === "Open" || shop.status === "Open now";
             const selected = shop.id === selectedId;
             const marker = L.marker([Number(shop.lat), Number(shop.lng)], {
                 icon: shopPinIcon(isOpen, selected),
@@ -377,14 +373,6 @@ export default function JunkshopsMap({
         setGpsStatus("idle");
     };
 
-    if (!hasMappableShops) {
-        return (
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 min-h-[200px] flex items-center justify-center text-sm text-[#72796e] p-6 text-center">
-                No shop locations to show. Partner shops appear here after providers complete setup.
-            </div>
-        );
-    }
-
     const selectedShop = mappableShops.find((s) => s.id === routeTargetId);
 
     const shellClassName = fillContainer
@@ -466,7 +454,13 @@ export default function JunkshopsMap({
                 />
             </div>
 
-            {routingEnabled && (
+            {!hasMappableShops && (
+                <p className="text-xs text-[#72796e] text-center px-2">
+                    No shop pins yet — partner locations appear here after providers complete setup.
+                </p>
+            )}
+
+            {routingEnabled && hasMappableShops && (
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div className="text-xs text-[#72796e] space-y-0.5">
                         {routeLoading && <p>Calculating route…</p>}

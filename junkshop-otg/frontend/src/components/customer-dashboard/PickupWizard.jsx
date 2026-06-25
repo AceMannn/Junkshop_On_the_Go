@@ -1,13 +1,48 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, X, Minus, Plus, Camera } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Minus,
+  Plus,
+  Package,
+  Store,
+  Camera,
+  Calendar,
+  User,
+  ClipboardCheck,
+  Truck,
+  MapPin,
+} from 'lucide-react';
 import { pickupApi } from '../../services/api';
 import { useCatalogMaterials } from '../../hooks/useCatalogData';
 import EmptyState from '../ui/EmptyState';
+import MaterialPhotoUploader from '../ui/MaterialPhotoUploader';
 import { TIME_SLOTS, materialsSummary } from '../../utils/pickupHelpers';
 import { getUserFullName } from '../../utils/userDisplay';
 
-const PICKUP_STEPS = ['Type', 'Shop', 'Materials', 'Schedule', 'Contact', 'Review'];
-const DROP_OFF_STEPS = ['Type', 'Shop', 'Materials', 'Schedule', 'Review'];
+const PICKUP_STEPS = ['Type', 'Shop', 'Materials', 'Photos', 'Schedule', 'Contact', 'Review'];
+const DROP_OFF_STEPS = ['Type', 'Shop', 'Materials', 'Photos', 'Schedule', 'Review'];
+
+const STEP_ICONS = {
+  Type: Truck,
+  Shop: Store,
+  Materials: Package,
+  Photos: Camera,
+  Schedule: Calendar,
+  Contact: User,
+  Review: ClipboardCheck,
+};
+
+const STEP_HINTS = {
+  Type: 'Choose how you will hand over your recyclables.',
+  Shop: 'Pick a partner junkshop or let us find the nearest one.',
+  Materials: 'Select what you are selling and how much.',
+  Photos: 'Show the shop what you are bringing — crop or replace anytime.',
+  Schedule: 'Pick a date and time that works for you.',
+  Contact: 'Where should the shop pick up your items?',
+  Review: 'Double-check everything before you submit.',
+};
 
 function buildScheduleDates() {
   const rows = [];
@@ -27,14 +62,37 @@ function buildScheduleDates() {
   return rows;
 }
 
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+function StepHeader({ steps, step }) {
+  const label = steps[step];
+  const Icon = STEP_ICONS[label] || Package;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
+          <Icon size={16} />
+        </span>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+            Step {step + 1} of {steps.length}
+          </p>
+          <h3 className="font-bold text-[#191c1c]">{label}</h3>
+        </div>
+      </div>
+      <p className="text-sm text-[#72796e] pl-10">{STEP_HINTS[label]}</p>
+    </div>
+  );
 }
+
+function FieldLabel({ children }) {
+  return (
+    <span className="text-xs font-semibold uppercase tracking-wide text-[#72796e]">
+      {children}
+    </span>
+  );
+}
+
+const inputClass =
+  'w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600';
 
 export default function PickupWizard({ user, shops, onClose, onSuccess, prefill = null }) {
   const { materials: catalogMaterials } = useCatalogMaterials({ autoRefresh: false });
@@ -73,6 +131,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
 
   const isDropOff = requestType === 'drop_off';
   const steps = isDropOff ? DROP_OFF_STEPS : PICKUP_STEPS;
+  const currentLabel = steps[step];
 
   const openShops = shops.filter((shop) => {
     const status = String(shop.status).toLowerCase();
@@ -117,53 +176,37 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
     );
   };
 
-  const handlePhotoUpload = async (event) => {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) return;
-    const next = [...photos];
-    for (const file of files) {
-      if (next.length >= 3) break;
-      if (!file.type.startsWith('image/')) continue;
-      const data = await readFileAsDataUrl(file);
-      next.push({
-        fileName: file.name,
-        mimeType: file.type,
-        data,
-      });
-    }
-    setPhotos(next.slice(0, 3));
-    event.target.value = '';
-  };
-
   const validateStep = () => {
     setError('');
-    if (step === 0) return true;
-    if (step === 1) {
+    if (currentLabel === 'Shop') {
       if (assignmentMode === 'specific' && !junkshopId) {
         setError('Select a junkshop or choose nearest available.');
         return false;
       }
       return true;
     }
-    if (step === 2) {
+    if (currentLabel === 'Materials') {
       if (selectedMaterials.length === 0) {
         setError('Select at least one material.');
         return false;
       }
+      return true;
+    }
+    if (currentLabel === 'Photos') {
       if (photos.length < 1) {
         setError('Upload at least one photo of your materials.');
         return false;
       }
       return true;
     }
-    if (step === 3) {
+    if (currentLabel === 'Schedule') {
       if (!scheduledDate) {
         setError('Choose a date.');
         return false;
       }
       return true;
     }
-    if (!isDropOff && step === 4) {
+    if (currentLabel === 'Contact') {
       const phone = contactPhone.replace(/\D/g, '').slice(0, 11);
       if (!contactName.trim() || !address.trim()) {
         setError('Name and pickup address are required.');
@@ -227,38 +270,59 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
       : openShops.find((shop) => String(shop._id || shop.id) === String(junkshopId))?.name;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-lg max-h-[92vh] rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="font-bold text-[#191c1c]">Book pickup</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-full hover:bg-zinc-100"
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-xl max-h-[92vh] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="shrink-0 bg-gradient-to-r from-[#154212] to-emerald-800 px-5 py-4 text-white">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-lg">Book pickup</h2>
+              <p className="text-xs text-emerald-100/90 mt-0.5">
+                {isDropOff ? 'Drop-off at shop' : 'Home pickup'} · JunkShop On-The-Go
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex min-h-10 min-w-10 items-center justify-center rounded-full bg-white/15 hover:bg-white/25"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="mt-4 flex gap-1">
+            {steps.map((label, index) => (
+              <div
+                key={label}
+                title={label}
+                className={`h-1.5 flex-1 rounded-full transition-colors ${
+                  index <= step ? 'bg-white' : 'bg-white/25'
+                }`}
+              />
+            ))}
+          </div>
         </div>
 
-        <div className="px-5 py-2 flex gap-1">
-          {steps.map((label, index) => (
-            <div
-              key={label}
-              className={`h-1 flex-1 rounded-full ${index <= step ? 'bg-emerald-600' : 'bg-zinc-200'}`}
-            />
-          ))}
-        </div>
+        <div className="scroll-y-clean flex-1 px-5 py-5 space-y-5">
+          <StepHeader steps={steps} step={step} />
 
-        <div className="scroll-y-clean flex-1 px-5 py-4 space-y-4">
-          {step === 0 && (
-            <>
-              <p className="text-sm text-[#72796e]">How will you hand over recyclables?</p>
-              <div className="grid grid-cols-1 gap-3">
-                {[
-                  { id: 'home_pickup', label: 'Home pickup', desc: 'Shop comes to your address' },
-                  { id: 'drop_off', label: 'Drop-off at shop', desc: 'Bring items to the junkshop' },
-                ].map((opt) => (
+          {currentLabel === 'Type' && (
+            <div className="grid grid-cols-1 gap-3">
+              {[
+                {
+                  id: 'home_pickup',
+                  label: 'Home pickup',
+                  desc: 'The shop comes to your address on your schedule.',
+                  icon: Truck,
+                },
+                {
+                  id: 'drop_off',
+                  label: 'Drop-off at shop',
+                  desc: 'Bring items to the junkshop during your time slot.',
+                  icon: MapPin,
+                },
+              ].map((opt) => {
+                const OptIcon = opt.icon;
+                return (
                   <button
                     key={opt.id}
                     type="button"
@@ -266,35 +330,48 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                       setRequestType(opt.id);
                       setStep(0);
                     }}
-                    className={`text-left p-4 rounded-xl border-2 transition ${
+                    className={`text-left p-4 rounded-2xl border-2 transition-all ${
                       requestType === opt.id
-                        ? 'border-emerald-600 bg-emerald-50'
-                        : 'border-zinc-200'
+                        ? 'border-emerald-600 bg-emerald-50 shadow-sm ring-1 ring-emerald-600/20'
+                        : 'border-zinc-200 hover:border-zinc-300 bg-white'
                     }`}
                   >
-                    <p className="font-semibold">{opt.label}</p>
-                    <p className="text-xs text-[#72796e]">{opt.desc}</p>
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                          requestType === opt.id
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-zinc-100 text-zinc-600'
+                        }`}
+                      >
+                        <OptIcon size={20} />
+                      </span>
+                      <div>
+                        <p className="font-semibold text-[#191c1c]">{opt.label}</p>
+                        <p className="text-xs text-[#72796e] mt-0.5">{opt.desc}</p>
+                      </div>
+                    </div>
                   </button>
-                ))}
-              </div>
-            </>
+                );
+              })}
+            </div>
           )}
 
-          {step === 1 && (
-            <>
-              <div className="grid grid-cols-2 gap-2">
+          {currentLabel === 'Shop' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-zinc-100">
                 {[
                   { id: 'specific', label: 'Choose shop' },
-                  { id: 'nearest', label: 'Nearest available' },
+                  { id: 'nearest', label: 'Nearest' },
                 ].map((opt) => (
                   <button
                     key={opt.id}
                     type="button"
                     onClick={() => setAssignmentMode(opt.id)}
-                    className={`py-2.5 rounded-xl text-sm font-semibold border ${
+                    className={`py-2.5 rounded-lg text-sm font-semibold transition ${
                       assignmentMode === opt.id
-                        ? 'bg-[#154212] text-white border-[#154212]'
-                        : 'border-zinc-200'
+                        ? 'bg-white text-[#154212] shadow-sm'
+                        : 'text-[#72796e]'
                     }`}
                   >
                     {opt.label}
@@ -302,23 +379,26 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                 ))}
               </div>
               {assignmentMode === 'specific' && (
-                <select
-                  value={junkshopId}
-                  onChange={(event) => setJunkshopId(event.target.value)}
-                  className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm"
-                >
-                  <option value="">Select junkshop</option>
-                  {openShops.map((shop) => (
-                    <option key={shop.id} value={shop._id || shop.id}>
-                      {shop.name} {shop.status === 'Closed' ? '(closed)' : ''}
-                    </option>
-                  ))}
-                </select>
+                <label className="block space-y-1.5">
+                  <FieldLabel>Junkshop</FieldLabel>
+                  <select
+                    value={junkshopId}
+                    onChange={(event) => setJunkshopId(event.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select junkshop</option>
+                    {openShops.map((shop) => (
+                      <option key={shop.id} value={shop._id || shop.id}>
+                        {shop.name} {shop.status === 'Closed' ? '(closed)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               )}
-            </>
+            </div>
           )}
 
-          {step === 2 && (
+          {currentLabel === 'Materials' && (
             <>
               {materialOptions.length === 0 ? (
                 <EmptyState
@@ -327,14 +407,16 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                   description="Choose a verified partner shop with materials."
                 />
               ) : (
-                <div className="scroll-y-clean space-y-2 max-h-52">
+                <div className="scroll-y-clean space-y-2 max-h-64">
                   {materialOptions.map((item) => {
                     const selected = selectedMaterials.find((row) => row.catalogId === item.catalogId);
                     return (
                       <div
                         key={item.catalogId}
-                        className={`rounded-xl border px-3 py-3 ${
-                          selected ? 'border-emerald-500 bg-emerald-50' : 'border-zinc-200'
+                        className={`rounded-xl border px-3 py-3 transition ${
+                          selected
+                            ? 'border-emerald-500 bg-emerald-50/80'
+                            : 'border-zinc-200 bg-white'
                         }`}
                       >
                         <button
@@ -354,7 +436,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                               <button
                                 type="button"
                                 onClick={() => updateQuantity(item.catalogId, -1)}
-                                className="flex h-11 w-11 items-center justify-center rounded-lg border border-zinc-200"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white"
                                 aria-label="Decrease quantity"
                               >
                                 <Minus size={16} />
@@ -365,7 +447,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                               <button
                                 type="button"
                                 onClick={() => updateQuantity(item.catalogId, 1)}
-                                className="flex h-11 w-11 items-center justify-center rounded-lg border border-zinc-200"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white"
                                 aria-label="Increase quantity"
                               >
                                 <Plus size={16} />
@@ -381,39 +463,21 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                   })}
                 </div>
               )}
-
-              <div className="rounded-xl border border-dashed border-zinc-300 p-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[#42493e]">
-                  <Camera size={16} />
-                  Material photos (required, up to 3)
-                </div>
-                <input type="file" accept="image/*" multiple onChange={handlePhotoUpload} />
-                {photos.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2">
-                    {photos.map((photo, index) => (
-                      <img
-                        key={`${photo.fileName}-${index}`}
-                        src={photo.data}
-                        alt={photo.fileName}
-                        className="h-20 w-full object-cover rounded-lg border"
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
             </>
           )}
 
-          {step === 3 && (
-            <>
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[#72796e]">
-                  Date
-                </span>
+          {currentLabel === 'Photos' && (
+            <MaterialPhotoUploader photos={photos} onChange={setPhotos} maxPhotos={3} />
+          )}
+
+          {currentLabel === 'Schedule' && (
+            <div className="space-y-4">
+              <label className="block space-y-1.5">
+                <FieldLabel>Date</FieldLabel>
                 <select
                   value={scheduledDate}
                   onChange={(event) => setScheduledDate(event.target.value)}
-                  className="w-full border rounded-xl px-4 py-3 text-sm"
+                  className={inputClass}
                 >
                   {scheduleDates.map((row) => (
                     <option key={row.value} value={row.value}>
@@ -422,14 +486,12 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                   ))}
                 </select>
               </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[#72796e]">
-                  Time slot
-                </span>
+              <label className="block space-y-1.5">
+                <FieldLabel>Time slot</FieldLabel>
                 <select
                   value={timeSlot}
                   onChange={(event) => setTimeSlot(event.target.value)}
-                  className="w-full border rounded-xl px-4 py-3 text-sm"
+                  className={inputClass}
                 >
                   {TIME_SLOTS.map((row) => (
                     <option key={row.id} value={row.id}>
@@ -438,19 +500,19 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                   ))}
                 </select>
               </label>
-            </>
+            </div>
           )}
 
-          {!isDropOff && step === 4 && (
-            <>
+          {currentLabel === 'Contact' && (
+            <div className="space-y-3">
               <input
-                className="w-full border rounded-xl px-4 py-3 text-sm"
+                className={inputClass}
                 placeholder="Full name *"
                 value={contactName}
                 onChange={(event) => setContactName(event.target.value)}
               />
               <input
-                className="w-full border rounded-xl px-4 py-3 text-sm"
+                className={inputClass}
                 placeholder="Phone (09XXXXXXXXX) *"
                 inputMode="numeric"
                 maxLength={11}
@@ -460,74 +522,101 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                 }
               />
               <input
-                className="w-full border rounded-xl px-4 py-3 text-sm"
+                className={inputClass}
                 placeholder="Email (optional)"
                 value={contactEmail}
                 onChange={(event) => setContactEmail(event.target.value)}
               />
               <textarea
                 rows={3}
-                className="w-full border rounded-xl px-4 py-3 text-sm resize-none"
+                className={`${inputClass} resize-none`}
                 placeholder="Pickup address *"
                 value={address}
                 onChange={(event) => setAddress(event.target.value)}
               />
               <textarea
                 rows={2}
-                className="w-full border rounded-xl px-4 py-3 text-sm resize-none"
-                placeholder="Notes"
+                className={`${inputClass} resize-none`}
+                placeholder="Notes for the shop (optional)"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
               />
-            </>
+            </div>
           )}
 
-          {step === steps.length - 1 && (
-            <div className="text-sm space-y-2 bg-zinc-50 rounded-xl p-4">
-              <p>
-                <strong>Type:</strong> {isDropOff ? 'Drop-off' : 'Home pickup'}
-              </p>
-              <p>
-                <strong>Shop:</strong> {reviewShopName}
-              </p>
-              <p>
-                <strong>Materials:</strong> {materialsSummary(selectedMaterials)}
-              </p>
-              <p>
-                <strong>Photos:</strong> {photos.length} uploaded
-              </p>
-              <p>
-                <strong>When:</strong> {scheduledDate} · {selectedTimeLabel}
-              </p>
-              {!isDropOff && (
-                <>
-                  <p>
-                    <strong>Address:</strong> {address}
-                  </p>
-                  <p>
-                    <strong>Phone:</strong> {contactPhone}
-                  </p>
-                </>
-              )}
-              {notes && (
+          {currentLabel === 'Review' && (
+            <div className="space-y-4">
+              <div className="text-sm space-y-2.5 bg-zinc-50 rounded-2xl p-4 border border-zinc-100">
                 <p>
-                  <strong>Notes:</strong> {notes}
+                  <span className="text-[#72796e]">Type · </span>
+                  <strong>{isDropOff ? 'Drop-off' : 'Home pickup'}</strong>
                 </p>
+                <p>
+                  <span className="text-[#72796e]">Shop · </span>
+                  <strong>{reviewShopName}</strong>
+                </p>
+                <p>
+                  <span className="text-[#72796e]">Materials · </span>
+                  <strong>{materialsSummary(selectedMaterials)}</strong>
+                </p>
+                <p>
+                  <span className="text-[#72796e]">When · </span>
+                  <strong>
+                    {scheduledDate} · {selectedTimeLabel}
+                  </strong>
+                </p>
+                {!isDropOff && (
+                  <>
+                    <p>
+                      <span className="text-[#72796e]">Address · </span>
+                      <strong>{address}</strong>
+                    </p>
+                    <p>
+                      <span className="text-[#72796e]">Phone · </span>
+                      <strong>{contactPhone}</strong>
+                    </p>
+                  </>
+                )}
+                {notes && (
+                  <p>
+                    <span className="text-[#72796e]">Notes · </span>
+                    <strong>{notes}</strong>
+                  </p>
+                )}
+              </div>
+              {photos.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#72796e]">
+                    Photos ({photos.length})
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {photos.map((photo, index) => (
+                      <img
+                        key={`review-${index}`}
+                        src={photo.data}
+                        alt={photo.fileName}
+                        className="aspect-[4/3] w-full object-cover rounded-lg border border-zinc-200"
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+            <p className="text-sm text-red-700 bg-red-50 border border-red-100 px-3 py-2.5 rounded-xl">
+              {error}
+            </p>
           )}
         </div>
 
-        <div className="flex gap-2 px-5 py-4 border-t">
+        <div className="shrink-0 flex gap-2 px-5 py-4 border-t bg-[#f9f9f8]">
           {step > 0 && (
             <button
               type="button"
               onClick={() => setStep((value) => value - 1)}
-              className="flex-1 py-3 rounded-xl border font-semibold text-sm"
+              className="flex-1 py-3 rounded-xl border border-zinc-200 bg-white font-semibold text-sm text-[#42493e] hover:bg-zinc-50"
             >
               <ChevronLeft size={16} className="inline mr-1" />
               Back
@@ -537,7 +626,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
             <button
               type="button"
               onClick={handleNext}
-              className="flex-1 py-3 rounded-xl bg-[#154212] text-white font-semibold text-sm"
+              className="flex-1 py-3 rounded-xl bg-[#154212] text-white font-semibold text-sm hover:bg-emerald-900 shadow-sm"
             >
               Next
               <ChevronRight size={16} className="inline ml-1" />
@@ -547,7 +636,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
               type="button"
               disabled={submitting}
               onClick={handleSubmit}
-              className="flex-1 py-3 rounded-xl bg-[#154212] text-white font-semibold text-sm disabled:opacity-50"
+              className="flex-1 py-3 rounded-xl bg-[#154212] text-white font-semibold text-sm hover:bg-emerald-900 disabled:opacity-50 shadow-sm"
             >
               {submitting ? 'Submitting…' : 'Submit request'}
             </button>

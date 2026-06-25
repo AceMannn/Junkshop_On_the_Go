@@ -156,6 +156,24 @@ exports.listPickupRequests = async (req, res) => {
       return res.status(403).json({ message: 'Not allowed.' });
     }
 
+    await PickupRequest.updateMany(
+      {
+        requestType: { $ne: 'drop_off' },
+        status: { $in: ['accepted', 'in_transit'] },
+        $or: [
+          { serviceFee: { $gt: 0 } },
+          { serviceFeePaymentStatus: { $ne: 'confirmed' } },
+        ],
+      },
+      {
+        $set: {
+          serviceFee: 0,
+          serviceFeePaid: true,
+          serviceFeePaymentStatus: 'confirmed',
+        },
+      }
+    );
+
     const requests = await PickupRequest.find(query)
       .populate('customer', POPULATE_FIELDS)
       .populate('provider', POPULATE_FIELDS)
@@ -487,17 +505,8 @@ exports.acceptPickupRequest = async (req, res) => {
     request.provider = req.user._id;
     request.junkshop = junkshop._id;
     request.serviceFee = serviceFee;
-    request.gcashNumber = provider.gcashNumber || '';
-    request.gcashQrUrl = provider.gcashQrUrl || '';
     request.serviceFeePaid = true;
     request.serviceFeePaymentStatus = 'confirmed';
-    request.paymentReference = '';
-    request.paymentProofUrl = '';
-    request.paymentSubmittedAt = undefined;
-    request.paymentConfirmedAt = undefined;
-    request.paymentSubmitCount = 0;
-    request.paymentCooldownUntil = undefined;
-    request.paymentRejectNote = '';
 
     await request.save();
     await request.populate('customer', POPULATE_FIELDS);
@@ -595,11 +604,6 @@ exports.updatePickupStatus = async (req, res) => {
       if (request.status !== 'accepted') {
         return res.status(400).json({ message: 'Request must be accepted first.' });
       }
-      if (!isPaymentConfirmed(request)) {
-        return res.status(400).json({
-          message: 'Confirm the customer payment before marking in transit.',
-        });
-      }
     }
 
     if (status === 'completed') {
@@ -631,22 +635,32 @@ exports.updatePickupStatus = async (req, res) => {
           $inc: { recyclingPoints: request.pointsAwarded },
         });
       } else {
+        const actualWeight = Number(req.body.actualWeight);
+        if (!actualWeight || actualWeight < 0.1) {
+          return res.status(400).json({ message: 'Enter actual weight (min 0.1 kg).' });
+        }
+        const totalAmount = Number(req.body.totalAmount);
+        if (!Number.isFinite(totalAmount) || totalAmount < 0) {
+          return res.status(400).json({ message: 'Enter cash paid to the customer.' });
+        }
+
+        request.actualWeightKg = actualWeight;
+
         const existingTx = await Transaction.findOne({ pickupRequest: request._id });
         if (!existingTx && request.customer && request.provider) {
           const materialLabel =
             request.materials?.map((m) => m.name).join(', ') || 'Mixed recyclables';
-          const weight = Number(req.body.actualWeight ?? request.estimatedWeightKg) || 0;
-          const pricePerUnit = Number(req.body.pricePerUnit ?? 15);
-          const totalAmount = Number(
-            req.body.totalAmount ?? Math.round(weight * pricePerUnit * 100) / 100
-          );
+          const pricePerUnit =
+            actualWeight > 0
+              ? Math.round((totalAmount / actualWeight) * 100) / 100
+              : 0;
 
           await Transaction.create({
             customer: request.customer,
             provider: request.provider,
             pickupRequest: request._id,
             material: materialLabel,
-            weight,
+            weight: actualWeight,
             pricePerUnit,
             totalAmount,
             status: 'completed',

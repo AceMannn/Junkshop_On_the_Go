@@ -64,6 +64,64 @@ export function formatOperatingHoursSummary(schedule) {
     .join(', ');
 }
 
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+/**
+ * Given a shop object (with .status and .operatingHours), returns:
+ *   'open'   — manual toggle is open AND schedule says open right now
+ *   'closed' — manual toggle is closed (override)
+ *   'closed_now' — toggle is open but schedule says closed right now
+ *   'unknown' — no schedule available
+ */
+export function getShopLiveStatus(shop) {
+  if (!shop) return 'unknown';
+
+  const manualClosed = String(shop.status || '').toLowerCase() === 'closed';
+  if (manualClosed) return 'closed';
+
+  const schedule = sanitizeOperatingHours(shop.operatingHours);
+  const openRows = schedule.filter((row) => !row.closed && row.open && row.close);
+  if (openRows.length === 0) return 'open';
+
+  const now = new Date();
+  const dayKey = DAY_KEYS[now.getDay()];
+  const todayRow = schedule.find((r) => r.day === dayKey);
+
+  if (!todayRow || todayRow.closed || !todayRow.open || !todayRow.close) {
+    return 'closed_now';
+  }
+
+  const [openH, openM] = todayRow.open.split(':').map(Number);
+  const [closeH, closeM] = todayRow.close.split(':').map(Number);
+  if (!Number.isFinite(openH) || !Number.isFinite(openM) || !Number.isFinite(closeH) || !Number.isFinite(closeM)) {
+    return 'open';
+  }
+
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const openMins = openH * 60 + openM;
+  const closeMins = closeH * 60 + closeM;
+
+  return nowMins >= openMins && nowMins < closeMins ? 'open' : 'closed_now';
+}
+
+export function getShopStatusLabel(shop) {
+  if (!shop) return 'Open';
+  if (shop.accountStatus === 'suspended') return 'Suspended';
+
+  const toggle =
+    shop.availabilityStatus ??
+    (shop.status === 'open' || shop.status === 'closed' ? shop.status : 'open');
+
+  const live = getShopLiveStatus({
+    status: toggle,
+    operatingHours: shop.operatingHours,
+  });
+
+  if (live === 'closed') return 'Closed';
+  if (live === 'closed_now') return 'Closed now';
+  return 'Open';
+}
+
 export function copyWeekdayHours(schedule, fromDay = 'mon') {
   const source = schedule.find((row) => row.day === fromDay);
   if (!source) return schedule;

@@ -148,3 +148,42 @@
   border-radius: 9999px;
   min-width: 32px;
 }
+
+/* Hide scrollbar arrows on a specific scroll container (Windows Chromium classic scrollbars) */
+.no-scrollbar-arrows {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.no-scrollbar-arrows::-webkit-scrollbar {
+  width: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.no-scrollbar-arrows::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.no-scrollbar-arrows::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 10px;
+}
+
+.no-scrollbar-arrows::-webkit-scrollbar-button,
+.no-scrollbar-arrows::-webkit-scrollbar-button:single-button,
+.no-scrollbar-arrows::-webkit-scrollbar-button:double-button,
+.no-scrollbar-arrows::-webkit-scrollbar-button:vertical,
+.no-scrollbar-arrows::-webkit-scrollbar-button:horizontal,
+.no-scrollbar-arrows::-webkit-scrollbar-button:vertical:start:decrement,
+.no-scrollbar-arrows::-webkit-scrollbar-button:vertical:end:increment,
+.no-scrollbar-arrows::-webkit-scrollbar-button:horizontal:start:decrement,
+.no-scrollbar-arrows::-webkit-scrollbar-button:horizontal:end:increment,
+.no-scrollbar-arrows::-webkit-scrollbar-button:decrement,
+.no-scrollbar-arrows::-webkit-scrollbar-button:increment {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}

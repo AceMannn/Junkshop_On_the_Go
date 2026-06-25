@@ -57,8 +57,6 @@ async function evaluateProviderProfile(user) {
     Number.isFinite(Number(shop.location?.lat)) &&
     Number.isFinite(Number(shop.location?.lng));
 
-  const gcashNumber = normalizePhone(user.gcashNumber);
-
   return buildChecklist([
     {
       id: 'junkshopName',
@@ -84,11 +82,6 @@ async function evaluateProviderProfile(user) {
       id: 'material',
       label: 'At least one available material',
       done: materialCount > 0,
-    },
-    {
-      id: 'gcashNumber',
-      label: 'GCash mobile number',
-      done: hasValidPhone(gcashNumber),
     },
   ]);
 }

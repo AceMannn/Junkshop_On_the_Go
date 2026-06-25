@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search, Download, Plus } from "lucide-react";
+import { Search, Download, Plus, ReceiptText, DollarSign } from "lucide-react";
 import { domainApi } from "../../services/api";
 import LoadErrorBanner from "../ui/LoadErrorBanner";
 import { normalizeTransaction } from "../../utils/catalogMappers";
@@ -115,7 +115,7 @@ export default function ProviderTransactionsTab({ onNotify }) {
                     <button
                         type="button"
                         onClick={() => setShowForm((v) => !v)}
-                        className="inline-flex items-center gap-2 border border-[#154212] text-[#154212] px-4 py-2 rounded-lg text-sm font-semibold"
+                        className="inline-flex items-center gap-2 bg-[#154212] text-white px-4 py-2 rounded-lg text-sm font-semibold"
                     >
                         <Plus size={16} />
                         Record sale
@@ -124,7 +124,7 @@ export default function ProviderTransactionsTab({ onNotify }) {
                         type="button"
                         onClick={handleExport}
                         disabled={filtered.length === 0}
-                        className="inline-flex items-center gap-2 bg-[#154212] text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+                        className="inline-flex items-center gap-2 border border-[#154212] text-[#154212] px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
                     >
                         <Download size={16} />
                         Export CSV
@@ -195,17 +195,27 @@ export default function ProviderTransactionsTab({ onNotify }) {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white p-4 rounded-xl border shadow-sm">
-                    <p className="text-xs text-[#72796e]">Showing</p>
-                    <h3 className="text-xl font-bold text-emerald-700">
-                        {filtered.length} / {rows.length}
-                    </h3>
+                <div className="bg-white p-4 rounded-xl border border-zinc-200 border-t-2 border-t-blue-400 shadow-sm flex flex-col gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
+                        <ReceiptText size={18} className="text-blue-700" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] uppercase tracking-wider font-semibold text-[#72796e]">Showing</p>
+                        <h3 className="text-xl font-bold text-[#191c1c] mt-1">
+                            {filtered.length} <span className="text-sm font-semibold text-[#72796e]">/ {rows.length}</span>
+                        </h3>
+                    </div>
                 </div>
-                <div className="bg-white p-4 rounded-xl border shadow-sm">
-                    <p className="text-xs text-[#72796e]">Filtered total</p>
-                    <h3 className="text-xl font-bold text-emerald-700">
-                        ₱{totalEarnings.toFixed(2)}
-                    </h3>
+                <div className="bg-white p-4 rounded-xl border border-zinc-200 border-t-2 border-t-emerald-400 shadow-sm flex flex-col gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+                        <DollarSign size={18} className="text-emerald-700" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] uppercase tracking-wider font-semibold text-[#72796e]">Filtered total</p>
+                        <h3 className="text-xl font-bold text-emerald-700 mt-1">
+                            ₱{totalEarnings.toFixed(2)}
+                        </h3>
+                    </div>
                 </div>
             </div>
 

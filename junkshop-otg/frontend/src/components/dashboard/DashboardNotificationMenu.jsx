@@ -7,6 +7,7 @@ import {
     notificationBadgeBaseClass,
     notificationBadgePositionClass,
 } from "./dashboardTopbarUi";
+import { getPickupRequestId } from "../../utils/notificationNavigation";
 
 const VISIBLE_LIMIT = 5;
 
@@ -14,14 +15,7 @@ function getNotificationId(notification) {
     return notification._id || notification.id;
 }
 
-function getPickupRequestId(notification) {
-    const ref = notification.pickupRequest;
-    if (!ref) return null;
-    if (typeof ref === "string") return ref;
-    return ref._id || ref.id || null;
-}
-
-export default function DashboardNotificationMenu({ onNavigate }) {
+export default function DashboardNotificationMenu({ onNavigate, isNavigable }) {
     const notifRef = useRef(null);
     const [showNotifs, setShowNotifs] = useState(false);
     const [notifications, setNotifications] = useState([]);
@@ -127,7 +121,9 @@ export default function DashboardNotificationMenu({ onNavigate }) {
                             visibleNotifications.map((notification) => {
                                 const id = getNotificationId(notification);
                                 const pickupId = getPickupRequestId(notification);
-                                const isClickable = Boolean(pickupId);
+                                const isClickable = isNavigable
+                                    ? isNavigable(notification)
+                                    : Boolean(pickupId);
 
                                 return (
                                     <button
@@ -139,7 +135,7 @@ export default function DashboardNotificationMenu({ onNavigate }) {
                                             notification.read
                                                 ? "text-[#72796e] hover:bg-zinc-50"
                                                 : "bg-emerald-50 font-semibold text-[#191c1c] hover:bg-emerald-100/80"
-                                        } ${isClickable ? "cursor-pointer" : "cursor-default opacity-80"}`}
+                                        } ${isClickable ? "cursor-pointer hover:ring-1 hover:ring-emerald-200/80" : "cursor-default opacity-80"}`}
                                     >
                                         <p className="font-semibold text-xs">{notification.title}</p>
                                         <p className="text-xs mt-0.5 line-clamp-2 font-normal">

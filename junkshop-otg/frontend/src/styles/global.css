@@ -33,10 +33,12 @@
   }
 
   body {
-    background-color: white;
-    color: var(--color-charcoal);
+    background-color: #f9f9f8;
+    color: #191c1c;
     font-family: var(--font-family-base);
     overflow-x: clip;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1 {
@@ -163,6 +165,18 @@
     border-color: rgba(0, 0, 0, 0.06);
   }
 
+  .site-muted {
+    color: #72796e;
+  }
+
+  .site-page-bg {
+    background-color: #f9f9f8;
+  }
+
+  .site-brand-text {
+    color: #154212;
+  }
+
   .from-eco-green {
     --tw-gradient-from: var(--color-eco-green);
     --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(255, 255, 255, 0));
@@ -193,4 +207,67 @@
     -moz-appearance: textfield;
     appearance: textfield;
   }
+}
+
+/*
+ * Dashboard panel scroll — unlayered, last in file so it wins over Tailwind.
+ * Windows Chromium can ignore scrollbar-button rules; pair with arrow covers in JSX.
+ */
+.dashboard-panel-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+  --scrollbar-size: 17px;
+}
+
+.dashboard-panel-scroll::-webkit-scrollbar {
+  width: var(--scrollbar-size) !important;
+  height: var(--scrollbar-size) !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: transparent !important;
+}
+
+.dashboard-panel-scroll::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.dashboard-panel-scroll::-webkit-scrollbar-thumb {
+  background: #d4d4d8 !important;
+  border-radius: 9999px !important;
+  min-height: 32px;
+  border: 4px solid transparent;
+  background-clip: padding-box;
+}
+
+.dashboard-panel-scroll::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+
+.dashboard-panel-scroll::-webkit-scrollbar-button,
+.dashboard-panel-scroll::-webkit-scrollbar-button:single-button,
+.dashboard-panel-scroll::-webkit-scrollbar-button:double-button,
+.dashboard-panel-scroll::-webkit-scrollbar-button:vertical,
+.dashboard-panel-scroll::-webkit-scrollbar-button:horizontal,
+.dashboard-panel-scroll::-webkit-scrollbar-button:vertical:start:decrement,
+.dashboard-panel-scroll::-webkit-scrollbar-button:vertical:end:increment,
+.dashboard-panel-scroll::-webkit-scrollbar-button:horizontal:start:decrement,
+.dashboard-panel-scroll::-webkit-scrollbar-button:horizontal:end:increment,
+.dashboard-panel-scroll::-webkit-scrollbar-button:decrement,
+.dashboard-panel-scroll::-webkit-scrollbar-button:increment {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  max-width: 0 !important;
+  max-height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }

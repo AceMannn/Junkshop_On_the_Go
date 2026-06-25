@@ -1,4 +1,13 @@
 import { useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useOutlet,
+} from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
@@ -18,16 +27,117 @@ import {
   setStoredUser,
 } from './utils/authStorage';
 import { setAuthHandlers } from './utils/authEvents';
+import { defaultDashboardPath } from './utils/dashboardRoutes';
 
-const PUBLIC_SECTIONS = ['home', 'about', 'contact'];
+const LEGACY_HASH_SECTIONS = {
+  home: '/',
+  about: '/about',
+  contact: '/contact',
+};
 
-function getSectionFromHash() {
-  const hash = window.location.hash.slice(1);
-  return PUBLIC_SECTIONS.includes(hash) ? hash : 'home';
+function LegacyHashRedirect() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (LEGACY_HASH_SECTIONS[hash]) {
+      navigate(LEGACY_HASH_SECTIONS[hash], { replace: true });
+      window.history.replaceState(null, '', LEGACY_HASH_SECTIONS[hash]);
+    }
+  }, [navigate]);
+
+  return null;
 }
 
-export default function App() {
-  const [activeSection, setActiveSection] = useState(getSectionFromHash);
+function PublicShell({
+  user,
+  onLogout,
+  isAuthenticated,
+  onShowLogin,
+  onShowSignUp,
+}) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const outlet = useOutlet();
+
+  const activeSection =
+    location.pathname === '/about'
+      ? 'about'
+      : location.pathname === '/contact'
+        ? 'contact'
+        : 'home';
+
+  const handleNavigate = (section) => {
+    if (section === 'home') navigate('/');
+    else if (section === 'about') navigate('/about');
+    else if (section === 'contact') navigate('/contact');
+    else navigate('/');
+  };
+
+  useLayoutEffect(() => {
+    if (user) return;
+    window.scrollTo(0, 0);
+  }, [location.pathname, user]);
+
+  return (
+    <div className="min-h-screen site-page-bg">
+      <Header
+        activeSection={activeSection}
+        onNavigate={handleNavigate}
+        onLogout={onLogout}
+        isAuthenticated={isAuthenticated}
+        onShowLogin={onShowLogin}
+        onShowSignUp={onShowSignUp}
+      />
+      <main>{outlet}</main>
+      <Footer onNavigate={handleNavigate} />
+    </div>
+  );
+}
+
+function CustomerRoute({ user, children }) {
+  const location = useLocation();
+
+  if (!user) {
+    return (
+      <Navigate
+        to="/"
+        replace
+        state={{ showLogin: true, from: location.pathname }}
+      />
+    );
+  }
+
+  if (user.role === 'provider') {
+    return <Navigate to="/provider/dashboard" replace />;
+  }
+
+  return children;
+}
+
+function ProviderRoute({ user, children }) {
+  const location = useLocation();
+
+  if (!user) {
+    return (
+      <Navigate
+        to="/"
+        replace
+        state={{ showLogin: true, from: location.pathname }}
+      />
+    );
+  }
+
+  if (user.role !== 'provider') {
+    return <Navigate to="/customer/overview" replace />;
+  }
+
+  return children;
+}
+
+function AppRoutes() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(() => getStoredUser());
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
@@ -40,14 +150,6 @@ export default function App() {
   const [pickupWizardPrefill, setPickupWizardPrefill] = useState(null);
   const [pickupWizardSignal, setPickupWizardSignal] = useState(0);
 
-
-  const handleNavigate = (section) => {
-    const nextSection = PUBLIC_SECTIONS.includes(section) ? section : 'home';
-
-    setActiveSection(nextSection);
-    window.history.pushState(null, '', `#${nextSection}`);
-  };
-
   const persistSession = ({ token, user: sessionUser }) => {
     saveSession({ token, user: sessionUser });
     setUser(sessionUser);
@@ -57,6 +159,21 @@ export default function App() {
 
   const adminPortalUrl =
     import.meta.env.VITE_ADMIN_PORTAL_URL || 'http://localhost:5175';
+
+  const redirectAfterAuth = useCallback(
+    (sessionUser) => {
+      const from = location.state?.from;
+      const fallback = defaultDashboardPath(sessionUser?.role);
+      const target =
+        typeof from === 'string' &&
+        ((sessionUser?.role === 'provider' && from.startsWith('/provider')) ||
+          (sessionUser?.role !== 'provider' && from.startsWith('/customer')))
+          ? from
+          : fallback;
+      navigate(target, { replace: true });
+    },
+    [location.state?.from, navigate]
+  );
 
   const handleAuthSuccess = (session) => {
     if (session?.user?.role === 'admin') {
@@ -75,6 +192,7 @@ export default function App() {
     if (session?.user?.requiresPhoneSetup) {
       setNeedsPhoneSetup(true);
     }
+    redirectAfterAuth(session.user);
   };
 
   const handleSignUpComplete = (result) => {
@@ -111,30 +229,38 @@ export default function App() {
   const handleLogout = () => {
     clearSession();
     setUser(null);
-    setActiveSection('home');
+    navigate('/');
   };
 
-  const handleSessionExpired = useCallback((message) => {
-    setUser(null);
-    setActiveSection('home');
-    setLoginPrefill({
-      email: '',
-      role: 'customer',
-      message: message || 'Session expired. Please log in again.',
-    });
-    setShowLoginModal(true);
-  }, []);
+  const handleSessionExpired = useCallback(
+    (message) => {
+      setUser(null);
+      setLoginPrefill({
+        email: '',
+        role: 'customer',
+        message: message || 'Session expired. Please log in again.',
+      });
+      setShowLoginModal(true);
+      navigate('/', { replace: true });
+    },
+    [navigate]
+  );
 
-  const handleAccountSuspended = useCallback((message) => {
-    setUser(null);
-    setActiveSection('home');
-    setLoginPrefill({
-      email: '',
-      role: 'customer',
-      message: message || 'Your account is not active. Please contact support if you need help.',
-    });
-    setShowLoginModal(true);
-  }, []);
+  const handleAccountSuspended = useCallback(
+    (message) => {
+      setUser(null);
+      setLoginPrefill({
+        email: '',
+        role: 'customer',
+        message:
+          message ||
+          'Your account is not active. Please contact support if you need help.',
+      });
+      setShowLoginModal(true);
+      navigate('/', { replace: true });
+    },
+    [navigate]
+  );
 
   useLayoutEffect(() => {
     setAuthHandlers({
@@ -151,27 +277,24 @@ export default function App() {
     }
   }, []);
 
-  useLayoutEffect(() => {
-    if (user) return;
-    window.scrollTo(0, 0);
-  }, [activeSection, user]);
-
-  // Handle browser back/forward buttons
   useEffect(() => {
-    const handlePopState = () => {
-      setActiveSection(getSectionFromHash());
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+    if (location.state?.showLogin) {
+      setShowLoginModal(true);
+      if (location.state?.message) {
+        setLoginPrefill((prev) => ({
+          ...prev,
+          message: location.state.message,
+        }));
+      }
+    }
+  }, [location.state?.showLogin, location.state?.message]);
 
   useEffect(() => {
     const token = getToken();
-
     if (!token) return;
 
-    authApi.me()
+    authApi
+      .me()
       .then(({ user: currentUser }) => {
         if (currentUser?.role === 'admin') {
           clearSession();
@@ -194,10 +317,6 @@ export default function App() {
       });
   }, []);
 
-  const isAuthenticated = Boolean(user);
-  const isProviderMode = user?.role === 'provider';
-
-  // Disable body scroll when login modal is open
   useEffect(() => {
     if (showLoginModal || showSignUpModal) {
       document.body.style.overflow = 'hidden';
@@ -209,89 +328,112 @@ export default function App() {
     };
   }, [showLoginModal, showSignUpModal]);
 
-  let mainContent;
+  useEffect(() => {
+    if (!user) return;
+    if (['/', '/about', '/contact'].includes(location.pathname)) {
+      navigate(defaultDashboardPath(user.role), { replace: true });
+    }
+  }, [user, location.pathname, navigate]);
 
-  if (isAuthenticated && isProviderMode) {
-    mainContent = (
-      <ProviderDashboard
-        onLogout={handleLogout}
-        user={user}
-        onUserUpdate={(updatedUser) => {
-          setUser(updatedUser);
-          setStoredUser(updatedUser);
-        }}
-      />
-    );
-  } else if (isAuthenticated && !isProviderMode) {
-    mainContent = (
-      <>
-        <CustomerDashboard
-          onLogout={handleLogout}
-          user={user}
-          onUserUpdate={(updatedUser) => {
-            setUser(updatedUser);
-            setStoredUser(updatedUser);
-            if (!updatedUser?.requiresPhoneSetup) {
-              setNeedsPhoneSetup(false);
-            }
-          }}
-          onBookMaterial={(material) => {
-            setPickupWizardPrefill(material);
-            setPickupWizardSignal((value) => value + 1);
-          }}
-          onOpenAllPrices={() => {}}
-          pickupWizardPrefill={pickupWizardPrefill}
-          pickupWizardSignal={pickupWizardSignal}
-        />
-        {needsPhoneSetup && (
-          <PhoneSetupModal
-            user={user}
-            onComplete={(updatedUser) => {
-              setUser(updatedUser);
-              setStoredUser(updatedUser);
-              setNeedsPhoneSetup(false);
-            }}
-          />
-        )}
-      </>
-    );
-  } else {
-    mainContent = (
-      <div className="min-h-screen bg-white">
-        <Header
-          activeSection={activeSection}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-          isAuthenticated={isAuthenticated}
-          onShowLogin={() => {
-            setLoginPrefill({ email: '', role: 'customer', message: '' });
-            setShowLoginModal(true);
-          }}
-          onShowSignUp={() => setShowSignUpModal(true)}
-        />
-        <main>
-          {activeSection === 'home' && (
-            <HomePage
-              onSignInToSell={() => {
-                setLoginPrefill({ email: '', role: 'customer', message: '' });
-                setShowLoginModal(true);
-              }}
-            />
-          )}
-          {activeSection === 'about' && <AboutPage onNavigate={handleNavigate} />}
-          {activeSection === 'contact' && <ContactPage />}
-          {activeSection !== 'home' && activeSection !== 'about' && activeSection !== 'contact' && (
-            <HomePage />
-          )}
-        </main>
-        <Footer onNavigate={handleNavigate} />
-      </div>
-    );
-  }
+  const isAuthenticated = Boolean(user);
+  const openLogin = () => {
+    setLoginPrefill({ email: '', role: 'customer', message: '' });
+    setShowLoginModal(true);
+  };
 
   return (
     <>
-      {mainContent}
+      <LegacyHashRedirect />
+
+      <Routes>
+        <Route
+          element={
+            <PublicShell
+              user={user}
+              onLogout={handleLogout}
+              isAuthenticated={isAuthenticated}
+              onShowLogin={openLogin}
+              onShowSignUp={() => setShowSignUpModal(true)}
+            />
+          }
+        >
+          <Route index element={<HomePage onSignInToSell={openLogin} />} />
+          <Route path="about" element={<AboutPage onNavigate={(s) => {
+            if (s === 'contact') navigate('/contact');
+            else if (s === 'home') navigate('/');
+            else navigate('/about');
+          }} />} />
+          <Route path="contact" element={<ContactPage />} />
+        </Route>
+
+        <Route
+          path="/customer/*"
+          element={
+            <CustomerRoute user={user}>
+              <>
+                <CustomerDashboard
+                  onLogout={handleLogout}
+                  user={user}
+                  onUserUpdate={(updatedUser) => {
+                    setUser(updatedUser);
+                    setStoredUser(updatedUser);
+                    if (!updatedUser?.requiresPhoneSetup) {
+                      setNeedsPhoneSetup(false);
+                    }
+                  }}
+                  onBookMaterial={(material) => {
+                    setPickupWizardPrefill(material);
+                    setPickupWizardSignal((value) => value + 1);
+                  }}
+                  onOpenAllPrices={() => {}}
+                  pickupWizardPrefill={pickupWizardPrefill}
+                  pickupWizardSignal={pickupWizardSignal}
+                />
+                {needsPhoneSetup && user && (
+                  <PhoneSetupModal
+                    user={user}
+                    onComplete={(updatedUser) => {
+                      setUser(updatedUser);
+                      setStoredUser(updatedUser);
+                      setNeedsPhoneSetup(false);
+                    }}
+                  />
+                )}
+              </>
+            </CustomerRoute>
+          }
+        />
+
+        <Route
+          path="/provider/*"
+          element={
+            <ProviderRoute user={user}>
+              <ProviderDashboard
+                onLogout={handleLogout}
+                user={user}
+                onUserUpdate={(updatedUser) => {
+                  setUser(updatedUser);
+                  setStoredUser(updatedUser);
+                }}
+              />
+            </ProviderRoute>
+          }
+        />
+
+        <Route
+          path="*"
+          element={
+            user ? (
+              <Navigate
+                to={defaultDashboardPath(user.role)}
+                replace
+              />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+      </Routes>
 
       {showLoginModal && (
         <LoginScreen
@@ -321,5 +463,13 @@ export default function App() {
         />
       )}
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
   );
 }

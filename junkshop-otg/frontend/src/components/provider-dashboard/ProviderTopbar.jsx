@@ -2,7 +2,8 @@ import { useEffect, useRef } from "react";
 import { HelpCircle, Lock, LogOut, Store, User, UserX } from "lucide-react";
 import { getUserInitials, getUserFullName } from "../../utils/userDisplay";
 import logoImage from "../../assets/junkshop-logo.png";
-import DashboardNotificationMenu, { getPickupRequestId } from "../dashboard/DashboardNotificationMenu";
+import DashboardNotificationMenu from "../dashboard/DashboardNotificationMenu";
+import { isProviderNotificationNavigable } from "../../utils/notificationNavigation";
 import {
     dashboardAvatarClass,
     dashboardIconButtonClass,
@@ -68,11 +69,9 @@ export default function ProviderTopbar({
 
                 <div className={dashboardTopbarActionsClass}>
                     <DashboardNotificationMenu
+                        isNavigable={isProviderNotificationNavigable}
                         onNavigate={(notification) => {
-                            const pickupId = getPickupRequestId(notification);
-                            if (pickupId) {
-                                onNotificationNavigate?.(pickupId);
-                            }
+                            onNotificationNavigate?.(notification);
                         }}
                     />
 

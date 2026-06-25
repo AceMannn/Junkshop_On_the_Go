@@ -222,9 +222,9 @@ export default function LoginScreen({
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className={`scroll-y-clean relative min-h-0 flex-1 p-5 sm:p-6 ${
-            error ? 'overflow-hidden' : ''
-          }`}
+          className={`relative min-h-0 flex-1 p-5 sm:p-6 ${
+            view === 'login' ? '' : 'scroll-y-clean'
+          } ${error ? 'overflow-hidden' : ''}`}
         >
           {onClose && <AuthModalClose onClick={onClose} label="Close login" />}
 

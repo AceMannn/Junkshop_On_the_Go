@@ -19,6 +19,8 @@ import { Heart } from "lucide-react";
 import JunkshopsMap from "../maps/JunkshopsMap";
 import EmptyState from "../ui/EmptyState";
 import ShopRating from "../ui/ShopRating";
+import VerifiedPartnerIcon, { isVerified } from "../ui/VerifiedPartnerIcon";
+import ShopCardPreviewDetails from "./ShopCardPreviewDetails";
 import NumberInput from "../ui/NumberInput";
 import { isFavoriteShopId } from "../../utils/favorites";
 import { priceCategories } from "../../data/prices";
@@ -84,20 +86,12 @@ function PanelStatus({ loading, error, source, onRetry }) {
         );
     }
 
-    if (source === "api") {
-        return (
-            <p className="text-xs font-medium text-emerald-700">
-                Live data from your database
-            </p>
-        );
-    }
-
     return null;
 }
 
 export function DashboardPanelShell({ title, onClose, children }) {
     return (
-        <div className="flex flex-col flex-1 min-h-0 w-full h-full bg-white">
+        <div className="fixed inset-x-0 bottom-0 top-16 z-20 flex flex-col bg-white md:left-56">
             <div className="flex items-center gap-3 px-4 sm:px-6 lg:px-8 py-4 border-b border-zinc-200 shrink-0 bg-white">
                 <button
                     type="button"
@@ -113,8 +107,19 @@ export function DashboardPanelShell({ title, onClose, children }) {
                 </h2>
             </div>
 
-            <div className="scroll-y-clean flex-1 min-h-0 overscroll-contain px-4 sm:px-6 lg:px-8 py-5 sm:py-6 pb-20 lg:pb-6">
-                {children}
+            <div className="relative flex-1 min-h-0 overflow-hidden">
+                <div className="dashboard-panel-scroll h-full px-4 sm:px-6 lg:px-8 py-5 sm:py-6 pb-20 lg:pb-6">
+                    {children}
+                </div>
+                {/* Windows Chromium may still paint arrow buttons — cover the track ends */}
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute top-0 right-0 z-10 h-4 w-[17px] bg-white"
+                />
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute bottom-0 right-0 z-10 h-4 w-[17px] bg-white"
+                />
             </div>
         </div>
     );
@@ -126,15 +131,13 @@ export function JunkshopsPanel({
     initialShopId = null,
     autoRouteShopId = null,
     onRouteDrawn,
+    onViewProfile,
 }) {
     const { shops, loading, error, source, refresh } = useCatalogJunkshops({ partnersOnly: true });
     const [query, setQuery] = useState("");
     const [locationFilter, setLocationFilter] = useState("all");
     const [expandedId, setExpandedId] = useState(initialShopId);
     const [pendingRouteId, setPendingRouteId] = useState(null);
-    const [reviewsByShopId, setReviewsByShopId] = useState({});
-    const [reviewsLoadingId, setReviewsLoadingId] = useState("");
-    const [reviewsErrorByShopId, setReviewsErrorByShopId] = useState({});
     const effectiveRouteId = autoRouteShopId || pendingRouteId;
 
     useEffect(() => {
@@ -142,31 +145,6 @@ export function JunkshopsPanel({
             setExpandedId(initialShopId);
         }
     }, [initialShopId]);
-
-    const loadShopReviews = useCallback(
-        async (shopId) => {
-            if (!shopId || reviewsByShopId[shopId]) return;
-            setReviewsLoadingId(shopId);
-            setReviewsErrorByShopId((prev) => ({ ...prev, [shopId]: "" }));
-            try {
-                const { reviews } = await domainApi.getJunkshopReviews(shopId, { limit: 5 });
-                setReviewsByShopId((prev) => ({ ...prev, [shopId]: reviews || [] }));
-            } catch (err) {
-                setReviewsErrorByShopId((prev) => ({
-                    ...prev,
-                    [shopId]: err.message || "Could not load reviews.",
-                }));
-            } finally {
-                setReviewsLoadingId("");
-            }
-        },
-        [reviewsByShopId]
-    );
-
-    useEffect(() => {
-        if (!expandedId) return;
-        loadShopReviews(expandedId);
-    }, [expandedId, loadShopReviews]);
 
     const filteredShops = useMemo(() => {
         return shops.filter((shop) => {
@@ -184,7 +162,11 @@ export function JunkshopsPanel({
                 (locationFilter === "teresa" && addressLower.includes("teresa")) ||
                 (locationFilter === "sta-mesa" && addressLower.includes("sta. mesa"));
 
-            return matchesQuery && matchesLocation;
+            // Only show shops within 5 km (shops with no distanceKm are always shown)
+            const withinRange =
+                shop.distanceKm == null || shop.distanceKm <= 5;
+
+            return matchesQuery && matchesLocation && withinRange;
         });
     }, [shops, query, locationFilter]);
 
@@ -230,11 +212,11 @@ export function JunkshopsPanel({
                 {filteredShops.length === 0 ? (
                     <EmptyState
                         compact
-                        title={shops.length === 0 ? "No partner shops yet" : "No matches"}
+                        title={shops.length === 0 ? "No partner shops yet" : "No junkshops within range"}
                         description={
                             shops.length === 0
                                 ? "Verified junkshops appear here after providers complete shop setup (address, materials, GCash, and map pin)."
-                                : "No junkshops match your search. Try a different filter."
+                                : "No junkshops found within 5 km of your location. Try a different filter."
                         }
                     />
                 ) : (
@@ -242,9 +224,6 @@ export function JunkshopsPanel({
                         {filteredShops.map((shop) => {
                             const isOpen = shop.status === "Open";
                             const isExpanded = expandedId === shop.id;
-                            const reviews = reviewsByShopId[shop.id] || [];
-                            const reviewsError = reviewsErrorByShopId[shop.id];
-                            const isLoadingReviews = reviewsLoadingId === shop.id;
 
                             return (
                                 <article
@@ -267,7 +246,14 @@ export function JunkshopsPanel({
                                 >
                                     <div className="flex justify-between items-start gap-3 mb-3">
                                         <div className="min-w-0">
-                                            <h3 className="font-bold text-[#191c1c]">{shop.name}</h3>
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <h3 className="font-bold text-[#191c1c] truncate">
+                                                    {shop.name}
+                                                </h3>
+                                                {isVerified(shop) && (
+                                                    <VerifiedPartnerIcon size="sm" />
+                                                )}
+                                            </div>
                                             <p className="text-xs text-[#72796e] flex items-start gap-1 mt-1">
                                                 <MapPin size={14} className="shrink-0 mt-0.5" />
                                                 <span>{shop.address}</span>
@@ -333,93 +319,20 @@ export function JunkshopsPanel({
                                     </div>
 
                                     {isExpanded && (
-                                        <div className="mb-4 p-3 bg-white rounded-lg border border-zinc-100 text-sm space-y-2">
-                                            {shop.isPartner && (
-                                                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-                                                    Verified partner shop
-                                                </p>
-                                            )}
-                                            {shop.topPrice && (
-                                                <p>
-                                                    <span className="font-semibold">Top price:</span>{" "}
-                                                    {shop.topPrice}
-                                                </p>
-                                            )}
-                                            {shop.hours && (
-                                                <p>
-                                                    <span className="font-semibold">Hours:</span>{" "}
-                                                    {shop.hours}
-                                                </p>
-                                            )}
-                                            <p>
-                                                <span className="font-semibold">Phone:</span>{" "}
-                                                {shop.phone || "—"}
-                                            </p>
-                                            {shop.listingPrices?.length > 0 && (
-                                                <div>
-                                                    <p className="font-semibold mb-1">Sample prices:</p>
-                                                    <ul className="space-y-0.5 text-xs text-[#42493e]">
-                                                        {shop.listingPrices.slice(0, 6).map((item) => (
-                                                            <li key={`${item.name}-${item.price}`}>
-                                                                {item.name} — ₱{item.price}/{item.unit || "kg"}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                            <div className="pt-1">
-                                                <p className="font-semibold mb-1">Customer reviews:</p>
-                                                {isLoadingReviews ? (
-                                                    <p className="text-xs text-[#72796e]">Loading reviews…</p>
-                                                ) : reviewsError ? (
-                                                    <p className="text-xs text-red-700">{reviewsError}</p>
-                                                ) : reviews.length === 0 ? (
-                                                    <p className="text-xs text-[#72796e]">No reviews yet.</p>
-                                                ) : (
-                                                    <ul className="space-y-2 text-xs">
-                                                        {reviews.map((review) => (
-                                                            <li
-                                                                key={review.id}
-                                                                className="bg-zinc-50 border border-zinc-100 rounded-md px-2.5 py-2"
-                                                            >
-                                                                <p className="font-semibold text-[#191c1c]">
-                                                                    ★ {review.score} · {review.customerName}
-                                                                </p>
-                                                                <p className="text-[#72796e]">
-                                                                    {new Date(review.createdAt).toLocaleDateString("en-PH")}
-                                                                </p>
-                                                                {review.comment ? (
-                                                                    <p className="text-[#42493e] mt-1">
-                                                                        {review.comment}
-                                                                    </p>
-                                                                ) : (
-                                                                    <p className="text-[#72796e] italic mt-1">
-                                                                        No written comment.
-                                                                    </p>
-                                                                )}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                )}
-                                            </div>
-                                        </div>
+                                        <ShopCardPreviewDetails shop={shop} />
                                     )}
 
-                                    <div className="flex flex-col sm:flex-row gap-2">
-                                        <a
-                                            href={
-                                                shop.phone
-                                                    ? `tel:${shop.phone.replace(/-/g, "")}`
-                                                    : undefined
-                                            }
-                                            className={`flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors ${shop.phone
-                                                ? "bg-[#154212] text-white hover:bg-emerald-900"
-                                                : "bg-zinc-200 text-zinc-500 pointer-events-none"
-                                                }`}
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onViewProfile?.(shop);
+                                            }}
+                                            className="flex-1 inline-flex items-center justify-center gap-2 py-2 bg-[#154212] text-white rounded-lg text-sm font-bold hover:bg-emerald-900 transition-colors"
                                         >
-                                            <Phone size={16} />
-                                            Contact
-                                        </a>
+                                            View Shop Profile
+                                        </button>
                                         <button
                                             type="button"
                                             onClick={(e) => {
@@ -427,20 +340,10 @@ export function JunkshopsPanel({
                                                 setExpandedId(shop.id);
                                                 setPendingRouteId(shop.id);
                                             }}
-                                            className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 border border-emerald-300 text-[#154212] rounded-lg text-sm font-bold hover:bg-emerald-50 transition-colors"
+                                            className="inline-flex items-center justify-center gap-1.5 py-2 px-3 border border-zinc-300 text-[#42493e] rounded-lg text-sm font-bold hover:bg-zinc-50 transition-colors"
                                         >
-                                            <Map size={16} />
+                                            <Map size={15} />
                                             Route
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setExpandedId(isExpanded ? null : shop.id);
-                                            }}
-                                            className="flex-1 py-2.5 border border-[#154212] text-[#154212] rounded-lg text-sm font-bold hover:bg-emerald-50 transition-colors"
-                                        >
-                                            {isExpanded ? "Hide Details" : "View Details"}
                                         </button>
                                     </div>
                                 </article>
@@ -453,8 +356,7 @@ export function JunkshopsPanel({
             {!loading && (
                 <div className="order-2 lg:order-1">
                     <JunkshopsMap
-                        key={`junkshops-map-${filteredShops.length}`}
-                        shops={filteredShops}
+                        shops={shops}
                         selectedId={expandedId}
                         onSelectShop={setExpandedId}
                         routingEnabled

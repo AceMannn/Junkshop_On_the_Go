@@ -10,7 +10,8 @@ import {
 import { getUserInitials, getUserFullName } from "../../utils/userDisplay";
 import { formatPoints } from "../../utils/pickupPoints";
 import logoImage from "../../assets/junkshop-logo.png";
-import DashboardNotificationMenu, { getPickupRequestId } from "../dashboard/DashboardNotificationMenu";
+import DashboardNotificationMenu from "../dashboard/DashboardNotificationMenu";
+import { isCustomerNotificationNavigable } from "../../utils/notificationNavigation";
 import {
     dashboardAvatarClass,
     dashboardIconButtonClass,
@@ -92,11 +93,9 @@ export default function CustomerTopbar({
                     )}
 
                     <DashboardNotificationMenu
+                        isNavigable={isCustomerNotificationNavigable}
                         onNavigate={(notification) => {
-                            const pickupId = getPickupRequestId(notification);
-                            if (pickupId) {
-                                onNotificationNavigate?.(pickupId);
-                            }
+                            onNotificationNavigate?.(notification);
                         }}
                     />
 

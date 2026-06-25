@@ -5,6 +5,7 @@ import { formatUpdatedDate } from '../../utils/catalogMappers';
 import ShopBadges from '../ui/ShopBadges';
 import EmptyState from '../ui/EmptyState';
 import LoadErrorBanner from '../ui/LoadErrorBanner';
+import { siteContainerClass, siteSectionPadClass } from '../ui/siteUi';
 
 const HIGHLIGHTS = [
   { id: 'plastic', label: 'Plastic' },
@@ -129,8 +130,8 @@ export default function MaterialMarketplaceSection({
   };
 
   return (
-    <section className={compact ? 'space-y-5' : 'py-16 bg-gradient-to-br from-[#f8fcf8] via-white to-[#f2faf4]'}>
-      <div className={compact ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
+    <section className={compact ? 'space-y-5' : `${siteSectionPadClass} site-page-bg`}>
+      <div className={compact ? '' : siteContainerClass}>
         <div className={compact ? 'mb-4' : 'text-center mb-10'}>
           <h2 className={compact ? 'text-lg sm:text-xl font-bold text-[#191c1c]' : 'mb-4'}>{title}</h2>
           <p className={`text-[#72796e] ${compact ? 'text-sm max-w-2xl' : 'text-xl max-w-3xl mx-auto'}`}>

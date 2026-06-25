@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { MapPin, Package, Store } from 'lucide-react';
 import garbageCollector from '../assets/garbage_collector.png';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
@@ -19,6 +19,15 @@ import {
 } from '../data/recyclingGuide';
 import { priceCategories } from '../data/prices';
 import { shopStatusBadgeClass } from '../utils/catalogMappers';
+import SiteSectionHeader from '../components/ui/SiteSectionHeader';
+import SiteButton from '../components/ui/SiteButton';
+import {
+  siteCardClass,
+  siteCardHoverClass,
+  siteContainerClass,
+  siteHeroGradientClass,
+  siteSectionPadClass,
+} from '../components/ui/siteUi';
 
 const DATE_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest first' },
@@ -76,27 +85,31 @@ export default function HomePage({ onSignInToSell }) {
   const closeModal = () => setActiveModal(null);
 
   return (
-    <div>
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#f3fbf4] via-white to-[#e8f7ec] bg-[radial-gradient(circle_at_10px_10px,rgba(61,163,93,0.08)_3px,transparent_0)] bg-[size:24px_24px]">
-        <div className="absolute top-10 right-10 w-32 h-32 bg-leaf-green/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-10 left-10 w-40 h-40 bg-eco-green/10 rounded-full blur-3xl" />
+    <div className="site-page-bg">
+      <section className={siteHeroGradientClass}>
+        <div className="absolute top-10 right-10 w-40 h-40 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-10 left-10 w-48 h-48 bg-[#154212]/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16 sm:pt-32 sm:pb-20 lg:pt-36 lg:pb-24">
+        <div className={`${siteContainerClass} pt-28 pb-16 sm:pt-32 sm:pb-20 lg:pt-36 lg:pb-24 relative z-10`}>
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h1 className="mb-6">
-                Recycle Smarter, <span className="text-eco-green">Earn More.</span>
+              <p className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#154212] mb-4">
+                Teresa, Sta. Mesa · Community recycling
+              </p>
+              <h1 className="mb-6 text-[#191c1c]">
+                Recycle Smarter, <span className="text-[#154212]">Earn More.</span>
               </h1>
-              <p className="text-xl text-gray-600">
-                Identify recyclables, know their value, and find junkshops in Teresa,
+              <p className="text-lg sm:text-xl text-[#72796e] leading-relaxed max-w-xl">
+                Identify recyclables, know their value, and find trusted junkshops in Teresa,
                 Sta. Mesa, Manila.
               </p>
             </div>
             <div className="relative">
+              <div className="absolute -inset-3 bg-gradient-to-br from-emerald-200/40 to-transparent rounded-3xl blur-2xl pointer-events-none" />
               <ImageWithFallback
                 src={garbageCollector}
                 alt="Garbage collector"
-                className="rounded-[24px] shadow-2xl w-full h-auto"
+                className="relative rounded-2xl shadow-xl ring-1 ring-zinc-200/80 w-full h-auto"
               />
             </div>
           </div>
@@ -108,9 +121,13 @@ export default function HomePage({ onSignInToSell }) {
         onViewAllPrices={() => setActiveModal('prices')}
       />
 
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SectionHeader title="Find Junkshops Near You" description="Discover trusted junkshops in Teresa, Sta. Mesa with local pricing and community ratings." />
+      <section className={`${siteSectionPadClass} bg-white`}>
+        <div className={siteContainerClass}>
+          <SiteSectionHeader
+            eyebrow="Nearby partners"
+            title="Find Junkshops Near You"
+            description="Discover trusted junkshops in Teresa, Sta. Mesa with local pricing and community ratings."
+          />
           {shopsError && (
             <LoadErrorBanner
               message={shopsError}
@@ -118,7 +135,7 @@ export default function HomePage({ onSignInToSell }) {
               className="mb-4"
             />
           )}
-          <div className="bg-[#f9faf9] rounded-[28px] shadow-lg overflow-hidden border border-gray-100 min-w-0">
+          <div className={`${siteCardClass} shadow-md overflow-hidden min-w-0`}>
             <div className="grid lg:grid-cols-2 min-w-0">
               <div className="min-w-0 p-4 sm:p-6 lg:p-8 bg-white">
                 <div className="space-y-6 sm:space-y-8">
@@ -135,7 +152,7 @@ export default function HomePage({ onSignInToSell }) {
                     previewShops.map((shop, index) => (
                       <article key={shop.id} className="flex min-w-0 gap-3 sm:gap-4 items-start">
                         <div className="flex flex-col items-center shrink-0">
-                          <div className="w-10 h-10 rounded-full bg-eco-green flex items-center justify-center shadow-md">
+                          <div className="w-10 h-10 rounded-xl bg-[#154212] flex items-center justify-center shadow-sm">
                             <MapPin className="text-white" size={18} />
                           </div>
                           {index !== previewShops.length - 1 && <div className="w-[2px] h-12 sm:h-16 bg-gray-200 mt-2 rounded-full" />}
@@ -147,7 +164,7 @@ export default function HomePage({ onSignInToSell }) {
                           </p>
                           <div className="flex flex-wrap items-center gap-2 text-sm">
                             <ShopRating shop={shop} />
-                            <span className={shop.status === 'Open' ? 'text-eco-green' : shop.status === 'Suspended' ? 'text-amber-700' : 'text-gray-500'}>{shop.status}</span>
+                            <span className={(shop.status === 'Open' || shop.status === 'Open now') ? 'text-eco-green' : shop.status === 'Suspended' ? 'text-amber-700' : 'text-gray-500'}>{shop.status}</span>
                             <span className="text-gray-600">{shop.topPrice}</span>
                             {shop.isPartner && (
                               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Partner</span>
@@ -162,7 +179,7 @@ export default function HomePage({ onSignInToSell }) {
                   )}
                 </div>
               </div>
-              <div className="relative fluid-map-min-height min-h-0 overflow-hidden bg-eco-green">
+              <div className="relative fluid-map-min-height min-h-0 overflow-hidden bg-[#154212]">
                 {shopsLoading ? (
                   <div className="flex fluid-map-min-height h-full items-center justify-center p-4 sm:p-8">
                     <p className="text-sm text-white/80 animate-pulse">Loading map…</p>
@@ -184,20 +201,27 @@ export default function HomePage({ onSignInToSell }) {
               </div>
             </div>
           </div>
-          <SectionAction variant="outline" onClick={() => setActiveModal('map')}>Open full map</SectionAction>
+          <div className="mt-10 text-center">
+            <SiteButton variant="outline" onClick={() => setActiveModal('map')}>
+              Open full map
+            </SiteButton>
+          </div>
         </div>
       </section>
 
-      <section className="relative py-20 overflow-hidden bg-gradient-to-br from-[#eef9f1] via-white to-[#f4fbf5]">
-        <div className="absolute top-10 left-10 w-40 h-40 bg-eco-green/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-10 right-10 w-48 h-48 bg-leaf-green/10 rounded-full blur-3xl" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <SectionHeader title="Quick Recycling Tips" description="Follow these simple steps to prepare your recyclables properly before bringing them to a junkshop." />
+      <section className={`relative ${siteSectionPadClass} overflow-hidden site-page-bg`}>
+        <div className="absolute top-10 left-10 w-40 h-40 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className={`${siteContainerClass} relative z-10`}>
+          <SiteSectionHeader
+            eyebrow="How-to"
+            title="Quick Recycling Tips"
+            description="Follow these simple steps to prepare your recyclables properly before bringing them to a junkshop."
+          />
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {previewRecyclingSteps.map((step) => (
               <article
                 key={step.number}
-                className="bg-white rounded-[24px] overflow-hidden text-center shadow-md border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-2"
+                className={`${siteCardClass} ${siteCardHoverClass} overflow-hidden text-center`}
               >
                 <div className="h-40 sm:h-44 bg-zinc-100 overflow-hidden">
                   <ImageWithFallback
@@ -213,7 +237,11 @@ export default function HomePage({ onSignInToSell }) {
               </article>
             ))}
           </div>
-          <SectionAction variant="dark" onClick={() => setActiveModal('guide')}>View full guide</SectionAction>
+          <div className="mt-10 text-center">
+            <SiteButton variant="dark" onClick={() => setActiveModal('guide')}>
+              View full guide
+            </SiteButton>
+          </div>
         </div>
       </section>
 
@@ -370,26 +398,12 @@ function RecyclableMaterialsTable({
   );
 }
 
-function SectionHeader({ title, description }) {
-  return (
-    <div className="text-center mb-12">
-      <h2 className="mb-4">{title}</h2>
-      <p className="text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">{description}</p>
-    </div>
-  );
-}
-
 function SectionAction({ children, onClick, variant = 'primary' }) {
-  const variants = {
-    primary: 'bg-eco-green text-white hover:bg-[#358F52]',
-    outline: 'border-2 border-eco-green bg-white text-eco-green hover:bg-eco-green hover:text-white',
-    dark: 'bg-charcoal text-white hover:bg-eco-green',
-  };
   return (
     <div className="mt-10 text-center">
-      <button type="button" onClick={onClick} className={`inline-flex items-center justify-center rounded-[12px] px-6 py-3 font-semibold shadow-md transition-all ${variants[variant]}`}>
+      <SiteButton variant={variant} onClick={onClick}>
         {children}
-      </button>
+      </SiteButton>
     </div>
   );
 }
