@@ -124,7 +124,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
   const [contactName, setContactName] = useState(getUserFullName(user));
   const [contactPhone, setContactPhone] = useState(user?.phone || '');
   const [contactEmail, setContactEmail] = useState(
-    user?.email?.includes('@customer.junkshop.internal') ? '' : user?.email || ''
+    user?.email || ''
   );
   const [address, setAddress] = useState(user?.address || '');
   const [notes, setNotes] = useState('');

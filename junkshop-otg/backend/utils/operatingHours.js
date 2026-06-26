@@ -92,14 +92,6 @@ function formatOperatingHoursSummary(schedule) {
     .join(', ');
 }
 
-function providerPlaceholderEmail(normalizedPhone) {
-  return `${normalizedPhone}@provider.junkshop.internal`;
-}
-
-function customerPlaceholderEmail(normalizedPhone) {
-  return `${normalizedPhone}@customer.junkshop.internal`;
-}
-
 function isInternalAccountEmail(email) {
   const value = String(email || '').toLowerCase();
   return (
@@ -108,12 +100,20 @@ function isInternalAccountEmail(email) {
   );
 }
 
+/** Email safe to show in API/UI — empty when optional / legacy internal placeholder. */
+function publicUserEmail(email) {
+  const value = String(email || '').trim();
+  if (!value || isInternalAccountEmail(value)) {
+    return '';
+  }
+  return value.toLowerCase();
+}
+
 module.exports = {
   DAY_LABELS,
   DEFAULT_SCHEDULE,
   sanitizeOperatingHours,
   formatOperatingHoursSummary,
-  providerPlaceholderEmail,
-  customerPlaceholderEmail,
   isInternalAccountEmail,
+  publicUserEmail,
 };

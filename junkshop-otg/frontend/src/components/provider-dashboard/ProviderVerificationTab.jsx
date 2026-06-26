@@ -13,7 +13,10 @@ function imageSrc(data) {
 }
 
 function buildDocumentPayload(preview, docType, fileName, mimeType) {
-    if (!preview || !docType) return null;
+    if (!preview) return null;
+    if (!docType) {
+        return { error: "Select an ID type before uploading." };
+    }
 
     const resolvedMime =
         mimeType ||
@@ -152,14 +155,24 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
     );
 
     const persistDocuments = async ({ notify = true } = {}) => {
+        const govPayload = buildDocumentPayload(govPreview, govType, govFileName, govMime);
+        if (govPayload?.error) {
+            throw new Error(govPayload.error);
+        }
+
+        const permitPayload = buildDocumentPayload(
+            permitPreview,
+            permitType,
+            permitFileName,
+            permitMime
+        );
+        if (permitPayload?.error) {
+            throw new Error(permitPayload.error);
+        }
+
         const payload = {
-            governmentId: buildDocumentPayload(govPreview, govType, govFileName, govMime),
-            businessPermit: buildDocumentPayload(
-                permitPreview,
-                permitType,
-                permitFileName,
-                permitMime
-            ),
+            governmentId: govPayload,
+            businessPermit: permitPayload,
             shopPhotos: shopPhotosPayload,
         };
 

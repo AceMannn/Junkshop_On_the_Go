@@ -133,17 +133,21 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
 
                     {!accountView && (
                         <>
-                            <VerificationStatusBanner
-                                user={user}
-                                className="mb-5 sm:mb-6"
-                                onGoVerification={() => handleNavigate("verification")}
-                            />
-                            <ProfileCompletionBanner
-                                user={user}
-                                role="provider"
-                                onGoSettings={() => handleNavigate("settings")}
-                                className="mb-5 sm:mb-6"
-                            />
+                            {activeTab !== "verification" && (
+                                <VerificationStatusBanner
+                                    user={user}
+                                    className="mb-5 sm:mb-6"
+                                    onGoVerification={() => handleNavigate("verification")}
+                                />
+                            )}
+                            {activeTab !== "settings" && (
+                                <ProfileCompletionBanner
+                                    user={user}
+                                    role="provider"
+                                    onGoSettings={() => handleNavigate("settings")}
+                                    className="mb-5 sm:mb-6"
+                                />
+                            )}
                         </>
                     )}
 

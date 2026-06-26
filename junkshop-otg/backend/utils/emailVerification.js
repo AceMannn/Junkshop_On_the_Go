@@ -28,6 +28,10 @@ function isCustomerEmailVerified(user) {
     return true;
   }
 
+  if (!user.email || !String(user.email).trim()) {
+    return true;
+  }
+
   return user.emailVerified !== false;
 }
 

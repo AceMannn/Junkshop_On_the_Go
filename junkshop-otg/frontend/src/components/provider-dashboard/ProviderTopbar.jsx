@@ -110,7 +110,6 @@ export default function ProviderTopbar({
                             >
                                 <div className="px-3 py-2.5 border-b border-zinc-100 mb-1">
                                     <p className="text-sm font-bold text-[#191c1c] truncate">{fullName}</p>
-                                    <p className="text-xs text-[#72796e] truncate">{user?.email}</p>
                                 </div>
 
                                 <button

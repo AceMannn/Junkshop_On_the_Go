@@ -9,7 +9,8 @@
     "seed": "node scripts/seed.js",
     "smoke": "node scripts/smokeVerificationFlow.js",
     "ratings:backfill": "node scripts/backfillRatings.js",
-    "dedupe:phones": "node scripts/dedupePhones.js"
+    "dedupe:phones": "node scripts/dedupePhones.js",
+    "migrate:internal-emails": "node scripts/migrateInternalEmails.js"
   },
   "keywords": [],
   "author": "",

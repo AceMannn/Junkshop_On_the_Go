@@ -29,10 +29,8 @@ const userSchema = new mongoose.Schema(
 
     email: {
       type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
       trim: true,
+      lowercase: true,
     },
 
     emailVerified: {
@@ -229,5 +227,6 @@ const userSchema = new mongoose.Schema(
 
 userSchema.index({ phone: 1 });
 userSchema.index({ role: 1, phone: 1 });
+userSchema.index({ email: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('User', userSchema);

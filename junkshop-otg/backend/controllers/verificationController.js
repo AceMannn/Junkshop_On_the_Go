@@ -155,7 +155,12 @@ exports.getMyVerification = async (req, res) => {
       return res.status(403).json({ message: 'Provider account required.' });
     }
 
-    res.json({ verification: serializeVerification(req.user, { includeFiles: true }) });
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found.' });
+    }
+
+    res.json({ verification: serializeVerification(user, { includeFiles: true }) });
   } catch (error) {
     res.status(500).json({ message: 'Could not load verification details.' });
   }
@@ -167,7 +172,12 @@ exports.saveVerificationDocuments = async (req, res) => {
       return res.status(403).json({ message: 'Provider account required.' });
     }
 
-    if (!canEditVerification(req.user)) {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found.' });
+    }
+
+    if (!canEditVerification(user)) {
       return res.status(400).json({
         message: 'Documents cannot be edited while verification is pending review.',
       });
@@ -175,8 +185,8 @@ exports.saveVerificationDocuments = async (req, res) => {
 
     const { governmentId, businessPermit, shopPhotos } = req.body;
 
-    if (!req.user.verificationDocuments) {
-      req.user.verificationDocuments = {
+    if (!user.verificationDocuments) {
+      user.verificationDocuments = {
         governmentId: {},
         businessPermit: {},
         shopPhotos: [],
@@ -185,28 +195,28 @@ exports.saveVerificationDocuments = async (req, res) => {
 
     if (governmentId !== undefined) {
       if (governmentId === null) {
-        req.user.verificationDocuments.governmentId = {};
+        user.verificationDocuments.governmentId = {};
       } else {
         const cleaned = sanitizeDocumentPayload(governmentId, GOVERNMENT_ID_TYPES);
         if (cleaned?.error) {
           return res.status(400).json({ message: cleaned.error });
         }
         if (cleaned) {
-          req.user.verificationDocuments.governmentId = cleaned;
+          user.verificationDocuments.governmentId = cleaned;
         }
       }
     }
 
     if (businessPermit !== undefined) {
       if (businessPermit === null) {
-        req.user.verificationDocuments.businessPermit = {};
+        user.verificationDocuments.businessPermit = {};
       } else {
         const cleaned = sanitizeDocumentPayload(businessPermit, BUSINESS_PERMIT_TYPES);
         if (cleaned?.error) {
           return res.status(400).json({ message: cleaned.error });
         }
         if (cleaned) {
-          req.user.verificationDocuments.businessPermit = cleaned;
+          user.verificationDocuments.businessPermit = cleaned;
         }
       }
     }
@@ -216,19 +226,19 @@ exports.saveVerificationDocuments = async (req, res) => {
       if (cleanedPhotos.error) {
         return res.status(400).json({ message: cleanedPhotos.error });
       }
-      req.user.verificationDocuments.shopPhotos = cleanedPhotos.photos;
+      user.verificationDocuments.shopPhotos = cleanedPhotos.photos;
     }
 
-    if (req.user.verificationStatus === 'rejected') {
-      req.user.verificationStatus = 'draft';
-      req.user.verificationRejectNote = '';
+    if (user.verificationStatus === 'rejected') {
+      user.verificationStatus = 'draft';
+      user.verificationRejectNote = '';
     }
 
-    await req.user.save();
+    await user.save();
 
     res.json({
       message: 'Verification documents saved.',
-      verification: serializeVerification(req.user, { includeFiles: true }),
+      verification: serializeVerification(user, { includeFiles: true }),
     });
   } catch (error) {
     console.error('saveVerificationDocuments', error);
@@ -242,24 +252,29 @@ exports.submitVerification = async (req, res) => {
       return res.status(403).json({ message: 'Provider account required.' });
     }
 
-    if (!canEditVerification(req.user)) {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found.' });
+    }
+
+    if (!canEditVerification(user)) {
       return res.status(400).json({ message: 'Application is already pending review.' });
     }
 
-    const validationMessage = validateReadyForSubmit(req.user);
+    const validationMessage = validateReadyForSubmit(user);
     if (validationMessage) {
       return res.status(400).json({ message: validationMessage });
     }
 
-    req.user.verificationStatus = 'pending';
-    req.user.verificationSubmittedAt = new Date();
-    req.user.verificationRejectNote = '';
-    await req.user.save();
-    await syncProfileComplete(req.user._id);
+    user.verificationStatus = 'pending';
+    user.verificationSubmittedAt = new Date();
+    user.verificationRejectNote = '';
+    await user.save();
+    await syncProfileComplete(user._id);
 
     res.json({
       message: 'Verification submitted. An admin will review your documents soon.',
-      verification: serializeVerification(req.user, { includeFiles: true }),
+      verification: serializeVerification(user, { includeFiles: true }),
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not submit verification.' });

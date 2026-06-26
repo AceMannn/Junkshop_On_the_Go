@@ -32,9 +32,7 @@ const {
 const {
   sanitizeOperatingHours,
   formatOperatingHoursSummary,
-  providerPlaceholderEmail,
-  customerPlaceholderEmail,
-  isInternalAccountEmail,
+  publicUserEmail,
 } = require('../utils/operatingHours');
 const {
   findCustomerByPhone,
@@ -71,7 +69,7 @@ const userPayload = (user) => ({
   firstName: user.firstName,
   middleName: user.middleName,
   lastName: user.lastName,
-  email: user.email,
+  email: publicUserEmail(user.email),
   phone: user.phone,
   junkshopName: user.junkshopName,
   address: user.address,
@@ -174,19 +172,12 @@ const registerUser = async (req, res) => {
         return res.status(phoneConflict.status).json({ message: phoneConflict.message });
       }
 
-      const resolvedEmail = cleanedEmail || customerPlaceholderEmail(normalizedPhone);
-
       if (cleanedEmail) {
         const emailConflict = await assertEmailAvailable(cleanedEmail, {
           intendedRole: 'customer',
         });
         if (emailConflict) {
           return res.status(emailConflict.status).json({ message: emailConflict.message });
-        }
-      } else {
-        const existingPlaceholder = await User.findOne({ email: resolvedEmail });
-        if (existingPlaceholder) {
-          return res.status(409).json({ message: 'This mobile number is already registered.' });
         }
       }
 
@@ -198,11 +189,14 @@ const registerUser = async (req, res) => {
         firstName: cleanedFirstName,
         middleName: cleanedMiddleName,
         lastName: cleanedLastName,
-        email: resolvedEmail,
         phone: normalizedPhone,
         password: hashedPassword,
         emailVerified: !hasRealEmail,
       });
+
+      if (hasRealEmail) {
+        user.email = cleanedEmail;
+      }
 
       let verificationCode = null;
       let delivery = { stub: true };
@@ -267,8 +261,6 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Please enter a valid email address.' });
     }
 
-    const resolvedEmail = cleanedEmail || providerPlaceholderEmail(normalizedPhone);
-
     const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
       intendedRole: 'provider',
       context: 'signup',
@@ -277,11 +269,13 @@ const registerUser = async (req, res) => {
       return res.status(phoneConflict.status).json({ message: phoneConflict.message });
     }
 
-    const emailConflict = await assertEmailAvailable(resolvedEmail, {
-      intendedRole: 'provider',
-    });
-    if (emailConflict) {
-      return res.status(emailConflict.status).json({ message: emailConflict.message });
+    if (cleanedEmail) {
+      const emailConflict = await assertEmailAvailable(cleanedEmail, {
+        intendedRole: 'provider',
+      });
+      if (emailConflict) {
+        return res.status(emailConflict.status).json({ message: emailConflict.message });
+      }
     }
 
     const schedule = sanitizeOperatingHours(operatingHours);
@@ -306,7 +300,7 @@ const registerUser = async (req, res) => {
       firstName: cleanedFirstName,
       middleName: cleanedMiddleName,
       lastName: cleanedLastName,
-      email: resolvedEmail,
+      ...(cleanedEmail ? { email: cleanedEmail } : {}),
       phone: normalizedPhone,
       password: hashedPassword,
       junkshopName: cleanedJunkshopName,
@@ -449,8 +443,8 @@ const loginUser = async (req, res) => {
 
     if (
       user.role === 'customer' &&
-      user.emailVerified === false &&
-      !isInternalAccountEmail(user.email)
+      publicUserEmail(user.email) &&
+      user.emailVerified === false
     ) {
       return res.status(403).json({
         message: 'Verify your email before signing in. Check your inbox for the code.',
@@ -627,15 +621,6 @@ const updateMe = async (req, res) => {
       }
 
       req.user.phone = cleaned;
-
-      if (
-        req.user.role === 'customer' &&
-        isInternalAccountEmail(req.user.email) &&
-        !String(req.body.email || '').trim()
-      ) {
-        req.user.email = customerPlaceholderEmail(cleaned);
-        req.user.emailVerified = true;
-      }
     }
     if (address !== undefined) {
       req.user.address = String(address).trim();

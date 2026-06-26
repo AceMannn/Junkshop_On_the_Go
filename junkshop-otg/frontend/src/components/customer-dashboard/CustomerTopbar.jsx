@@ -145,7 +145,6 @@ export default function CustomerTopbar({
                                     <p className="text-sm font-bold text-[#191c1c] truncate">
                                         {fullName}
                                     </p>
-                                    <p className="text-xs text-[#72796e] truncate">{user?.email}</p>
                                 </div>
 
                                 <button

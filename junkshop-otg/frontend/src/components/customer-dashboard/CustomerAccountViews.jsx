@@ -64,19 +64,19 @@ function InputField({ label, required, type = "text", value, onChange, readOnly 
     );
 }
 
-function isProviderInternalEmail(email) {
-    return String(email || "").endsWith("@provider.junkshop.internal");
+function isPlaceholderEmail(email) {
+    const value = String(email || "").toLowerCase();
+    return (
+        value.endsWith("@provider.junkshop.internal") ||
+        value.endsWith("@customer.junkshop.internal")
+    );
 }
 
 export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
     const isProvider = user?.role === "provider";
     const displayName = getDisplayName(user);
-    const showEmail = user?.email && !isProviderInternalEmail(user.email);
-    const emailDisplay = showEmail
-        ? user.email
-        : isProvider
-          ? "No email on file (optional at signup)"
-          : user?.email || "";
+    const hasRealEmail = Boolean(user?.email) && !isPlaceholderEmail(user.email);
+    const emailDisplay = hasRealEmail ? user.email : "";
     const [form, setForm] = useState({
         firstName: user?.firstName || "",
         lastName: user?.lastName || "",
@@ -121,9 +121,9 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                 <div className="min-w-0">
                     <p className="font-bold text-[#191c1c] truncate">{displayName}</p>
                     <p className="text-sm text-[#72796e] truncate">
-                        {isProvider ? user?.phone || emailDisplay : emailDisplay}
+                        {isProvider ? user?.phone || emailDisplay : emailDisplay || user?.phone || ""}
                     </p>
-                    {isProvider && showEmail && (
+                    {isProvider && hasRealEmail && (
                         <p className="text-xs text-[#72796e] truncate mt-0.5">{user.email}</p>
                     )}
                     <p className="text-xs text-emerald-700 font-medium mt-1 capitalize">
@@ -170,9 +170,9 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                         />
                         <InputField
                             label="Email address"
-                            required={!isProvider}
+                            required={false}
                             type="email"
-                            value={emailDisplay}
+                            value={emailDisplay || "Not provided"}
                             readOnly
                         />
                         <InputField
