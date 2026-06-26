@@ -44,6 +44,7 @@ const {
   assertEmailAvailable,
   emailConflictMessage,
 } = require('../utils/accountIdentity');
+const { AUTH_LOOKUP_EXCLUDE, SESSION_USER_EXCLUDE } = require('../utils/userQueries');
 const { isBanned } = require('../utils/accountModeration');
 
 const DEFAULT_SHOP_LOCATION = { lat: 14.5995, lng: 121.0055 };
@@ -235,7 +236,7 @@ const registerUser = async (req, res) => {
         return res.status(201).json(payload);
       }
 
-      const freshUser = await User.findById(user._id);
+      const freshUser = await User.findById(user._id).select(SESSION_USER_EXCLUDE);
       const token = createToken(freshUser);
 
       return res.status(201).json({
@@ -328,7 +329,7 @@ const registerUser = async (req, res) => {
     });
 
     await syncProfileComplete(user._id);
-    const freshUser = await User.findById(user._id);
+    const freshUser = await User.findById(user._id).select(SESSION_USER_EXCLUDE);
     const token = createToken(freshUser);
 
     res.status(201).json({
@@ -379,15 +380,15 @@ const loginUser = async (req, res) => {
           return res.status(400).json({ message: 'Please enter a valid email address.' });
         }
         const emailRole = cleanedRole || 'admin';
-        user = await User.findOne({ email: normalizedEmail, role: emailRole });
+        user = await User.findOne({ email: normalizedEmail, role: emailRole }).select(AUTH_LOOKUP_EXCLUDE);
         if (!user && cleanedRole === 'customer') {
-          user = await User.findOne({ email: normalizedEmail, role: 'admin' });
+          user = await User.findOne({ email: normalizedEmail, role: 'admin' }).select(AUTH_LOOKUP_EXCLUDE);
         }
         if (!user && (cleanedRole === 'customer' || cleanedRole === 'provider')) {
           const crossRoleUser = await User.findOne({
             email: normalizedEmail,
             role: cleanedRole === 'customer' ? 'provider' : 'customer',
-          });
+          }).select(AUTH_LOOKUP_EXCLUDE);
           if (crossRoleUser) {
             return res.status(403).json({
               message: emailConflictMessage(crossRoleUser.role),
@@ -458,10 +459,8 @@ const loginUser = async (req, res) => {
       });
     }
 
-    await syncProfileComplete(user._id);
-    const freshUser = await User.findById(user._id);
-    const token = createToken(freshUser);
-    const userResponse = await buildUserResponse(freshUser);
+    const token = createToken(user);
+    const userResponse = await buildUserResponse(user);
 
     res.status(200).json({
       message: userResponse.requiresPhoneSetup
@@ -477,8 +476,10 @@ const loginUser = async (req, res) => {
 };
 
 const getCurrentUser = async (req, res) => {
-  await syncProfileComplete(req.user._id);
-  const freshUser = await User.findById(req.user._id);
+  const freshUser = await User.findById(req.user._id).select(SESSION_USER_EXCLUDE);
+  if (!freshUser) {
+    return res.status(404).json({ message: 'Account not found.' });
+  }
   res.status(200).json({
     user: await buildUserResponse(freshUser),
   });
@@ -572,7 +573,7 @@ const updateProviderProfile = async (req, res) => {
     }
 
     await syncProfileComplete(req.user._id);
-    const freshUser = await User.findById(req.user._id);
+    const freshUser = await User.findById(req.user._id).select(SESSION_USER_EXCLUDE);
 
     res.json({
       message: 'Provider profile updated.',
@@ -645,7 +646,7 @@ const updateMe = async (req, res) => {
 
     await req.user.save();
     await syncProfileComplete(req.user._id);
-    const freshUser = await User.findById(req.user._id);
+    const freshUser = await User.findById(req.user._id).select(SESSION_USER_EXCLUDE);
 
     res.json({
       message: 'Profile updated.',
@@ -910,7 +911,7 @@ const verifyEmail = async (req, res) => {
     await user.save();
     await syncProfileComplete(user._id);
 
-    const freshUser = await User.findById(user._id);
+    const freshUser = await User.findById(user._id).select(SESSION_USER_EXCLUDE);
     const token = createToken(freshUser);
 
     res.json({

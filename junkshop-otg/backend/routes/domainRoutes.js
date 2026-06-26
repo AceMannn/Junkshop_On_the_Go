@@ -12,6 +12,7 @@ const contactController = require('../controllers/contactController');
 const { haversineKm, formatDistanceKm } = require('../utils/geo');
 const { syncProfileComplete } = require('../utils/profileCompletion');
 const { syncJunkshopMaterialTags } = require('../utils/syncJunkshopTags');
+const { TRANSACTION_LIST_LIMIT } = require('../utils/listLimits');
 const {
   pickAllowed,
   JUNKSHOP_WRITE_KEYS,
@@ -550,7 +551,8 @@ router.get('/transactions', protect, async (req, res) => {
   const transactions = await Transaction.find(query)
     .populate('customer provider', 'firstName lastName email junkshopName status role')
     .populate('pickupRequest', 'requestType status')
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .limit(TRANSACTION_LIST_LIMIT);
 
   const statusMap = await loadUserStatusMap(
     transactions.flatMap((row) => [row.customer?._id, row.provider?._id]).filter(Boolean)

@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const { normalizePhone, hasValidPhone } = require('./profileCompletion');
+const { AUTH_LOOKUP_EXCLUDE } = require('./userQueries');
 
 const ROLE_LABELS = {
   customer: 'Customer',
@@ -19,7 +20,7 @@ async function findUserByNormalizedPhone(normalizedPhone, options = {}) {
   const { roles, excludeUserId } = options;
   const roleFilter = roles ? { role: { $in: roles } } : {};
 
-  let user = await User.findOne({ phone: normalizedPhone, ...roleFilter });
+  let user = await User.findOne({ phone: normalizedPhone, ...roleFilter }).select(AUTH_LOOKUP_EXCLUDE);
   if (user) {
     if (excludeUserId && user._id.toString() === String(excludeUserId)) {
       user = null;
@@ -40,7 +41,7 @@ async function findUserByNormalizedPhone(normalizedPhone, options = {}) {
     return null;
   }
 
-  return User.findById(match._id);
+  return User.findById(match._id).select(AUTH_LOOKUP_EXCLUDE);
 }
 
 async function findCustomerByPhone(rawPhone) {
@@ -71,7 +72,7 @@ async function findUserByGcashNumber(normalizedPhone, options = {}) {
     return null;
   }
 
-  return User.findById(match._id);
+  return User.findById(match._id).select(AUTH_LOOKUP_EXCLUDE);
 }
 
 async function findUserByPhoneOrGcash(normalizedPhone, options = {}) {

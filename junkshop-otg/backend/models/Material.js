@@ -66,4 +66,6 @@ const materialSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+materialSchema.index({ provider: 1 });
+
 module.exports = mongoose.model('Material', materialSchema);

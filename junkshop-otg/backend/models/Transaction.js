@@ -49,4 +49,7 @@ const transactionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+transactionSchema.index({ customer: 1, createdAt: -1 });
+transactionSchema.index({ provider: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Transaction', transactionSchema);

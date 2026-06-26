@@ -22,6 +22,7 @@ const {
   loadUserStatusMap,
   serializePickupForViewer,
 } = require('../utils/accountModeration');
+const { PICKUP_LIST_LIMIT } = require('../utils/listLimits');
 const {
   sendTransactionalEmail,
   sendTransactionalSms,
@@ -156,29 +157,12 @@ exports.listPickupRequests = async (req, res) => {
       return res.status(403).json({ message: 'Not allowed.' });
     }
 
-    await PickupRequest.updateMany(
-      {
-        requestType: { $ne: 'drop_off' },
-        status: { $in: ['accepted', 'in_transit'] },
-        $or: [
-          { serviceFee: { $gt: 0 } },
-          { serviceFeePaymentStatus: { $ne: 'confirmed' } },
-        ],
-      },
-      {
-        $set: {
-          serviceFee: 0,
-          serviceFeePaid: true,
-          serviceFeePaymentStatus: 'confirmed',
-        },
-      }
-    );
-
     const requests = await PickupRequest.find(query)
       .populate('customer', POPULATE_FIELDS)
       .populate('provider', POPULATE_FIELDS)
       .populate('junkshop', 'name address phone status rating provider')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(PICKUP_LIST_LIMIT);
 
     const junkshopProviderIds = requests
       .map((request) => request.junkshop?.provider)

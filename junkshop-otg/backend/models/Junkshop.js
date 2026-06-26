@@ -108,4 +108,6 @@ const junkshopSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+junkshopSchema.index({ provider: 1 });
+
 module.exports = mongoose.model('Junkshop', junkshopSchema);

@@ -113,4 +113,8 @@ const pickupRequestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+pickupRequestSchema.index({ customer: 1, createdAt: -1 });
+pickupRequestSchema.index({ provider: 1, createdAt: -1 });
+pickupRequestSchema.index({ status: 1, junkshop: 1 });
+
 module.exports = mongoose.model('PickupRequest', pickupRequestSchema);

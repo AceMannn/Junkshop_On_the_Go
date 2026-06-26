@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { SESSION_USER_EXCLUDE } = require('../utils/userQueries');
 
 const protect = async (req, res, next) => {
   try {
@@ -11,7 +12,7 @@ const protect = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await User.findById(decoded.id).select(SESSION_USER_EXCLUDE);
 
     if (!user) {
       return res.status(401).json({ message: 'Account no longer exists.' });
