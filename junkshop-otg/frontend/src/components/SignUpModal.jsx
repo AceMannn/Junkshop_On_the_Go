@@ -1,8 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../services/api';
 import ProviderSignUpWizard from './ProviderSignUpWizard';
 import EmailVerificationStep from './auth/EmailVerificationStep';
+import {
+  AUTH_DRAFT_KEYS,
+  clearSignUpDrafts,
+  loadAuthDraft,
+  loadCustomerSignUpDraft,
+  saveAuthDraft,
+  saveCustomerSignUpDraft,
+} from '../utils/authFormDraft';
 import {
   AuthModalClose,
   AuthErrorPopup,
@@ -16,26 +24,46 @@ import {
   authRoleToggleWrapClass,
   authSubmitClass,
 } from './auth/authModalUi';
+import { validatePasswordStrength } from '../utils/passwordPolicy';
+
+const EMPTY_CUSTOMER_FORM = {
+  firstName: '',
+  middleName: '',
+  lastName: '',
+  phone: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+};
+
+function readCustomerDraft() {
+  const draft = loadCustomerSignUpDraft();
+  return draft?.formData || { ...EMPTY_CUSTOMER_FORM };
+}
 
 export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowLogin }) {
-  const [selectedRole, setSelectedRole] = useState('customer');
-  const [formData, setFormData] = useState({
-    firstName: '',
-    middleName: '',
-    lastName: '',
-    phone: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
+  const metaDraft = loadAuthDraft(AUTH_DRAFT_KEYS.SIGNUP_META);
+  const customerDraft = loadCustomerSignUpDraft();
+
+  const [selectedRole, setSelectedRole] = useState(metaDraft?.selectedRole || 'customer');
+  const [formData, setFormData] = useState(readCustomerDraft);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState('form');
+  const [step, setStep] = useState(customerDraft?.step || 'form');
   const [pendingEmail, setPendingEmail] = useState('');
   const [verificationMessage, setVerificationMessage] = useState('');
   const [devVerificationCode, setDevVerificationCode] = useState('');
+
+  useEffect(() => {
+    saveAuthDraft(AUTH_DRAFT_KEYS.SIGNUP_META, { selectedRole });
+  }, [selectedRole]);
+
+  useEffect(() => {
+    if (selectedRole !== 'customer') return;
+    saveCustomerSignUpDraft({ formData, step });
+  }, [formData, step, selectedRole]);
 
   if (!isOpen) {
     return null;
@@ -81,8 +109,9 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
       }
     }
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long.');
+    const passwordValidation = validatePasswordStrength(formData.password);
+    if (!passwordValidation.ok) {
+      setError(passwordValidation.message);
       return;
     }
 
@@ -113,6 +142,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
       }
 
       onSignUpComplete?.(result);
+      clearSignUpDrafts();
       onClose();
     } catch (registerError) {
       setError(registerError.message);
@@ -157,18 +187,11 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
               initialDevCode={devVerificationCode}
               initialMessage={verificationMessage}
               onVerified={(session) => {
-                setFormData({
-                  firstName: '',
-                  middleName: '',
-                  lastName: '',
-                  phone: '',
-                  email: '',
-                  password: '',
-                  confirmPassword: '',
-                });
+                setFormData(EMPTY_CUSTOMER_FORM);
                 setStep('form');
                 setPendingEmail('');
                 setDevVerificationCode('');
+                clearSignUpDrafts();
                 onSignUpComplete?.(session);
                 onClose();
               }}
@@ -307,7 +330,9 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <span className="block mt-1 text-xs text-charcoal/50">Minimum 8 characters</span>
+                <span className="block mt-1 text-xs text-charcoal/50">
+                  10+ characters with uppercase, lowercase, and a number
+                </span>
               </div>
 
               <div>

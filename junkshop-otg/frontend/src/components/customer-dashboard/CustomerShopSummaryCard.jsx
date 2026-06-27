@@ -3,6 +3,7 @@ import VerifiedPartnerIcon, { isVerified } from "../ui/VerifiedPartnerIcon";
 import ShopRating from "../ui/ShopRating";
 import ShopBadges from "../ui/ShopBadges";
 import { shopStatusBadgeClass } from "../../utils/catalogMappers";
+import { useShopPhoto } from "../../hooks/useShopPhoto";
 
 const SHOP_IMAGE =
     "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?q=80&w=1000&auto=format&fit=crop";
@@ -26,7 +27,8 @@ export default function CustomerShopSummaryCard({
     onRoute,
     className = "",
 }) {
-    const heroSrc = shop.shopPhotoUrl || shop.image || SHOP_IMAGE;
+    const lazyPhoto = useShopPhoto(shop);
+    const heroSrc = lazyPhoto || shop.image || SHOP_IMAGE;
     // Hide the text "Verified" badge when we already show the blue check icon
     const displayBadges = (shop.badges || []).filter((b) => b !== "verified");
 

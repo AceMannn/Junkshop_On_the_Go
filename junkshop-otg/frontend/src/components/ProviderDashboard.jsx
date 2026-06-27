@@ -30,6 +30,7 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
     const [showToast, setShowToast] = useState(false);
+    const [passwordNoticeShown, setPasswordNoticeShown] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
     const [focusRequestId, setFocusRequestId] = useState(null);
     const [accountView, setAccountView] = useState(null);
@@ -93,6 +94,14 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3200);
     };
+
+    useEffect(() => {
+        if (!user?.passwordNeedsUpdate || passwordNoticeShown) return;
+        setToastMessage(user.passwordSecurityMessage || "For your security, change your password.");
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3200);
+        setPasswordNoticeShown(true);
+    }, [passwordNoticeShown, user?.passwordNeedsUpdate, user?.passwordSecurityMessage]);
 
     return (
         <div className="min-h-screen bg-[#f9f9f8] text-[#191c1c] font-sans overflow-x-hidden">

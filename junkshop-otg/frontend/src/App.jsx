@@ -28,6 +28,7 @@ import {
 } from './utils/authStorage';
 import { setAuthHandlers } from './utils/authEvents';
 import { defaultDashboardPath } from './utils/dashboardRoutes';
+import { clearSignUpDrafts } from './utils/authFormDraft';
 
 const LEGACY_HASH_SECTIONS = {
   home: '/',
@@ -187,12 +188,22 @@ function AppRoutes() {
       return;
     }
 
-    persistSession(session);
+    const sessionWithSecurity = {
+      ...session,
+      user: {
+        ...session.user,
+        passwordNeedsUpdate: Boolean(session.passwordNeedsUpdate),
+        passwordSecurityMessage: session.passwordSecurityMessage || '',
+      },
+    };
+
+    persistSession(sessionWithSecurity);
     setLoginPrefill({ email: '', role: 'customer', message: '' });
-    if (session?.user?.requiresPhoneSetup) {
+    clearSignUpDrafts();
+    if (sessionWithSecurity?.user?.requiresPhoneSetup) {
       setNeedsPhoneSetup(true);
     }
-    redirectAfterAuth(session.user);
+    redirectAfterAuth(sessionWithSecurity.user);
   };
 
   const handleSignUpComplete = (result) => {

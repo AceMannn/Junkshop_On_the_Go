@@ -86,7 +86,10 @@ exports.listApplications = async (req, res) => {
 
 exports.getApplication = async (req, res) => {
   try {
-    const application = await serializeVerificationForAdmin(req.params.id);
+    const application = await serializeVerificationForAdmin(req.params.id, {
+      includeFiles: false,
+      includeArchiveDocuments: false,
+    });
     if (!application) {
       return res.status(404).json({ message: 'Application not found.' });
     }
@@ -97,26 +100,111 @@ exports.getApplication = async (req, res) => {
   }
 };
 
-exports.approveApplication = async (req, res) => {
+function serializeDocumentImage(doc) {
+  if (!doc?.secureUrl && !doc?.data) return null;
+  return {
+    data: doc.secureUrl || doc.data,
+    secureUrl: doc.secureUrl || '',
+    publicId: doc.publicId || '',
+    mimeType: doc.mimeType || 'image/jpeg',
+    fileName: doc.fileName || '',
+    docType: doc.docType || '',
+    label: doc.label || '',
+    slot: doc.slot || null,
+  };
+}
+
+exports.getApplicationDocument = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const kind = String(req.params.kind || '').trim();
+    const slot = Number(req.params.slot);
+
+    let user;
+    if (kind === 'government-id') {
+      user = await User.findById(req.params.id)
+        .select('role verificationDocuments.governmentId')
+        .lean();
+    } else if (kind === 'business-permit') {
+      user = await User.findById(req.params.id)
+        .select('role verificationDocuments.businessPermit')
+        .lean();
+    } else if (kind === 'shop-photos') {
+      if (!Number.isFinite(slot)) {
+        return res.status(400).json({ message: 'Invalid shop photo slot.' });
+      }
+      user = await User.findOne({
+        _id: req.params.id,
+        role: 'provider',
+        'verificationDocuments.shopPhotos.slot': slot,
+      })
+        .select({ role: 1, 'verificationDocuments.shopPhotos.$': 1 })
+        .lean();
+    } else {
+      return res.status(400).json({ message: 'Invalid document type.' });
+    }
+
     if (!user || user.role !== 'provider') {
       return res.status(404).json({ message: 'Application not found.' });
     }
 
-    if (user.verificationStatus !== 'pending') {
+    const docs = user.verificationDocuments || {};
+
+    if (kind === 'government-id') {
+      const payload = serializeDocumentImage(docs.governmentId);
+      if (!payload) {
+        return res.status(404).json({ message: 'Government ID not found.' });
+      }
+      return res.json(payload);
+    }
+
+    if (kind === 'business-permit') {
+      const payload = serializeDocumentImage(docs.businessPermit);
+      if (!payload) {
+        return res.status(404).json({ message: 'Business permit not found.' });
+      }
+      return res.json(payload);
+    }
+
+    if (kind === 'shop-photos') {
+      const photo = (docs.shopPhotos || []).find((row) => Number(row.slot) === slot);
+      const payload = serializeDocumentImage(photo);
+      if (!payload) {
+        return res.status(404).json({ message: 'Shop photo not found.' });
+      }
+      return res.json(payload);
+    }
+
+    return res.status(400).json({ message: 'Invalid document type.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load verification document.' });
+  }
+};
+
+exports.approveApplication = async (req, res) => {
+  try {
+    const user = await User.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        role: 'provider',
+        verificationStatus: 'pending',
+      },
+      {
+        $set: {
+          verificationStatus: 'approved',
+          verificationReviewedAt: new Date(),
+          verificationRejectNote: '',
+        },
+        $addToSet: { badges: 'verified' },
+      },
+      {
+        new: true,
+        select: 'firstName lastName email role verificationStatus status badges',
+      }
+    );
+    if (!user) {
       return res.status(400).json({ message: 'Only pending applications can be approved.' });
     }
 
-    user.verificationStatus = 'approved';
-    user.verificationReviewedAt = new Date();
-    user.verificationRejectNote = '';
-
-    const badges = new Set(user.badges || []);
-    badges.add('verified');
-    user.badges = [...badges];
-
-    await user.save();
     await syncProfileComplete(user._id);
 
     await notifyProviderVerification(user, {
@@ -125,11 +213,13 @@ exports.approveApplication = async (req, res) => {
         'Your verification documents were approved. Your shop can appear on the public map once profile setup is complete.',
     });
 
-    const application = await serializeVerificationForAdmin(user._id);
-
     res.json({
       message: 'Application approved. Shop can now go live after profile setup is complete.',
-      application,
+      application: {
+        id: String(user._id),
+        verificationStatus: user.verificationStatus,
+        badges: user.badges || [],
+      },
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not approve application.' });
@@ -143,19 +233,28 @@ exports.rejectApplication = async (req, res) => {
       return res.status(400).json({ message: 'A rejection note is required.' });
     }
 
-    const user = await User.findById(req.params.id);
-    if (!user || user.role !== 'provider') {
-      return res.status(404).json({ message: 'Application not found.' });
-    }
-
-    if (user.verificationStatus !== 'pending') {
+    const user = await User.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        role: 'provider',
+        verificationStatus: 'pending',
+      },
+      {
+        $set: {
+          verificationStatus: 'rejected',
+          verificationReviewedAt: new Date(),
+          verificationRejectNote: note,
+        },
+      },
+      {
+        new: true,
+        select: 'firstName lastName email role verificationStatus verificationRejectNote status',
+      }
+    );
+    if (!user) {
       return res.status(400).json({ message: 'Only pending applications can be rejected.' });
     }
 
-    user.verificationStatus = 'rejected';
-    user.verificationReviewedAt = new Date();
-    user.verificationRejectNote = note;
-    await user.save();
     await syncProfileComplete(user._id);
 
     await notifyProviderVerification(user, {
@@ -163,11 +262,13 @@ exports.rejectApplication = async (req, res) => {
       message: note,
     });
 
-    const application = await serializeVerificationForAdmin(user._id);
-
     res.json({
       message: 'Application rejected. The owner can update documents and resubmit.',
-      application,
+      application: {
+        id: String(user._id),
+        verificationStatus: user.verificationStatus,
+        verificationRejectNote: user.verificationRejectNote || '',
+      },
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not reject application.' });
@@ -203,7 +304,10 @@ exports.requestReVerification = async (req, res) => {
       message: note,
     });
 
-    const application = await serializeVerificationForAdmin(user._id);
+    const application = await serializeVerificationForAdmin(user._id, {
+      includeFiles: false,
+      includeArchiveDocuments: false,
+    });
 
     res.json({
       message: 'Provider must re-verify. Their shop is hidden until approved again.',
@@ -253,7 +357,10 @@ exports.hardResetVerification = async (req, res) => {
       message: note,
     });
 
-    const application = await serializeVerificationForAdmin(user._id);
+    const application = await serializeVerificationForAdmin(user._id, {
+      includeFiles: false,
+      includeArchiveDocuments: false,
+    });
 
     res.json({
       message: 'Verification documents cleared. Previous files are kept for admin audit.',
@@ -304,16 +411,20 @@ exports.listUsers = async (req, res) => {
 
 exports.updateUserBadges = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    if (!user || user.role !== 'provider') {
-      return res.status(404).json({ message: 'Provider not found.' });
-    }
-
     const badges = Array.isArray(req.body.badges) ? req.body.badges : [];
     const cleaned = [...new Set(badges.filter((badge) => ALLOWED_BADGES.includes(badge)))];
 
-    user.badges = cleaned;
-    await user.save();
+    const user = await User.findOneAndUpdate(
+      { _id: req.params.id, role: 'provider' },
+      { $set: { badges: cleaned } },
+      {
+        returnDocument: 'after',
+        select: 'badges',
+      }
+    );
+    if (!user) {
+      return res.status(404).json({ message: 'Provider not found.' });
+    }
 
     res.json({
       message: 'Badges updated.',

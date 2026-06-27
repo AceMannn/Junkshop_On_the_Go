@@ -15,7 +15,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { pickupApi } from '../../services/api';
-import { useCatalogMaterials } from '../../hooks/useCatalogData';
+import { useFeaturedMaterials } from '../../hooks/useCatalogData';
 import EmptyState from '../ui/EmptyState';
 import MaterialPhotoUploader from '../ui/MaterialPhotoUploader';
 import { TIME_SLOTS, materialsSummary } from '../../utils/pickupHelpers';
@@ -95,7 +95,7 @@ const inputClass =
   'w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600';
 
 export default function PickupWizard({ user, shops, onClose, onSuccess, prefill = null }) {
-  const { materials: catalogMaterials } = useCatalogMaterials({ autoRefresh: false });
+  const { materials: marketMaterials } = useFeaturedMaterials({ autoRefresh: false });
   const scheduleDates = useMemo(() => buildScheduleDates(), []);
 
   const [step, setStep] = useState(0);
@@ -151,13 +151,13 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
         unit: row.unit === 'piece' ? 'piece' : 'kg',
       }));
     }
-    return catalogMaterials.map((row) => ({
+    return marketMaterials.map((row) => ({
       catalogId: row.id,
       name: row.material,
       category: row.category,
       unit: row.unit === 'piece' ? 'piece' : 'kg',
     }));
-  }, [assignmentMode, junkshopId, selectedShop, catalogMaterials]);
+  }, [assignmentMode, junkshopId, marketMaterials, selectedShop]);
 
   const toggleMaterial = (item) => {
     setSelectedMaterials((prev) => {
@@ -359,6 +359,14 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
 
           {currentLabel === 'Shop' && (
             <div className="space-y-4">
+              {prefill?.junkshopId && (
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-800">
+                  <Store size={14} className="shrink-0" />
+                  <span>
+                    Pre-selected from <strong>Sell your recyclables</strong>. You can still change it below.
+                  </span>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-zinc-100">
                 {[
                   { id: 'specific', label: 'Choose shop' },

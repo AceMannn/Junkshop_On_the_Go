@@ -9,6 +9,7 @@ const JUNKSHOP_WRITE_KEYS = [
   'status',
   'location',
   'pickupEnabled',
+  'description',
 ];
 
 const MATERIAL_WRITE_KEYS = [

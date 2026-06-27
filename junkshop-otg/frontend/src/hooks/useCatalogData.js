@@ -31,7 +31,7 @@ function useCustomerCoords() {
   return coords;
 }
 
-export function useCatalogJunkshops({ autoRefresh = true, partnersOnly = false } = {}) {
+export function useCatalogJunkshops({ autoRefresh = true, partnersOnly = false, withPending = false } = {}) {
   const coords = useCustomerCoords();
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +47,7 @@ export function useCatalogJunkshops({ autoRefresh = true, partnersOnly = false }
           lat: coords?.lat,
           lng: coords?.lng,
           partnersOnly,
+          withPending,
         });
 
         setShops((junkshops || []).map(normalizeJunkshop));
@@ -61,7 +62,7 @@ export function useCatalogJunkshops({ autoRefresh = true, partnersOnly = false }
         if (!silent) setLoading(false);
       }
     },
-    [coords, partnersOnly]
+    [coords, partnersOnly, withPending]
   );
 
   useEffect(() => {

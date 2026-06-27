@@ -18,6 +18,10 @@ const {
   RESET_CODE_LENGTH,
 } = require('../utils/passwordRecovery');
 const {
+  PASSWORD_REQUIREMENTS_MESSAGE,
+  validatePasswordStrength,
+} = require('../utils/passwordPolicy');
+const {
   sendPasswordResetEmail,
   sendPasswordResetSms,
   sendEmailVerificationEmail,
@@ -147,8 +151,9 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Last name must contain letters only.' });
     }
 
-    if (password.length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.ok) {
+      return res.status(400).json({ message: passwordValidation.message });
     }
 
     if (cleanedRole === 'customer') {
@@ -463,6 +468,8 @@ const loginUser = async (req, res) => {
       token,
       user: userResponse,
       requiresPhoneSetup: userResponse.requiresPhoneSetup,
+      passwordNeedsUpdate: !validatePasswordStrength(password).ok,
+      passwordSecurityMessage: PASSWORD_REQUIREMENTS_MESSAGE,
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error during login.' });
@@ -650,8 +657,9 @@ const changePassword = async (req, res) => {
       return res.status(400).json({ message: 'Current and new password are required.' });
     }
 
-    if (newPassword.length < 8) {
-      return res.status(400).json({ message: 'New password must be at least 8 characters.' });
+    const passwordValidation = validatePasswordStrength(newPassword);
+    if (!passwordValidation.ok) {
+      return res.status(400).json({ message: passwordValidation.message });
     }
 
     const valid = await bcrypt.compare(currentPassword, req.user.password);
@@ -841,8 +849,9 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    if (newPassword.length < 8) {
-      return res.status(400).json({ message: 'New password must be at least 8 characters.' });
+    const passwordValidation = validatePasswordStrength(newPassword);
+    if (!passwordValidation.ok) {
+      return res.status(400).json({ message: passwordValidation.message });
     }
 
     const hashedToken = hashResetCode(resetToken);

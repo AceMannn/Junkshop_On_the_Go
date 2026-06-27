@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Eye, EyeOff, Loader2, Shield } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { authApi } from '../services/api';
-
-const inputClass =
-  'w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#154212]';
+import logoImage from '@shared-assets/junkshop-logo.png';
+import { adminInputClass, adminPrimaryButtonClass } from '../utils/adminUi';
 
 export default function AdminLoginScreen({ onLoginSuccess, sessionExpiredMessage = '' }) {
   const [email, setEmail] = useState('');
@@ -45,14 +44,18 @@ export default function AdminLoginScreen({ onLoginSuccess, sessionExpiredMessage
   };
 
   return (
-    <div className="min-h-screen bg-[#f3f4f1] flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm">
+    <div className="min-h-screen bg-[#f9f9f8] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(61,163,93,0.08),_transparent_55%)] pointer-events-none" />
+
+      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm">
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-[#154212]">
-            <Shield size={22} />
-          </div>
+          <img
+            src={logoImage}
+            alt="JunkShop On-The-Go"
+            className="h-12 w-12 rounded-xl object-contain"
+          />
           <div>
-            <h1 className="text-xl font-bold text-[#191c1c]">JunkShop Admin Portal</h1>
+            <h1 className="text-xl font-bold text-[#191c1c]">JunkShop Admin</h1>
             <p className="text-sm text-zinc-500">Staff sign-in only</p>
           </div>
         </div>
@@ -80,7 +83,7 @@ export default function AdminLoginScreen({ onLoginSuccess, sessionExpiredMessage
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className={inputClass}
+              className={adminInputClass}
               placeholder="admin@junkshop-otg.ph"
             />
           </div>
@@ -96,7 +99,7 @@ export default function AdminLoginScreen({ onLoginSuccess, sessionExpiredMessage
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={`${inputClass} pr-11`}
+                className={`${adminInputClass} pr-11`}
               />
               <button
                 type="button"
@@ -109,11 +112,7 @@ export default function AdminLoginScreen({ onLoginSuccess, sessionExpiredMessage
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="inline-flex w-full items-center justify-center rounded-xl bg-[#154212] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f3310] disabled:opacity-60"
-          >
+          <button type="submit" disabled={isLoading} className={`${adminPrimaryButtonClass} w-full py-3`}>
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Sign in
           </button>

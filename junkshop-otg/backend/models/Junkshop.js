@@ -79,6 +79,12 @@ const junkshopSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    description: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 500,
+    },
     isCatalog: {
       type: Boolean,
       default: false,

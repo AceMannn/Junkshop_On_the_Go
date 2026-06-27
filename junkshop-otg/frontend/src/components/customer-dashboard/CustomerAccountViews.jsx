@@ -13,6 +13,7 @@ import { authApi, domainApi } from "../../services/api";
 import EmptyState from "../ui/EmptyState";
 import { getUserInitials } from "../../utils/userDisplay";
 import { formatPoints } from "../../utils/pickupPoints";
+import { validatePasswordStrength } from "../../utils/passwordPolicy";
 
 function getDisplayName(user) {
     if (!user) return "Eco Warrior";
@@ -308,8 +309,13 @@ export function AccountSettingsPage({
 
     const handlePasswordChange = async (e) => {
         e.preventDefault();
-        setSaving(true);
         setError("");
+        const passwordValidation = validatePasswordStrength(newPassword);
+        if (!passwordValidation.ok) {
+            setError(passwordValidation.message);
+            return;
+        }
+        setSaving(true);
         try {
             await authApi.changePassword({ currentPassword, newPassword });
             setCurrentPassword("");
@@ -353,12 +359,12 @@ export function AccountSettingsPage({
                         />
                         <input
                             className="w-full bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#154212] outline-none"
-                            placeholder="New password (min 8 characters)"
+                            placeholder="New password"
                             type="password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             required
-                            minLength={8}
+                            minLength={10}
                         />
                         {error && (
                             <p className="text-sm text-red-600">{error}</p>

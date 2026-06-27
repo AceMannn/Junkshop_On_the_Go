@@ -75,6 +75,10 @@ export const adminApi = {
   getApplication(id) {
     return request(`/api/admin/applications/${id}`);
   },
+  getApplicationDocument(id, kind, slot) {
+    const slotPath = kind === 'shop-photos' && slot != null ? `/${slot}` : '';
+    return request(`/api/admin/applications/${id}/documents/${kind}${slotPath}`);
+  },
   approveApplication(id) {
     return request(`/api/admin/applications/${id}/approve`, { method: 'PATCH' });
   },

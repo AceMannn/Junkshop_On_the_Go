@@ -4,7 +4,9 @@ import { X, ZoomIn } from 'lucide-react';
 export default function PickupMaterialPhotosGallery({ photos = [], title = 'Material photos' }) {
   const [lightboxIndex, setLightboxIndex] = useState(null);
 
-  const validPhotos = (photos || []).filter((photo) => photo?.data);
+  const validPhotos = (photos || [])
+    .map((photo) => ({ ...photo, src: photo?.secureUrl || photo?.data || '' }))
+    .filter((photo) => photo.src);
 
   if (validPhotos.length === 0) return null;
 
@@ -21,7 +23,7 @@ export default function PickupMaterialPhotosGallery({ photos = [], title = 'Mate
               className="relative group rounded-lg overflow-hidden border border-zinc-200 aspect-[4/3] bg-white"
             >
               <img
-                src={photo.data}
+                src={photo.src}
                 alt={photo.fileName || `Material photo ${index + 1}`}
                 className="w-full h-full object-cover"
               />
@@ -53,7 +55,7 @@ export default function PickupMaterialPhotosGallery({ photos = [], title = 'Mate
             <X size={22} />
           </button>
           <img
-            src={validPhotos[lightboxIndex].data}
+            src={validPhotos[lightboxIndex].src}
             alt={validPhotos[lightboxIndex].fileName || 'Material photo'}
             className="max-w-full max-h-[85vh] object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}

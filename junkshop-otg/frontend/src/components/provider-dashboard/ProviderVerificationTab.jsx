@@ -9,6 +9,7 @@ const selectClass =
 function imageSrc(data) {
     if (!data) return "";
     if (data.startsWith("data:")) return data;
+    if (/^https?:\/\//i.test(data)) return data;
     return `data:image/jpeg;base64,${data}`;
 }
 
@@ -47,8 +48,11 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [isDirty, setIsDirty] = useState(false);
     const [error, setError] = useState("");
     const [verification, setVerification] = useState(null);
+
+    const markDirty = () => setIsDirty(true);
 
     const [govType, setGovType] = useState("");
     const [govPreview, setGovPreview] = useState("");
@@ -111,6 +115,7 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
 
         setPhotoPreviews(nextPreviews);
         setPhotoMeta(nextMeta);
+        setIsDirty(false);
     }, []);
 
     const loadVerification = useCallback(async () => {
@@ -154,7 +159,7 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
         [photoMeta, photoPreviews, photoSlots]
     );
 
-    const persistDocuments = async ({ notify = true } = {}) => {
+    const buildDocumentsPayload = () => {
         const govPayload = buildDocumentPayload(govPreview, govType, govFileName, govMime);
         if (govPayload?.error) {
             throw new Error(govPayload.error);
@@ -170,20 +175,32 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
             throw new Error(permitPayload.error);
         }
 
-        const payload = {
+        return {
             governmentId: govPayload,
             businessPermit: permitPayload,
             shopPhotos: shopPhotosPayload,
         };
+    };
 
-        const { verification: updated, message } = await verificationApi.saveDocuments(payload);
-        setVerification(updated);
-        hydrateFromVerification(updated);
+    const applyVerificationMeta = (updated) => {
+        setVerification((prev) => ({
+            ...prev,
+            ...updated,
+            requirements: updated.requirements || prev?.requirements,
+        }));
         onUserUpdate?.({
             ...user,
             verificationStatus: updated.verificationStatus,
             verificationRejectNote: updated.verificationRejectNote || "",
         });
+        setIsDirty(false);
+    };
+
+    const persistDocuments = async ({ notify = true } = {}) => {
+        const payload = buildDocumentsPayload();
+
+        const { verification: updated, message } = await verificationApi.saveDocuments(payload);
+        applyVerificationMeta(updated);
         if (notify) {
             onNotify?.(message || "Documents saved.");
         }
@@ -206,15 +223,9 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
         setSubmitting(true);
         setError("");
         try {
-            await persistDocuments({ notify: false });
-            const { verification: updated, message } = await verificationApi.submit();
-            setVerification(updated);
-            hydrateFromVerification(updated);
-            onUserUpdate?.({
-                ...user,
-                verificationStatus: updated.verificationStatus,
-                verificationRejectNote: "",
-            });
+            const payload = isDirty ? buildDocumentsPayload() : undefined;
+            const { verification: updated, message } = await verificationApi.submit(payload);
+            applyVerificationMeta(updated);
             onNotify?.(message || "Verification submitted.");
         } catch (submitError) {
             setError(submitError.message || "Could not submit verification.");
@@ -289,7 +300,10 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
                         <select
                             value={govType}
                             disabled={!canEdit}
-                            onChange={(e) => setGovType(e.target.value)}
+                            onChange={(e) => {
+                                setGovType(e.target.value);
+                                markDirty();
+                            }}
                             className={selectClass}
                         >
                             <option value="">Select ID type</option>
@@ -309,11 +323,13 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
                             setGovPreview(preview);
                             setGovFileName(fileName || "");
                             setGovMime(mimeType || "");
+                            markDirty();
                         }}
                         onClear={() => {
                             setGovPreview("");
                             setGovFileName("");
                             setGovMime("");
+                            markDirty();
                         }}
                         helperText="Upload front of ID"
                         alt="Government ID preview"
@@ -333,7 +349,10 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
                         <select
                             value={permitType}
                             disabled={!canEdit}
-                            onChange={(e) => setPermitType(e.target.value)}
+                            onChange={(e) => {
+                                setPermitType(e.target.value);
+                                markDirty();
+                            }}
                             className={selectClass}
                         >
                             <option value="">Select permit type</option>
@@ -353,11 +372,13 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
                             setPermitPreview(preview);
                             setPermitFileName(fileName || "");
                             setPermitMime(mimeType || "");
+                            markDirty();
                         }}
                         onClear={() => {
                             setPermitPreview("");
                             setPermitFileName("");
                             setPermitMime("");
+                            markDirty();
                         }}
                         helperText="Upload permit or registration"
                         alt="Business permit preview"
@@ -392,6 +413,7 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
                                             mimeType: mimeType || "",
                                         },
                                     }));
+                                    markDirty();
                                 }}
                                 onClear={() => {
                                     setPhotoPreviews((prev) => ({ ...prev, [slotDef.slot]: "" }));
@@ -399,6 +421,7 @@ export default function ProviderVerificationTab({ user, onNotify, onUserUpdate }
                                         ...prev,
                                         [slotDef.slot]: { fileName: "", mimeType: "" },
                                     }));
+                                    markDirty();
                                 }}
                                 helperText="Tap to upload photo"
                                 alt={`${slotDef.label} preview`}

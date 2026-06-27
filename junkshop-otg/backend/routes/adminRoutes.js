@@ -9,6 +9,8 @@ router.use(protect, requireAdmin);
 
 router.get('/overview', adminController.getOverview);
 router.get('/applications', adminController.listApplications);
+router.get('/applications/:id/documents/:kind/:slot', adminController.getApplicationDocument);
+router.get('/applications/:id/documents/:kind', adminController.getApplicationDocument);
 router.get('/applications/:id', adminController.getApplication);
 router.patch('/applications/:id/approve', adminController.approveApplication);
 router.patch('/applications/:id/reject', adminController.rejectApplication);

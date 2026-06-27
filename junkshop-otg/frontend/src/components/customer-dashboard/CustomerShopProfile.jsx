@@ -23,6 +23,7 @@ import { getShopStatusLabel } from "../../utils/operatingHours";
 import { maskCustomerName } from "../../utils/maskCustomerName";
 import { isFavoriteShopId } from "../../utils/favorites";
 import { domainApi } from "../../services/api";
+import { useShopPhoto } from "../../hooks/useShopPhoto";
 
 const TABS = [
     { id: "materials", label: "Materials", icon: ShoppingBag },
@@ -88,6 +89,8 @@ export default function CustomerShopProfile({
         }
     }, [activeTab, loadReviews]);
 
+    const heroPhoto = useShopPhoto(shop);
+
     if (!shop) return null;
 
     const isFav = isFavoriteShopId(shop.id, favoriteIds);
@@ -124,9 +127,9 @@ export default function CustomerShopProfile({
 
                 {/* Hero */}
                 <div className="relative h-44 sm:h-52 bg-zinc-200 overflow-hidden shrink-0">
-                    {shop.shopPhotoUrl ? (
+                    {heroPhoto ? (
                         <img
-                            src={shop.shopPhotoUrl}
+                            src={heroPhoto}
                             alt={shop.name}
                             className="w-full h-full object-cover"
                         />

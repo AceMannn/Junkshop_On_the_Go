@@ -16,6 +16,8 @@ const {
   MAX_PAYMENT_SUBMITS,
 } = require('../utils/pickupPayment');
 const { MAX_DOCUMENT_BYTES } = require('../utils/verificationConstants');
+const { normalizeImageData } = require('../utils/verificationImageData');
+const { uploadImageData } = require('../utils/cloudinaryStorage');
 const {
   canStartNewActivity,
   isBanned,
@@ -93,6 +95,98 @@ const resolvePickupLocation = async ({ requestType, address, junkshop }) => {
 
 const serializeRequest = (doc, viewerRole, statusMap = {}) =>
   serializePickupForViewer(doc, viewerRole, statusMap);
+
+function isRemoteImageUrl(value) {
+  return /^https?:\/\//i.test(String(value || '').trim());
+}
+
+async function uploadPickupImage(rawData, { folder, mimeType, publicId, tags }) {
+  const uploaded = await uploadImageData(rawData, {
+    folder,
+    mimeType,
+    publicId,
+    tags,
+  });
+
+  if (!uploaded) return null;
+
+  return {
+    data: '',
+    secureUrl: uploaded.secureUrl,
+    publicId: uploaded.publicId,
+  };
+}
+
+async function processMaterialPhotos(photos, requestId) {
+  const processed = [];
+
+  for (const [index, photo] of photos.entries()) {
+    const mimeType = String(photo.mimeType || 'image/jpeg').trim();
+    const fileName = String(photo.fileName || 'photo.jpg').trim();
+    const rawData = String(photo.data || '').trim();
+    const isRemote = isRemoteImageUrl(rawData);
+    const data = isRemote ? '' : normalizeImageData(rawData);
+
+    if (!data && !isRemote) {
+      return { error: 'Material photo is required.' };
+    }
+    if (data && data.length > MAX_DOCUMENT_BYTES) {
+      return { error: 'Material photo is too large. Max 20MB per image.' };
+    }
+    if (!mimeType.startsWith('image/')) {
+      return { error: 'Material photos must be image files.' };
+    }
+
+    const uploaded = isRemote
+      ? {
+          data: '',
+          secureUrl: rawData,
+          publicId: String(photo.publicId || '').trim(),
+        }
+      : await uploadPickupImage(rawData, {
+          folder: 'pickup/material-photos',
+          mimeType,
+          publicId: `${requestId}/material-${index + 1}-${Date.now()}`,
+          tags: ['pickup', 'material-photo', String(requestId || '')].filter(Boolean),
+        });
+
+    processed.push({
+      fileName,
+      mimeType,
+      data: uploaded ? uploaded.data : data,
+      secureUrl: uploaded?.secureUrl || '',
+      publicId: uploaded?.publicId || '',
+    });
+  }
+
+  return { photos: processed };
+}
+
+async function processPaymentProof(rawProof, requestId) {
+  const rawData = String(rawProof || '').trim();
+  const isRemote = isRemoteImageUrl(rawData);
+  const data = isRemote ? '' : normalizeImageData(rawData);
+
+  if (!data && !isRemote) {
+    return { error: 'Upload a valid payment screenshot.' };
+  }
+  if (data && data.length > MAX_DOCUMENT_BYTES) {
+    return { error: 'Payment screenshot is too large. Max 20MB.' };
+  }
+
+  if (isRemote) {
+    return { proofUrl: rawData };
+  }
+
+  const uploaded = await uploadPickupImage(rawData, {
+    folder: 'pickup/payment-proofs',
+    mimeType: 'image/jpeg',
+    publicId: `${requestId}/payment-proof-${Date.now()}`,
+    tags: ['pickup', 'payment-proof', String(requestId || '')].filter(Boolean),
+  });
+
+  return { proofUrl: uploaded?.secureUrl || data };
+}
 
 const collectPickupStatusIds = (requests) => {
   const ids = [];
@@ -316,6 +410,10 @@ exports.createPickupRequest = async (req, res) => {
     if (photos.length < 1) {
       return res.status(400).json({ message: 'Upload at least one photo of your materials.' });
     }
+    const processedPhotos = await processMaterialPhotos(photos, req.user._id);
+    if (processedPhotos.error) {
+      return res.status(400).json({ message: processedPhotos.error });
+    }
 
     const totalKg = normalizedMaterials
       .filter((item) => item.unit === 'kg')
@@ -381,11 +479,7 @@ exports.createPickupRequest = async (req, res) => {
       contactPhone: normalizedPhone || contactPhone?.trim() || '',
       contactEmail: contactEmail?.trim() || '',
       materials: normalizedMaterials,
-      materialPhotos: photos.map((photo) => ({
-        fileName: String(photo.fileName || 'photo.jpg').trim(),
-        mimeType: String(photo.mimeType || 'image/jpeg').trim(),
-        data: String(photo.data || ''),
-      })),
+      materialPhotos: processedPhotos.photos,
       estimatedWeightKg: weight,
       address: pickupAddress,
       pickupLocation: pickupLocation || undefined,
@@ -748,12 +842,13 @@ exports.submitPaymentProof = async (req, res) => {
     if (paymentReference.length < 4) {
       return res.status(400).json({ message: 'Enter a valid GCash reference number.' });
     }
-    if (paymentProofUrl.length > MAX_DOCUMENT_BYTES) {
-      return res.status(400).json({ message: 'Payment screenshot is too large. Max 20MB.' });
+    const processedProof = await processPaymentProof(paymentProofUrl, request._id);
+    if (processedProof.error) {
+      return res.status(400).json({ message: processedProof.error });
     }
 
     request.paymentReference = paymentReference;
-    request.paymentProofUrl = paymentProofUrl;
+    request.paymentProofUrl = processedProof.proofUrl;
     request.paymentSubmittedAt = new Date();
     request.serviceFeePaymentStatus = 'submitted';
     request.paymentRejectNote = '';

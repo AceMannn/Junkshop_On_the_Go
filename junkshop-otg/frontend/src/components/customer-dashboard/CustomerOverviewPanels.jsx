@@ -24,7 +24,7 @@ import ShopCardPreviewDetails from "./ShopCardPreviewDetails";
 import NumberInput from "../ui/NumberInput";
 import { isFavoriteShopId } from "../../utils/favorites";
 import { priceCategories } from "../../data/prices";
-import { useCatalogJunkshops, useCatalogMaterials } from "../../hooks/useCatalogData";
+import { useCatalogJunkshops, useFeaturedMaterials } from "../../hooks/useCatalogData";
 import { domainApi } from "../../services/api";
 import {
     formatUpdatedDate,
@@ -174,7 +174,7 @@ export function JunkshopsPanel({
         <div className="space-y-6">
             <PanelStatus loading={loading} error={error} source={source} onRetry={refresh} />
             <p className="text-sm text-[#72796e] max-w-2xl">
-                Verified partner junkshops only — providers appear here after they complete shop setup.
+                Approved junkshops appear here. Verified, trusted, and top badges show when admins assign them.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3">
@@ -215,7 +215,7 @@ export function JunkshopsPanel({
                         title={shops.length === 0 ? "No partner shops yet" : "No junkshops within range"}
                         description={
                             shops.length === 0
-                                ? "Verified junkshops appear here after providers complete shop setup (address, materials, GCash, and map pin)."
+                                ? "Approved junkshops appear here after admin review."
                                 : "No junkshops found within 5 km of your location. Try a different filter."
                         }
                     />
@@ -405,7 +405,7 @@ function TrendBadge({ trend }) {
 }
 
 export function MaterialPricesPanel() {
-    const { materials, loading, error, source, refresh } = useCatalogMaterials();
+    const { materials, loading, error, refresh } = useFeaturedMaterials();
     const [activeCategory, setActiveCategory] = useState("all");
 
     const filteredPrices = useMemo(() => {
@@ -434,7 +434,7 @@ export function MaterialPricesPanel() {
     if (!loading && materials.length === 0) {
         return (
             <div className="space-y-6">
-                <PanelStatus loading={loading} error={error} source={source} onRetry={refresh} />
+                <PanelStatus loading={loading} error={error} source="api" onRetry={refresh} />
                 <EmptyState
                     title="No price data yet"
                     description="Run npm run seed for reference catalog prices, or check back when partner shops publish their buy rates."
@@ -445,7 +445,7 @@ export function MaterialPricesPanel() {
 
     return (
         <div className="space-y-6">
-            <PanelStatus loading={loading} error={error} source={source} onRetry={refresh} />
+            <PanelStatus loading={loading} error={error} source="api" onRetry={refresh} />
             <p className="text-sm text-[#72796e] max-w-2xl">
                 Live catalog and partner shop rates. Prices vary by condition and volume.
             </p>

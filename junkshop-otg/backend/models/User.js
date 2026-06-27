@@ -75,6 +75,8 @@ const userSchema = new mongoose.Schema(
         fileName: { type: String, trim: true, default: '' },
         mimeType: { type: String, trim: true, default: '' },
         data: { type: String, default: '' },
+        secureUrl: { type: String, trim: true, default: '' },
+        publicId: { type: String, trim: true, default: '' },
         uploadedAt: Date,
       },
       businessPermit: {
@@ -82,6 +84,8 @@ const userSchema = new mongoose.Schema(
         fileName: { type: String, trim: true, default: '' },
         mimeType: { type: String, trim: true, default: '' },
         data: { type: String, default: '' },
+        secureUrl: { type: String, trim: true, default: '' },
+        publicId: { type: String, trim: true, default: '' },
         uploadedAt: Date,
       },
       shopPhotos: [
@@ -91,6 +95,8 @@ const userSchema = new mongoose.Schema(
           fileName: { type: String, trim: true, default: '' },
           mimeType: { type: String, trim: true, default: '' },
           data: { type: String, default: '' },
+          secureUrl: { type: String, trim: true, default: '' },
+          publicId: { type: String, trim: true, default: '' },
           uploadedAt: Date,
         },
       ],
@@ -108,6 +114,8 @@ const userSchema = new mongoose.Schema(
             fileName: { type: String, trim: true, default: '' },
             mimeType: { type: String, trim: true, default: '' },
             data: { type: String, default: '' },
+            secureUrl: { type: String, trim: true, default: '' },
+            publicId: { type: String, trim: true, default: '' },
             uploadedAt: Date,
           },
           businessPermit: {
@@ -115,6 +123,8 @@ const userSchema = new mongoose.Schema(
             fileName: { type: String, trim: true, default: '' },
             mimeType: { type: String, trim: true, default: '' },
             data: { type: String, default: '' },
+            secureUrl: { type: String, trim: true, default: '' },
+            publicId: { type: String, trim: true, default: '' },
             uploadedAt: Date,
           },
           shopPhotos: [
@@ -124,6 +134,8 @@ const userSchema = new mongoose.Schema(
               fileName: { type: String, trim: true, default: '' },
               mimeType: { type: String, trim: true, default: '' },
               data: { type: String, default: '' },
+              secureUrl: { type: String, trim: true, default: '' },
+              publicId: { type: String, trim: true, default: '' },
               uploadedAt: Date,
             },
           ],

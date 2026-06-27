@@ -20,6 +20,8 @@ import {
     CheckCircle,
     Truck,
     MoreHorizontal,
+    ChevronLeft,
+    ChevronRight,
 } from "lucide-react";
 import CustomerPickupsTab from "./customer-dashboard/CustomerPickupsTab";
 import ProfileCompletionBanner from "./ui/ProfileCompletionBanner";
@@ -34,7 +36,7 @@ import {
     LogTripPanel,
     OVERVIEW_PANELS,
 } from "./customer-dashboard/CustomerOverviewPanels";
-import MaterialMarketplaceSection from "./marketplace/MaterialMarketplaceSection";
+import CustomerSellRecyclablesSection from "./customer-dashboard/CustomerSellRecyclablesSection";
 import { QuickAddPanel, ScanPhotoPanel } from "./customer-dashboard/CustomerFabPanels";
 import CustomerSpeedDial from "./customer-dashboard/CustomerSpeedDial";
 import CustomerTopbar from "./customer-dashboard/CustomerTopbar";
@@ -101,8 +103,8 @@ export default function CustomerDashboard({
     pickupWizardPrefill,
     pickupWizardSignal,
 }) {
-    const { shops } = useCatalogJunkshops({ partnersOnly: true });
-    const { favoriteIds, toggleFavorite } = useFavorites();
+    const { shops, loading: shopsLoading } = useCatalogJunkshops({ partnersOnly: true });
+    const { favoriteIds, loading: favoritesLoading, toggleFavorite } = useFavorites();
     const navigate = useNavigate();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState("overview");
@@ -119,6 +121,7 @@ export default function CustomerDashboard({
     const [focusPickupId, setFocusPickupId] = useState(null);
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
+    const [passwordNoticeShown, setPasswordNoticeShown] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
     const [pickupsTabMounted, setPickupsTabMounted] = useState(
         () => activeTab === "pickups"
@@ -181,6 +184,14 @@ export default function CustomerDashboard({
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3200);
     };
+
+    useEffect(() => {
+        if (!user?.passwordNeedsUpdate || passwordNoticeShown) return;
+        setToastMessage(user.passwordSecurityMessage || "For your security, change your password.");
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3200);
+        setPasswordNoticeShown(true);
+    }, [passwordNoticeShown, user?.passwordNeedsUpdate, user?.passwordSecurityMessage]);
 
     const openOverviewPanel = (panelId, shopId = null) => {
         navigate(
@@ -463,6 +474,7 @@ export default function CustomerDashboard({
                         <OverviewTab
                             user={user}
                             shops={shops}
+                            shopsLoading={shopsLoading}
                             favoriteIds={favoriteIds}
                             historyRows={historyRows}
                             onOpenPanel={openOverviewPanel}
@@ -476,6 +488,21 @@ export default function CustomerDashboard({
                             onViewAllPrices={() => {
                                 onOpenAllPrices?.();
                                 openOverviewPanel("prices");
+                            }}
+                            onViewShopProfile={(shop) => openShopProfile(shop, "Back to Overview")}
+                            onBookShop={(shop, prefillMaterial) => {
+                                handleTabChange("pickups");
+                                onBookMaterial?.({
+                                    junkshopId: shop._id || shop.id,
+                                    ...(prefillMaterial
+                                        ? {
+                                              name: prefillMaterial.name,
+                                              category: prefillMaterial.category,
+                                              unit: prefillMaterial.unit,
+                                              catalogId: `shop-${prefillMaterial.name}`,
+                                          }
+                                        : {}),
+                                });
                             }}
                         />
                     )}
@@ -511,7 +538,9 @@ export default function CustomerDashboard({
                     {!accountView && !overviewPanel && !shopProfile && activeTab === "favorites" && (
                         <FavoritesTab
                             shops={shops}
+                            shopsLoading={shopsLoading}
                             favoriteIds={favoriteIds}
+                            favoritesLoading={favoritesLoading}
                             onToggleFavorite={handleToggleFavorite}
                             onFindShops={() => openOverviewPanel("junkshops")}
                             onViewProfile={(shop) => openShopProfile(shop, "Back to Favorites")}
@@ -805,6 +834,7 @@ function CustomerSidePanel({
 function OverviewTab({
     user,
     shops,
+    shopsLoading = false,
     favoriteIds,
     historyRows,
     onOpenPanel,
@@ -813,15 +843,17 @@ function OverviewTab({
     onToggleFavorite,
     onBookMaterial,
     onViewAllPrices,
+    onViewShopProfile,
+    onBookShop,
 }) {
     const handleViewAllShops = () => onOpenPanel("junkshops");
     const welcomeName = user?.firstName || "there";
+    const [shopPage, setShopPage] = useState(0);
 
-    const nearbyShops = useMemo(
+    const junkshopCards = useMemo(
         () =>
             shops
-                .filter((shop) => shop.isPartner && (shop.distanceKm == null || shop.distanceKm <= 5))
-                .slice(0, 5)
+                .filter((shop) => shop.isPartner)
                 .map((shop) => ({
                     ...shop,
                     location: shop.address,
@@ -829,6 +861,23 @@ function OverviewTab({
                 })),
         [shops]
     );
+    const shopPageCount = Math.max(1, Math.ceil(junkshopCards.length / 3));
+    const visibleJunkshops = useMemo(() => {
+        const safePage = Math.min(shopPage, shopPageCount - 1);
+        return junkshopCards.slice(safePage * 3, safePage * 3 + 3);
+    }, [junkshopCards, shopPage, shopPageCount]);
+
+    useEffect(() => {
+        setShopPage((prev) => Math.min(prev, shopPageCount - 1));
+    }, [shopPageCount]);
+
+    const goPrevShops = () => {
+        setShopPage((prev) => (prev - 1 + shopPageCount) % shopPageCount);
+    };
+
+    const goNextShops = () => {
+        setShopPage((prev) => (prev + 1) % shopPageCount);
+    };
 
     const overviewStats = useMemo(() => {
         const totalKg = historyRows.reduce((sum, row) => {
@@ -892,13 +941,9 @@ function OverviewTab({
 
             <OverviewQuickAccess onOpenPanel={onOpenPanel} />
 
-            <MaterialMarketplaceSection
-                compact
-                isAuthenticated
-                title="Sell your recyclables"
-                description="Compare live partner prices and book a pickup or drop-off in a few taps."
-                onBookNow={onBookMaterial}
-                onViewAllPrices={onViewAllPrices}
+            <CustomerSellRecyclablesSection
+                onViewProfile={onViewShopProfile}
+                onBookNow={onBookShop}
             />
 
             {/* Stats */}
@@ -934,33 +979,54 @@ function OverviewTab({
                 />
             </section>
 
-            {/* Nearby + Recent */}
+            {/* Junkshops + Recent */}
             <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 sm:gap-8">
                 <div className="xl:col-span-2 space-y-4">
                     <div className="flex items-center justify-between gap-3">
                         <h2 className="text-lg sm:text-xl font-bold text-[#191c1c]">
-                            Nearby Junkshops
+                            Junkshops
                         </h2>
 
-                        <button
-                            type="button"
-                            onClick={handleViewAllShops}
-                            className="text-emerald-700 font-semibold flex items-center gap-1 hover:underline"
-                        >
-                            View All <Navigation size={18} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {junkshopCards.length > 3 && (
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={goPrevShops}
+                                        className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-[#154212] hover:bg-emerald-50"
+                                        aria-label="Previous junkshops"
+                                    >
+                                        <ChevronLeft size={17} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={goNextShops}
+                                        className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-[#154212] hover:bg-emerald-50"
+                                        aria-label="Next junkshops"
+                                    >
+                                        <ChevronRight size={17} />
+                                    </button>
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                onClick={handleViewAllShops}
+                                className="text-emerald-700 font-semibold flex items-center gap-1 hover:underline"
+                            >
+                                View All <Navigation size={18} />
+                            </button>
+                        </div>
                     </div>
 
                     <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#f9f9f8] to-transparent z-10" aria-hidden="true" />
-                    <div className="scroll-x-clean flex gap-4 sm:gap-6 pb-2 -mx-1 px-1 snap-x snap-mandatory">
-                        {nearbyShops.length === 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                        {visibleJunkshops.length === 0 ? (
                             <EmptyState
                                 compact
-                                title="No junkshops within range"
+                                title={shopsLoading ? "Loading junkshops..." : "No junkshops available"}
                             />
                         ) : (
-                            nearbyShops.map((shop) => (
+                            visibleJunkshops.map((shop) => (
                                 <CustomerShopSummaryCard
                                     key={shop.id}
                                     shop={shop}
@@ -968,7 +1034,6 @@ function OverviewTab({
                                     onToggleFavorite={() => onToggleFavorite(shop.id)}
                                     onViewProfile={() => openShopProfile(shop, "Back to Overview")}
                                     onRoute={() => onOpenShopRoute(shop)}
-                                    className="w-[min(100%,18rem)] min-w-[min(72vw,15rem)] sm:min-w-[16rem] max-w-[18rem] shrink-0 snap-start"
                                 />
                             ))
                         )}
@@ -1461,7 +1526,9 @@ function HistoryTab({
 
 function FavoritesTab({
     shops,
+    shopsLoading = false,
     favoriteIds,
+    favoritesLoading = false,
     onToggleFavorite,
     onFindShops,
     onViewProfile,
@@ -1471,6 +1538,8 @@ function FavoritesTab({
         () => shops.filter((shop) => isFavoriteShopId(shop.id, favoriteIds)),
         [shops, favoriteIds]
     );
+    const isLoadingFavorites =
+        favoritesLoading || (favoriteIds.length > 0 && shopsLoading && favoriteShops.length === 0);
 
     return (
         <div className="space-y-8 pb-24 md:pb-8">
@@ -1507,7 +1576,13 @@ function FavoritesTab({
                     />
                 ))}
 
-                {favoriteShops.length === 0 && (
+                {isLoadingFavorites && (
+                    <div className="col-span-full bg-white border border-zinc-200 rounded-xl flex flex-col items-center justify-center p-6 sm:p-8 text-center min-h-[min(50vh,20rem)] text-[#72796e]">
+                        Loading favorite shops...
+                    </div>
+                )}
+
+                {!isLoadingFavorites && favoriteShops.length === 0 && (
                     <div className="col-span-full bg-emerald-50/50 border-2 border-dashed border-emerald-200 rounded-xl flex flex-col items-center justify-center p-6 sm:p-8 text-center min-h-[min(50vh,20rem)]">
                         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
                             <Search size={42} className="text-emerald-600" />

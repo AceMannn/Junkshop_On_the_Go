@@ -52,6 +52,7 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
         hours: "8:00 AM - 6:00 PM",
         lat: "14.5995",
         lng: "121.0055",
+        description: "",
     });
     const [savingShop, setSavingShop] = useState(false);
 
@@ -64,6 +65,7 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                 hours: shop.hours,
                 lat: String(shop.lat ?? 14.5995),
                 lng: String(shop.lng ?? 121.0055),
+                description: shop.description || "",
             });
         }
     }, [shop]);
@@ -81,6 +83,7 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                 address: shopForm.address.trim(),
                 phone: shopForm.phone.trim(),
                 hours: shopForm.hours.trim(),
+                description: shopForm.description.trim().slice(0, 500),
                 status: shop?.status || "open",
                 location: {
                     lat: Number(shopForm.lat) || 14.5995,
@@ -156,6 +159,24 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                         value={shopForm.hours}
                         onChange={(v) => setShopForm({ ...shopForm, hours: v })}
                     />
+                    <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-[#42493e]">
+                            Shop description{" "}
+                            <span className="font-normal text-[#72796e]">(optional, max 500 chars)</span>
+                        </label>
+                        <textarea
+                            value={shopForm.description}
+                            onChange={(e) =>
+                                setShopForm({ ...shopForm, description: e.target.value.slice(0, 500) })
+                            }
+                            rows={3}
+                            placeholder="Tell customers what makes your shop special — materials accepted, fast service, etc."
+                            className="w-full bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#154212] resize-none"
+                        />
+                        <p className="text-xs text-[#72796e] text-right">
+                            {shopForm.description.length}/500
+                        </p>
+                    </div>
                     <LocationPickerMap
                         lat={shopForm.lat}
                         lng={shopForm.lng}

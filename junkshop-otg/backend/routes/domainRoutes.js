@@ -49,22 +49,22 @@ router.get('/junkshops', async (req, res) => {
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
   const partnersOnly = req.query.partners === 'true';
+  const withPending = req.query.withPending === 'true';
 
   let query = {};
   if (partnersOnly) {
-    const completeProviders = await User.find({
-      role: 'provider',
-      profileComplete: true,
-      status: { $ne: 'banned' },
-    })
-      .select('_id status')
+    const providerFilter = withPending
+      ? { role: 'provider', verificationStatus: { $in: ['approved', 'pending'] }, status: 'active' }
+      : { role: 'provider', verificationStatus: 'approved', status: 'active' };
+
+    const approvedProviders = await User.find(providerFilter)
+      .select('_id status verificationStatus')
       .lean();
-    const providerIds = completeProviders.map((user) => user._id);
+    const providerIds = approvedProviders.map((user) => user._id);
 
     query = {
       provider: { $in: providerIds },
       isCatalog: { $ne: true },
-      isPublished: true,
     };
   }
 
@@ -121,16 +121,13 @@ router.get('/junkshops', async (req, res) => {
   let providerMetaById = {};
   if (partnerProviderIds.length > 0) {
     const partnerProviders = await User.find({ _id: { $in: partnerProviderIds } })
-      .select('badges verificationDocuments.shopPhotos')
+      .select('badges verificationStatus')
       .lean();
 
     providerMetaById = partnerProviders.reduce((acc, provider) => {
-      const photo = (provider.verificationDocuments?.shopPhotos || []).find(
-        (row) => row?.data
-      );
       acc[String(provider._id)] = {
         badges: provider.badges || [],
-        shopPhotoUrl: photo?.data || '',
+        verificationStatus: provider.verificationStatus || 'draft',
       };
       return acc;
     }, {});
@@ -172,7 +169,8 @@ router.get('/junkshops', async (req, res) => {
       ...shop,
       listingPrices,
       badges: providerMeta.badges || [],
-      shopPhotoUrl: providerMeta.shopPhotoUrl || '',
+      verificationStatus: providerMeta.verificationStatus || 'draft',
+      shopPhotoUrl: '',
       materials:
         shop.materials?.length > 0
           ? shop.materials
@@ -218,6 +216,49 @@ router.get('/junkshops', async (req, res) => {
   }));
 
   res.json({ junkshops });
+});
+
+router.get('/junkshops/:id/photo', async (req, res) => {
+  try {
+    const shopQuery = String(req.params.id).match(/^[a-f\d]{24}$/i)
+      ? { _id: req.params.id }
+      : { slug: req.params.id };
+
+    const shop = await Junkshop.findOne(shopQuery)
+      .select('_id provider isCatalog')
+      .lean();
+
+    if (!shop || shop.isCatalog || !shop.provider) {
+      return res.status(404).json({ message: 'Shop photo not found.' });
+    }
+
+    const provider = await User.findOne({
+      _id: shop.provider,
+      role: 'provider',
+      verificationStatus: 'approved',
+      status: 'active',
+    })
+      .select('verificationDocuments.shopPhotos')
+      .lean();
+
+    const photo = (provider?.verificationDocuments?.shopPhotos || []).find(
+      (row) => row?.secureUrl || row?.data
+    );
+    if (!photo?.secureUrl && !photo?.data) {
+      return res.status(404).json({ message: 'Shop photo not found.' });
+    }
+
+    res.json({
+      data: photo.secureUrl || photo.data,
+      secureUrl: photo.secureUrl || '',
+      publicId: photo.publicId || '',
+      mimeType: photo.mimeType || 'image/jpeg',
+      fileName: photo.fileName || '',
+      slot: photo.slot || null,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load shop photo.' });
+  }
 });
 
 router.get('/junkshops/mine', protect, requireProvider, async (req, res) => {
@@ -330,15 +371,15 @@ router.delete('/junkshops/:id', protect, requireProvider, async (req, res) => {
 
 router.get('/materials', async (req, res) => {
   if (req.query.featured === 'true') {
-    const completeProviders = await User.find({
+    const visibleProviders = await User.find({
       role: 'provider',
-      profileComplete: true,
-      status: { $ne: 'banned' },
+      verificationStatus: 'approved',
+      status: 'active',
     })
       .select('_id status')
       .lean();
-    const providerIds = completeProviders.map((user) => user._id);
-    const providerStatusMap = completeProviders.reduce((acc, user) => {
+    const providerIds = visibleProviders.map((user) => user._id);
+    const providerStatusMap = visibleProviders.reduce((acc, user) => {
       acc[String(user._id)] = user.status;
       return acc;
     }, {});
@@ -393,7 +434,6 @@ router.get('/materials', async (req, res) => {
       const shops = await Junkshop.find({
         provider: { $in: materialProviderIds },
         isCatalog: { $ne: true },
-        isPublished: true,
       })
         .sort({ createdAt: 1 })
         .select('_id provider name address')

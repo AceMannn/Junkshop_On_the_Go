@@ -40,6 +40,8 @@ export function normalizeJunkshop(shop) {
     latestReview: shop.latestReview || null,
     badges: shop.badges || [],
     shopPhotoUrl: shop.shopPhotoUrl || '',
+    description: shop.description || '',
+    verificationStatus: shop.verificationStatus || 'draft',
     availabilityStatus,
   };
 

@@ -1,7 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../services/api';
 import LocationPickerMap from './maps/LocationPickerMap';
+import {
+  clearSignUpDrafts,
+  loadProviderSignUpDraft,
+  saveProviderSignUpDraft,
+} from '../utils/authFormDraft';
 import {
   AuthModalClose,
   AuthErrorPopup,
@@ -19,6 +24,7 @@ import {
   formatOperatingHoursSummary,
   sanitizeOperatingHours,
 } from '../utils/operatingHours';
+import { validatePasswordStrength } from '../utils/passwordPolicy';
 
 const STEPS = [
   { id: 1, title: 'Business info' },
@@ -42,6 +48,18 @@ const initialForm = {
   operatingHours: DEFAULT_OPERATING_HOURS,
   confirmAccurate: false,
 };
+
+function readProviderDraft() {
+  const draft = loadProviderSignUpDraft();
+  if (!draft?.form) return null;
+  return {
+    ...initialForm,
+    ...draft.form,
+    operatingHours: draft.form.operatingHours || DEFAULT_OPERATING_HOURS,
+    password: '',
+    confirmPassword: '',
+  };
+}
 
 function StepIndicator({ step }) {
   return (
@@ -71,8 +89,10 @@ export default function ProviderSignUpWizard({
   onShowLogin,
   onSwitchToCustomer,
 }) {
-  const [step, setStep] = useState(1);
-  const [form, setForm] = useState(initialForm);
+  const providerDraft = loadProviderSignUpDraft();
+
+  const [step, setStep] = useState(providerDraft?.step ?? 1);
+  const [form, setForm] = useState(() => readProviderDraft() || initialForm);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
@@ -82,6 +102,10 @@ export default function ProviderSignUpWizard({
     () => formatOperatingHoursSummary(form.operatingHours),
     [form.operatingHours]
   );
+
+  useEffect(() => {
+    saveProviderSignUpDraft({ step, form });
+  }, [step, form]);
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -108,8 +132,9 @@ export default function ProviderSignUpWizard({
           return 'Please enter a valid email address.';
         }
       }
-      if (form.password.length < 8) {
-        return 'Password must be at least 8 characters long.';
+      const passwordValidation = validatePasswordStrength(form.password);
+      if (!passwordValidation.ok) {
+        return passwordValidation.message;
       }
       if (form.password !== form.confirmPassword) {
         return 'Passwords do not match.';
@@ -164,6 +189,7 @@ export default function ProviderSignUpWizard({
 
       setForm(initialForm);
       setStep(1);
+      clearSignUpDrafts();
       onComplete?.(session);
       onClose?.();
     } catch (registerError) {

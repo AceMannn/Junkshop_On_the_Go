@@ -7,18 +7,51 @@ const {
   SHOP_PHOTO_SLOTS,
   MAX_DOCUMENT_BYTES,
 } = require('../utils/verificationConstants');
+const { normalizeImageData } = require('../utils/verificationImageData');
+const { uploadImageData } = require('../utils/cloudinaryStorage');
+
+function isRemoteImageUrl(value) {
+  return /^https?:\/\//i.test(String(value || '').trim());
+}
+
+function hasDocumentImage(doc) {
+  return Boolean(doc?.secureUrl || doc?.data);
+}
+
+function documentImageValue(doc) {
+  return doc?.secureUrl || doc?.data || '';
+}
 
 function canEditVerification(user) {
   return ['draft', 'rejected'].includes(user.verificationStatus);
 }
 
-function sanitizeDocumentPayload(raw, allowedTypes) {
+async function uploadVerificationImage(rawData, { folder, mimeType, publicId, tags }) {
+  const uploaded = await uploadImageData(rawData, {
+    folder,
+    mimeType,
+    publicId,
+    tags,
+  });
+
+  if (!uploaded) return null;
+
+  return {
+    secureUrl: uploaded.secureUrl,
+    publicId: uploaded.publicId,
+    data: '',
+  };
+}
+
+async function sanitizeDocumentPayload(raw, allowedTypes, { providerId, folder, publicIdPrefix } = {}) {
   const docType = String(raw?.docType || '').trim();
   const fileName = String(raw?.fileName || '').trim();
   const mimeType = String(raw?.mimeType || '').trim();
-  const data = String(raw?.data || '').trim();
+  const rawData = String(raw?.data || '').trim();
+  const isRemote = isRemoteImageUrl(rawData);
+  const data = isRemote ? '' : normalizeImageData(rawData);
 
-  if (!docType && !data) {
+  if (!docType && !data && !isRemote) {
     return null;
   }
 
@@ -26,11 +59,11 @@ function sanitizeDocumentPayload(raw, allowedTypes) {
     return { error: 'Choose a valid document type.' };
   }
 
-  if (!data) {
+  if (!data && !isRemote) {
     return { error: 'Upload a clear photo or scan of the document.' };
   }
 
-  if (data.length > MAX_DOCUMENT_BYTES) {
+  if (data && data.length > MAX_DOCUMENT_BYTES) {
     return { error: 'Document image is too large. Max 20MB per image.' };
   }
 
@@ -38,16 +71,31 @@ function sanitizeDocumentPayload(raw, allowedTypes) {
     return { error: 'Only image uploads are supported.' };
   }
 
+  const uploaded = isRemote
+    ? {
+        secureUrl: rawData,
+        publicId: String(raw?.publicId || '').trim(),
+        data: '',
+      }
+    : await uploadVerificationImage(rawData, {
+        folder,
+        mimeType,
+        publicId: `${providerId}/${publicIdPrefix}-${Date.now()}`,
+        tags: ['verification', String(providerId || '')].filter(Boolean),
+      });
+
   return {
     docType,
     fileName: fileName || docType,
     mimeType,
-    data,
+    data: uploaded ? uploaded.data : data,
+    secureUrl: uploaded?.secureUrl || '',
+    publicId: uploaded?.publicId || '',
     uploadedAt: new Date(),
   };
 }
 
-function sanitizeShopPhotos(rawPhotos) {
+async function sanitizeShopPhotos(rawPhotos, { providerId } = {}) {
   if (!Array.isArray(rawPhotos)) {
     return { error: 'Shop photos payload is invalid.' };
   }
@@ -63,11 +111,20 @@ function sanitizeShopPhotos(rawPhotos) {
       continue;
     }
 
-    const data = String(row.data || '').trim();
+    const rawData = String(row.data || '').trim();
+    const isRemote = isRemoteImageUrl(rawData);
+    const data = isRemote ? '' : normalizeImageData(rawData);
     const mimeType = String(row.mimeType || '').trim();
     const fileName = String(row.fileName || '').trim();
 
-    if (data.length > MAX_DOCUMENT_BYTES) {
+    if (!data && !isRemote) {
+      if (slotDef.required) {
+        continue;
+      }
+      continue;
+    }
+
+    if (data && data.length > MAX_DOCUMENT_BYTES) {
       return { error: `${slotDef.label} is too large. Max 20MB per image.` };
     }
 
@@ -75,12 +132,27 @@ function sanitizeShopPhotos(rawPhotos) {
       return { error: 'Shop photos must be image files.' };
     }
 
+    const uploaded = isRemote
+      ? {
+          secureUrl: rawData,
+          publicId: String(row.publicId || '').trim(),
+          data: '',
+        }
+      : await uploadVerificationImage(rawData, {
+          folder: 'verification/shop-photos',
+          mimeType,
+          publicId: `${providerId}/shop-photo-${slotDef.slot}-${Date.now()}`,
+          tags: ['verification', 'shop-photo', String(providerId || '')].filter(Boolean),
+        });
+
     cleaned.push({
       slot: slotDef.slot,
       label: slotDef.label,
       fileName: fileName || slotDef.label,
       mimeType,
-      data,
+      data: uploaded ? uploaded.data : data,
+      secureUrl: uploaded?.secureUrl || '',
+      publicId: uploaded?.publicId || '',
       uploadedAt: new Date(),
     });
   }
@@ -92,13 +164,17 @@ function serializeVerification(user, { includeFiles = true } = {}) {
   const docs = user.verificationDocuments || {};
 
   const mapDoc = (doc) => {
-    if (!doc?.docType && !doc?.data) return null;
+    if (!doc?.docType && !hasDocumentImage(doc)) return null;
     return {
       docType: doc.docType || '',
       fileName: doc.fileName || '',
       mimeType: doc.mimeType || '',
       uploadedAt: doc.uploadedAt || null,
-      ...(includeFiles ? { data: doc.data || '' } : { hasFile: Boolean(doc.data) }),
+      secureUrl: doc.secureUrl || '',
+      publicId: doc.publicId || '',
+      ...(includeFiles
+        ? { data: documentImageValue(doc) }
+        : { hasFile: Boolean(hasDocumentImage(doc) || doc.fileName || doc.uploadedAt) }),
     };
   };
 
@@ -117,7 +193,11 @@ function serializeVerification(user, { includeFiles = true } = {}) {
         fileName: photo.fileName || '',
         mimeType: photo.mimeType || '',
         uploadedAt: photo.uploadedAt || null,
-        ...(includeFiles ? { data: photo.data || '' } : { hasFile: Boolean(photo.data) }),
+        secureUrl: photo.secureUrl || '',
+        publicId: photo.publicId || '',
+        ...(includeFiles
+          ? { data: documentImageValue(photo) }
+          : { hasFile: Boolean(hasDocumentImage(photo) || photo.fileName || photo.uploadedAt) }),
       })),
     },
     requirements: {
@@ -134,16 +214,77 @@ function validateReadyForSubmit(user) {
   const permit = docs.businessPermit;
   const photos = docs.shopPhotos || [];
 
-  if (!gov?.docType || !gov?.data) {
+  if (!gov?.docType || !hasDocumentImage(gov)) {
     return 'Upload a valid government ID before submitting.';
   }
 
-  if (!permit?.docType || !permit?.data) {
+  if (!permit?.docType || !hasDocumentImage(permit)) {
     return 'Upload a valid business permit before submitting.';
   }
 
-  if (!photos.some((photo) => photo?.slot === 1 && photo?.data)) {
+  if (!photos.some((photo) => photo?.slot === 1 && hasDocumentImage(photo))) {
     return 'Upload at least one front-view junkshop photo before submitting.';
+  }
+
+  return null;
+}
+
+async function applyDocumentUpdates(user, { governmentId, businessPermit, shopPhotos } = {}) {
+  if (!user.verificationDocuments) {
+    user.verificationDocuments = {
+      governmentId: {},
+      businessPermit: {},
+      shopPhotos: [],
+    };
+  }
+
+  if (governmentId !== undefined) {
+    if (governmentId === null) {
+      user.verificationDocuments.governmentId = {};
+    } else {
+      const cleaned = await sanitizeDocumentPayload(governmentId, GOVERNMENT_ID_TYPES, {
+        providerId: user._id,
+        folder: 'verification/government-id',
+        publicIdPrefix: 'government-id',
+      });
+      if (cleaned?.error) {
+        return { error: cleaned.error };
+      }
+      if (cleaned) {
+        user.verificationDocuments.governmentId = cleaned;
+      }
+    }
+  }
+
+  if (businessPermit !== undefined) {
+    if (businessPermit === null) {
+      user.verificationDocuments.businessPermit = {};
+    } else {
+      const cleaned = await sanitizeDocumentPayload(businessPermit, BUSINESS_PERMIT_TYPES, {
+        providerId: user._id,
+        folder: 'verification/business-permit',
+        publicIdPrefix: 'business-permit',
+      });
+      if (cleaned?.error) {
+        return { error: cleaned.error };
+      }
+      if (cleaned) {
+        user.verificationDocuments.businessPermit = cleaned;
+      }
+    }
+  }
+
+  if (shopPhotos !== undefined) {
+    const cleanedPhotos = await sanitizeShopPhotos(shopPhotos, { providerId: user._id });
+    if (cleanedPhotos.error) {
+      return { error: cleanedPhotos.error };
+    }
+    user.verificationDocuments.shopPhotos = cleanedPhotos.photos;
+  }
+
+  if (user.verificationStatus === 'rejected') {
+    user.verificationStatus = 'draft';
+    user.verificationRejectNote = '';
   }
 
   return null;
@@ -185,60 +326,20 @@ exports.saveVerificationDocuments = async (req, res) => {
 
     const { governmentId, businessPermit, shopPhotos } = req.body;
 
-    if (!user.verificationDocuments) {
-      user.verificationDocuments = {
-        governmentId: {},
-        businessPermit: {},
-        shopPhotos: [],
-      };
-    }
-
-    if (governmentId !== undefined) {
-      if (governmentId === null) {
-        user.verificationDocuments.governmentId = {};
-      } else {
-        const cleaned = sanitizeDocumentPayload(governmentId, GOVERNMENT_ID_TYPES);
-        if (cleaned?.error) {
-          return res.status(400).json({ message: cleaned.error });
-        }
-        if (cleaned) {
-          user.verificationDocuments.governmentId = cleaned;
-        }
-      }
-    }
-
-    if (businessPermit !== undefined) {
-      if (businessPermit === null) {
-        user.verificationDocuments.businessPermit = {};
-      } else {
-        const cleaned = sanitizeDocumentPayload(businessPermit, BUSINESS_PERMIT_TYPES);
-        if (cleaned?.error) {
-          return res.status(400).json({ message: cleaned.error });
-        }
-        if (cleaned) {
-          user.verificationDocuments.businessPermit = cleaned;
-        }
-      }
-    }
-
-    if (shopPhotos !== undefined) {
-      const cleanedPhotos = sanitizeShopPhotos(shopPhotos);
-      if (cleanedPhotos.error) {
-        return res.status(400).json({ message: cleanedPhotos.error });
-      }
-      user.verificationDocuments.shopPhotos = cleanedPhotos.photos;
-    }
-
-    if (user.verificationStatus === 'rejected') {
-      user.verificationStatus = 'draft';
-      user.verificationRejectNote = '';
+    const updateError = await applyDocumentUpdates(user, {
+      governmentId,
+      businessPermit,
+      shopPhotos,
+    });
+    if (updateError?.error) {
+      return res.status(400).json({ message: updateError.error });
     }
 
     await user.save();
 
     res.json({
       message: 'Verification documents saved.',
-      verification: serializeVerification(user, { includeFiles: true }),
+      verification: serializeVerification(user, { includeFiles: false }),
     });
   } catch (error) {
     console.error('saveVerificationDocuments', error);
@@ -261,6 +362,19 @@ exports.submitVerification = async (req, res) => {
       return res.status(400).json({ message: 'Application is already pending review.' });
     }
 
+    const hasDocumentPayload =
+      req.body &&
+      (req.body.governmentId !== undefined ||
+        req.body.businessPermit !== undefined ||
+        req.body.shopPhotos !== undefined);
+
+    if (hasDocumentPayload) {
+      const updateError = await applyDocumentUpdates(user, req.body);
+      if (updateError?.error) {
+        return res.status(400).json({ message: updateError.error });
+      }
+    }
+
     const validationMessage = validateReadyForSubmit(user);
     if (validationMessage) {
       return res.status(400).json({ message: validationMessage });
@@ -274,15 +388,30 @@ exports.submitVerification = async (req, res) => {
 
     res.json({
       message: 'Verification submitted. An admin will review your documents soon.',
-      verification: serializeVerification(user, { includeFiles: true }),
+      verification: serializeVerification(user, { includeFiles: false }),
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not submit verification.' });
   }
 };
 
-exports.serializeVerificationForAdmin = async (userId) => {
-  const user = await User.findById(userId).select('-password');
+exports.serializeVerificationForAdmin = async (
+  userId,
+  { includeFiles = false, includeArchiveDocuments = false } = {}
+) => {
+  const excludedFields = ['-password'];
+  if (!includeFiles) {
+    excludedFields.push(
+      '-verificationDocuments.governmentId.data',
+      '-verificationDocuments.businessPermit.data',
+      '-verificationDocuments.shopPhotos.data'
+    );
+  }
+  if (!includeArchiveDocuments) {
+    excludedFields.push('-verificationArchive.documents');
+  }
+
+  const user = await User.findById(userId).select(excludedFields.join(' '));
   if (!user || user.role !== 'provider') {
     return null;
   }
@@ -318,13 +447,13 @@ exports.serializeVerificationForAdmin = async (userId) => {
           isPublished: shop.isPublished,
         }
       : null,
-    verification: serializeVerification(user, { includeFiles: true }),
+    verification: serializeVerification(user, { includeFiles }),
     verificationArchive: (user.verificationArchive || []).map((entry) => ({
       archivedAt: entry.archivedAt || null,
       reason: entry.reason || '',
       action: entry.action || '',
       previousStatus: entry.previousStatus || '',
-      documents: entry.documents || null,
+      ...(includeArchiveDocuments ? { documents: entry.documents || null } : {}),
     })),
   };
 };

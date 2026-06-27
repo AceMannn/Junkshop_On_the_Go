@@ -184,15 +184,19 @@ export const contactApi = {
 };
 
 export const domainApi = {
-  getJunkshops({ lat, lng, partnersOnly } = {}) {
+  getJunkshops({ lat, lng, partnersOnly, withPending } = {}) {
     const params = new URLSearchParams();
     if (lat != null && lng != null) {
       params.set('lat', String(lat));
       params.set('lng', String(lng));
     }
     if (partnersOnly) params.set('partners', 'true');
+    if (withPending) params.set('withPending', 'true');
     const qs = params.toString();
     return request(`/api/junkshops${qs ? `?${qs}` : ''}`);
+  },
+  getJunkshopPhoto(id) {
+    return request(`/api/junkshops/${id}/photo`);
   },
   getMyJunkshops() {
     return request('/api/junkshops/mine');
@@ -392,7 +396,16 @@ export const verificationApi = {
       body: JSON.stringify(payload),
     });
   },
-  submit() {
-    return request('/api/verification/submit', { method: 'POST' });
+  submit(payload) {
+    const hasPayload =
+      payload &&
+      (payload.governmentId !== undefined ||
+        payload.businessPermit !== undefined ||
+        payload.shopPhotos !== undefined);
+
+    return request('/api/verification/submit', {
+      method: 'POST',
+      body: hasPayload ? JSON.stringify(payload) : undefined,
+    });
   },
 };

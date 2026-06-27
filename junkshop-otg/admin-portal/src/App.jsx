@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import AdminDashboard from './components/AdminDashboard';
+import AdminApp from './AdminApp';
 import AdminLoginScreen from './components/AdminLoginScreen';
 import { authApi } from './services/api';
 import {
@@ -63,14 +63,14 @@ export default function App() {
 
   if (booting) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-zinc-500">
+      <div className="min-h-screen flex items-center justify-center bg-[#f9f9f8] text-zinc-500">
         Loading admin portal...
       </div>
     );
   }
 
   if (user?.role === 'admin') {
-    return <AdminDashboard user={user} onLogout={handleLogout} />;
+    return <AdminApp user={user} onLogout={handleLogout} />;
   }
 
   return (

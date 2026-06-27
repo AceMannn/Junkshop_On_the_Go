@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { ChevronRight, Package } from 'lucide-react';
-import { useCatalogJunkshops, useCatalogMaterials } from '../../hooks/useCatalogData';
+import { useCatalogJunkshops, useFeaturedMaterials } from '../../hooks/useCatalogData';
 import { formatUpdatedDate } from '../../utils/catalogMappers';
 import ShopBadges from '../ui/ShopBadges';
 import EmptyState from '../ui/EmptyState';
 import LoadErrorBanner from '../ui/LoadErrorBanner';
 import { siteContainerClass, siteSectionPadClass } from '../ui/siteUi';
+import { useShopPhoto } from '../../hooks/useShopPhoto';
 
 const HIGHLIGHTS = [
   { id: 'plastic', label: 'Plastic' },
@@ -50,7 +51,7 @@ export default function MaterialMarketplaceSection({
   onViewAllPrices,
   compact = false,
 }) {
-  const { materials, loading, error, refresh } = useCatalogMaterials({ autoRefresh: false });
+  const { materials, loading, error, refresh } = useFeaturedMaterials({ autoRefresh: false });
   const { shops } = useCatalogJunkshops({ partnersOnly: true, autoRefresh: false });
   const [activeCategory, setActiveCategory] = useState(HIGHLIGHTS[0].id);
   const [selectedMaterialId, setSelectedMaterialId] = useState('');
@@ -101,6 +102,7 @@ export default function MaterialMarketplaceSection({
     }
     return shopOptions[0] || null;
   }, [shopOptions, selectedShopId]);
+  const selectedShopPhoto = useShopPhoto(selectedShop);
 
   const livePrice = useMemo(() => {
     if (!selectedMaterial || !selectedShop) return null;
@@ -246,9 +248,9 @@ export default function MaterialMarketplaceSection({
               </div>
 
               <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
-                {selectedShop?.shopPhotoUrl ? (
+                {selectedShopPhoto ? (
                   <img
-                    src={selectedShop.shopPhotoUrl}
+                    src={selectedShopPhoto}
                     alt={selectedShop.name}
                     className="w-full aspect-[4/3] max-h-48 object-cover rounded-xl border border-zinc-100"
                   />

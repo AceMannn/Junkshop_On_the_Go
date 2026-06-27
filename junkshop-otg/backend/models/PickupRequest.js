@@ -42,6 +42,8 @@ const pickupRequestSchema = new mongoose.Schema(
         fileName: { type: String, trim: true, default: '' },
         mimeType: { type: String, trim: true, default: '' },
         data: { type: String, default: '' },
+        secureUrl: { type: String, trim: true, default: '' },
+        publicId: { type: String, trim: true, default: '' },
       },
     ],
     estimatedWeightKg: {

@@ -25,9 +25,11 @@ function hasVerificationFiles(documents) {
   const photos = docs.shopPhotos || [];
 
   return Boolean(
-    gov?.data ||
+    gov?.secureUrl ||
+      gov?.data ||
+      permit?.secureUrl ||
       permit?.data ||
-      photos.some((photo) => photo?.data)
+      photos.some((photo) => photo?.secureUrl || photo?.data)
   );
 }
 

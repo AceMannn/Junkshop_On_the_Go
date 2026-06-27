@@ -103,7 +103,9 @@ async function evaluateProfile(user) {
 }
 
 async function syncProfileComplete(userId) {
-  const user = await User.findById(userId);
+  const user = await User.findById(userId).select(
+    '-password -verificationDocuments -verificationArchive'
+  );
   if (!user) return null;
 
   const status = await evaluateProfile(user);

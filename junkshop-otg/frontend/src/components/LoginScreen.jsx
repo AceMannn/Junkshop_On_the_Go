@@ -15,8 +15,18 @@ import {
   authSubmitClass,
 } from './auth/authModalUi';
 import EmailVerificationStep from './auth/EmailVerificationStep';
+import {
+  clearLoginDraft,
+  loadLoginDraft,
+  saveLoginDraft,
+} from '../utils/authFormDraft';
+import { validatePasswordStrength } from '../utils/passwordPolicy';
 
 const OTP_LENGTH = 6;
+
+function readLoginDraft() {
+  return loadLoginDraft();
+}
 
 export default function LoginScreen({
   onLoginSuccess,
@@ -26,15 +36,21 @@ export default function LoginScreen({
   initialRole = 'customer',
   successMessage = '',
 }) {
-  const [view, setView] = useState('login');
-  const [email, setEmail] = useState(initialEmail);
-  const [recoveryContact, setRecoveryContact] = useState(initialEmail);
+  const savedDraft = readLoginDraft();
+
+  const [view, setView] = useState(savedDraft.view || 'login');
+  const [email, setEmail] = useState(() => initialEmail || savedDraft.email || '');
+  const [recoveryContact, setRecoveryContact] = useState(
+    () => initialEmail || savedDraft.recoveryContact || savedDraft.email || ''
+  );
   const [password, setPassword] = useState('');
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState(initialRole);
+  const [selectedRole, setSelectedRole] = useState(
+    () => initialRole || savedDraft.selectedRole || 'customer'
+  );
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -50,19 +66,26 @@ export default function LoginScreen({
   }, [view]);
 
   useEffect(() => {
-    setEmail(initialEmail);
-    setRecoveryContact(initialEmail);
-    setSelectedRole(initialRole);
-    setPassword('');
-    setResetToken('');
-    setNewPassword('');
-    setError('');
-    setInfo('');
-    setVerificationEmail('');
-    setVerificationDevCode('');
-    setVerificationMessage('');
-    setView('login');
+    if (initialEmail) {
+      setEmail(initialEmail);
+      setRecoveryContact(initialEmail);
+    }
+    if (initialRole) {
+      setSelectedRole(initialRole);
+    }
+    if (successMessage) {
+      setPassword('');
+    }
   }, [initialEmail, initialRole, successMessage]);
+
+  useEffect(() => {
+    saveLoginDraft({
+      view,
+      email,
+      recoveryContact,
+      selectedRole,
+    });
+  }, [view, email, recoveryContact, selectedRole]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -92,11 +115,6 @@ export default function LoginScreen({
       }
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long.');
-      return;
-    }
-
     setIsLoading(true);
     try {
       const session = await authApi.login({
@@ -109,6 +127,7 @@ export default function LoginScreen({
         role: selectedRole,
       });
       onLoginSuccess(session);
+      clearLoginDraft();
     } catch (loginError) {
       if (loginError.requiresEmailVerification) {
         setVerificationEmail(loginError.email || email);
@@ -171,8 +190,9 @@ export default function LoginScreen({
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError('New password must be at least 8 characters.');
+    const passwordValidation = validatePasswordStrength(newPassword);
+    if (!passwordValidation.ok) {
+      setError(passwordValidation.message);
       return;
     }
 
@@ -517,6 +537,7 @@ export default function LoginScreen({
               initialMessage={verificationMessage}
               onVerified={(session) => {
                 onLoginSuccess(session);
+      clearLoginDraft();
               }}
               onBack={() => {
                 setView('login');
