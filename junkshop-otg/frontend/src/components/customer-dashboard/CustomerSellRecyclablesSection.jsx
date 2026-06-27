@@ -7,9 +7,11 @@ import {
   Phone,
   Calendar,
   Star,
-  SlidersHorizontal,
+  Store,
 } from 'lucide-react';
 import VerifiedPartnerIcon, { isVerified } from '../ui/VerifiedPartnerIcon';
+import EmptyState from '../ui/EmptyState';
+import { siteFilterChipClass } from '../ui/siteUi';
 import { useShopPhoto } from '../../hooks/useShopPhoto';
 import { useCatalogJunkshops } from '../../hooks/useCatalogData';
 import { shopAutoDescription } from '../../utils/shopDescription';
@@ -19,7 +21,7 @@ import ShopCategoryMaterialGrid, { SELL_CATEGORIES } from './ShopCategoryMateria
 import ConfirmUnverifiedShopModal from '../ui/ConfirmUnverifiedShopModal';
 
 const SORT_OPTIONS = [
-  { id: 'latest',   label: 'Latest'    },
+  { id: 'latest', label: 'Latest' },
   { id: 'toprated', label: 'Top rated' },
 ];
 
@@ -54,9 +56,7 @@ function StarRating({ rating, reviewCount }) {
     <div className="flex items-center gap-1 text-xs text-amber-500">
       <Star size={11} fill="currentColor" strokeWidth={0} />
       <span className="font-semibold text-[#42493e]">{Number(rating).toFixed(1)}</span>
-      {reviewCount > 0 && (
-        <span className="text-[#72796e]">({reviewCount})</span>
-      )}
+      {reviewCount > 0 && <span className="text-[#72796e]">({reviewCount})</span>}
     </div>
   );
 }
@@ -68,10 +68,43 @@ function ShopHeroPhoto({ shop }) {
       {photo ? (
         <img src={photo} alt={shop.name} className="w-full h-full object-cover" />
       ) : (
-        <div className="w-full h-full flex items-center justify-center text-xs text-zinc-400 select-none">
-          Shop photo coming soon
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-xs text-zinc-400 select-none bg-gradient-to-br from-zinc-50 to-zinc-100">
+          <Store size={22} className="opacity-40" />
+          <span>Shop photo coming soon</span>
         </div>
       )}
+    </div>
+  );
+}
+
+function ShopCardSkeleton() {
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden animate-pulse">
+      <div className="grid grid-cols-1 lg:grid-cols-2">
+        <div className="p-5 sm:p-6 border-b lg:border-b-0 lg:border-r border-zinc-100 space-y-4">
+          <div className="aspect-[16/9] rounded-xl bg-zinc-200" />
+          <div className="h-5 w-2/3 rounded-lg bg-zinc-200" />
+          <div className="space-y-2">
+            <div className="h-3 w-full rounded bg-zinc-100" />
+            <div className="h-3 w-4/5 rounded bg-zinc-100" />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <div className="h-10 flex-1 rounded-xl bg-zinc-200" />
+            <div className="h-10 flex-1 rounded-xl bg-zinc-100" />
+          </div>
+        </div>
+        <div className="p-5 sm:p-6 space-y-4">
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-16 rounded-xl bg-zinc-100" />
+            ))}
+          </div>
+          <div className="space-y-2 pt-2">
+            <div className="h-3 w-3/4 rounded bg-zinc-100" />
+            <div className="h-3 w-1/2 rounded bg-zinc-100" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -103,22 +136,24 @@ function ShopCard({ shop, onViewProfile, onBookNow }) {
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden transition-shadow hover:shadow-md">
       <div className="grid grid-cols-1 lg:grid-cols-2">
-        {/* LEFT: photo, name, description, buttons */}
         <div className="flex flex-col p-5 sm:p-6 border-b lg:border-b-0 lg:border-r border-zinc-100">
           <ShopHeroPhoto shop={shop} />
 
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h3 className="font-bold text-lg text-[#191c1c] leading-snug">{shop.name}</h3>
             {verified && <VerifiedPartnerIcon size="md" />}
+            {shop.verificationStatus === 'pending' && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                Pending review
+              </span>
+            )}
           </div>
 
           <StarRating rating={shop.rating} reviewCount={shop.reviewCount} />
 
-          <p className="text-sm text-[#72796e] leading-relaxed mt-2 mb-5 flex-1">
-            {description}
-          </p>
+          <p className="text-sm text-[#72796e] leading-relaxed mt-2 mb-5 flex-1">{description}</p>
 
           <div className="flex flex-col sm:flex-row gap-2 mt-auto">
             <button
@@ -140,7 +175,6 @@ function ShopCard({ shop, onViewProfile, onBookNow }) {
           </div>
         </div>
 
-        {/* RIGHT: category grid + info rows */}
         <div className="flex flex-col p-5 sm:p-6 gap-4">
           <ShopCategoryMaterialGrid
             byCategory={byCategory}
@@ -194,10 +228,7 @@ export default function CustomerSellRecyclablesSection({ onViewProfile, onBookNo
   const [shopIndex, setShopIndex] = useState(0);
   const [pendingBook, setPendingBook] = useState(null);
 
-  const partnerShops = useMemo(
-    () => allShops.filter((s) => s.isPartner),
-    [allShops]
-  );
+  const partnerShops = useMemo(() => allShops.filter((s) => s.isPartner), [allShops]);
 
   const filtered = useMemo(() => {
     let list = partnerShops;
@@ -227,14 +258,8 @@ export default function CustomerSellRecyclablesSection({ onViewProfile, onBookNo
   const total = filtered.length;
   const hasMultiple = total > 1;
 
-  const goPrev = useCallback(
-    () => setShopIndex((i) => (i - 1 + total) % total),
-    [total]
-  );
-  const goNext = useCallback(
-    () => setShopIndex((i) => (i + 1) % total),
-    [total]
-  );
+  const goPrev = useCallback(() => setShopIndex((i) => (i - 1 + total) % total), [total]);
+  const goNext = useCallback(() => setShopIndex((i) => (i + 1) % total), [total]);
 
   const handleFilterChange = (catId) => {
     setCategoryFilter(catId);
@@ -264,21 +289,25 @@ export default function CustomerSellRecyclablesSection({ onViewProfile, onBookNo
     setPendingBook(null);
   };
 
+  const emptyDescription =
+    categoryFilter !== 'all'
+      ? `No partner shops accept ${SELL_CATEGORIES.find((c) => c.id === categoryFilter)?.label || categoryFilter} yet. Try another category or check back soon.`
+      : 'Partner junkshops will appear here once they join. Check back soon!';
+
   return (
     <section>
-      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-        <div>
-          <h2 className="text-lg font-bold text-[#191c1c]">Sell your recyclables</h2>
-          <p className="text-sm text-[#72796e]">
-            Browse partner junkshops and book a pickup or drop-off.
-          </p>
-        </div>
+      <div className="mb-4">
+        <p className="text-xs font-bold uppercase tracking-wider text-[#3DA35D] mb-1">
+          Partner shops
+        </p>
+        <h2 className="text-lg sm:text-xl font-bold text-[#191c1c]">Sell your recyclables</h2>
+        <p className="text-sm text-[#72796e] mt-1">
+          Browse partner junkshops and book a pickup or drop-off.
+        </p>
       </div>
 
-      {/* Controls row */}
       <div className="flex flex-wrap gap-2 mb-4 items-center">
-        {/* Sort */}
-        <div className="flex rounded-xl overflow-hidden border border-zinc-200 shrink-0">
+        <div className="flex rounded-xl overflow-hidden border border-zinc-200 shrink-0 shadow-sm">
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.id}
@@ -295,74 +324,81 @@ export default function CustomerSellRecyclablesSection({ onViewProfile, onBookNo
           ))}
         </div>
 
-        {/* Category filter */}
-        <div className="flex flex-wrap gap-1 flex-1 min-w-0">
-          <button
-            key="all"
-            type="button"
-            onClick={() => handleFilterChange('all')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors ${
-              categoryFilter === 'all'
-                ? 'bg-emerald-700 text-white border-emerald-700'
-                : 'bg-white text-[#42493e] border-zinc-200 hover:border-zinc-300'
-            }`}
-          >
-            All
-          </button>
-          {SELL_CATEGORIES.map((cat) => (
+        <div className="relative flex-1 min-w-0">
+          <div className="scroll-x-clean flex gap-1.5 pb-0.5 md:flex-wrap">
             <button
-              key={cat.id}
               type="button"
-              onClick={() => handleFilterChange(cat.id)}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors ${
-                categoryFilter === cat.id
-                  ? 'bg-emerald-700 text-white border-emerald-700'
-                  : 'bg-white text-[#42493e] border-zinc-200 hover:border-zinc-300'
-              }`}
+              onClick={() => handleFilterChange('all')}
+              className={siteFilterChipClass(categoryFilter === 'all')}
             >
-              {cat.label}
+              All
             </button>
-          ))}
+            {SELL_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => handleFilterChange(cat.id)}
+                className={siteFilterChipClass(categoryFilter === cat.id)}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {loading && (
-        <div className="flex items-center justify-center h-40 text-sm text-[#72796e]">
-          Loading shops…
-        </div>
-      )}
+      {loading && <ShopCardSkeleton />}
 
       {!loading && total === 0 && (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center text-sm text-[#72796e]">
-          {categoryFilter !== 'all'
-            ? `No partner shops accept ${SELL_CATEGORIES.find((c) => c.id === categoryFilter)?.label || categoryFilter} yet.`
-            : 'No partner junkshops available yet. Check back soon!'}
-        </div>
+        <EmptyState
+          compact
+          icon={Store}
+          title={categoryFilter !== 'all' ? 'No shops for this category' : 'No partner shops yet'}
+          description={emptyDescription}
+        />
       )}
 
       {!loading && currentShop && (
         <>
-          {/* Shop navigation */}
           {hasMultiple && (
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-3 gap-3">
               <button
                 type="button"
                 onClick={goPrev}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors shadow-sm"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white hover:bg-emerald-50 hover:border-emerald-200 transition-colors shadow-sm"
                 aria-label="Previous shop"
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={18} className="text-[#154212]" />
               </button>
-              <span className="text-sm text-[#72796e] font-medium">
-                {safeIndex + 1} / {total}
-              </span>
+
+              <div className="flex flex-col items-center gap-1.5 min-w-0">
+                <span className="text-sm text-[#72796e] font-medium truncate max-w-[12rem] sm:max-w-none">
+                  {currentShop.name}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {filtered.map((shop, i) => (
+                    <button
+                      key={shop.id || shop._id || i}
+                      type="button"
+                      onClick={() => setShopIndex(i)}
+                      aria-label={`Go to shop ${i + 1}`}
+                      className={`h-1.5 rounded-full transition-all ${
+                        i === safeIndex
+                          ? 'w-5 bg-[#154212]'
+                          : 'w-1.5 bg-zinc-300 hover:bg-emerald-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={goNext}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors shadow-sm"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white hover:bg-emerald-50 hover:border-emerald-200 transition-colors shadow-sm"
                 aria-label="Next shop"
               >
-                <ChevronRight size={18} />
+                <ChevronRight size={18} className="text-[#154212]" />
               </button>
             </div>
           )}

@@ -12,16 +12,13 @@ import {
     Recycle,
     TreePine,
     MapPin,
-    Navigation,
-    Info,
     ReceiptText,
+    ChevronRight,
     Download,
     CalendarDays,
     CheckCircle,
     Truck,
     MoreHorizontal,
-    ChevronLeft,
-    ChevronRight,
 } from "lucide-react";
 import CustomerPickupsTab from "./customer-dashboard/CustomerPickupsTab";
 import ProfileCompletionBanner from "./ui/ProfileCompletionBanner";
@@ -42,6 +39,7 @@ import CustomerSpeedDial from "./customer-dashboard/CustomerSpeedDial";
 import CustomerTopbar from "./customer-dashboard/CustomerTopbar";
 import HelpModal from "./ui/HelpModal";
 import EmptyState from "./ui/EmptyState";
+import StatCard from "./ui/StatCard";
 import ShopRating from "./ui/ShopRating";
 import {
     ViewProfilePage,
@@ -86,13 +84,6 @@ const ACTIVITY_STYLES = [
     { icon: ReceiptText, iconBg: "bg-blue-100",     iconText: "text-blue-700"   },
     { icon: Store,       iconBg: "bg-amber-100",    iconText: "text-amber-700"  },
 ];
-
-const STAT_COLORS = {
-    green: { iconBg: "bg-emerald-100", iconText: "text-emerald-700", border: "border-t-emerald-400" },
-    amber: { iconBg: "bg-amber-100",   iconText: "text-amber-700",   border: "border-t-amber-400"   },
-    blue:  { iconBg: "bg-blue-100",    iconText: "text-blue-700",    border: "border-t-blue-400"    },
-    teal:  { iconBg: "bg-teal-100",    iconText: "text-teal-700",    border: "border-t-teal-400"    },
-};
 
 export default function CustomerDashboard({
     onLogout,
@@ -846,39 +837,7 @@ function OverviewTab({
     onViewShopProfile,
     onBookShop,
 }) {
-    const handleViewAllShops = () => onOpenPanel("junkshops");
     const welcomeName = user?.firstName || "there";
-    const [shopPage, setShopPage] = useState(0);
-
-    const junkshopCards = useMemo(
-        () =>
-            shops
-                .filter((shop) => shop.isPartner)
-                .map((shop) => ({
-                    ...shop,
-                    location: shop.address,
-                    image: shop.shopPhotoUrl || SHOP_IMAGE,
-                })),
-        [shops]
-    );
-    const shopPageCount = Math.max(1, Math.ceil(junkshopCards.length / 3));
-    const visibleJunkshops = useMemo(() => {
-        const safePage = Math.min(shopPage, shopPageCount - 1);
-        return junkshopCards.slice(safePage * 3, safePage * 3 + 3);
-    }, [junkshopCards, shopPage, shopPageCount]);
-
-    useEffect(() => {
-        setShopPage((prev) => Math.min(prev, shopPageCount - 1));
-    }, [shopPageCount]);
-
-    const goPrevShops = () => {
-        setShopPage((prev) => (prev - 1 + shopPageCount) % shopPageCount);
-    };
-
-    const goNextShops = () => {
-        setShopPage((prev) => (prev + 1) % shopPageCount);
-    };
-
     const overviewStats = useMemo(() => {
         const totalKg = historyRows.reduce((sum, row) => {
             const match = String(row.weight).match(/[\d.]+/);
@@ -912,6 +871,7 @@ function OverviewTab({
 
     return (
         <div className="space-y-5 sm:space-y-7 md:space-y-8">
+            {/* Mobile: Find a Shop button */}
             <section className="md:hidden">
                 <button
                     type="button"
@@ -923,6 +883,7 @@ function OverviewTab({
                 </button>
             </section>
 
+            {/* Welcome banner */}
             <section>
                 <div className="rounded-2xl bg-gradient-to-br from-[#154212] via-[#1e5a1a] to-[#3DA35D] p-4 sm:p-5 text-white shadow-[0_4px_20px_rgba(21,66,18,0.22)] relative overflow-hidden">
                     <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
@@ -941,163 +902,113 @@ function OverviewTab({
 
             <OverviewQuickAccess onOpenPanel={onOpenPanel} />
 
+            {/* Stats (2×2) + Recent Activities side-by-side */}
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                {/* Left: 2×2 stat cards */}
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    <StatCard
+                        label="Total Recycled"
+                        value={overviewStats.totalKg}
+                        unit="kg"
+                        icon={Recycle}
+                        helper="From your logged trips and transactions"
+                        accentColor="green"
+                    />
+                    <StatCard
+                        label="Total Earnings"
+                        value={`₱${overviewStats.totalEarnings}`}
+                        icon={DollarSign}
+                        helper="Total from your recycling history"
+                        accentColor="amber"
+                    />
+                    <StatCard
+                        label="Transactions"
+                        value={String(overviewStats.transactions)}
+                        icon={ReceiptText}
+                        helper="Trips recorded in your account"
+                        accentColor="blue"
+                    />
+                    <StatCard
+                        label="Trees Saved"
+                        value={String(overviewStats.trees)}
+                        icon={TreePine}
+                        helper="Estimated environmental impact"
+                        accentColor="teal"
+                    />
+                </div>
+
+                {/* Right: Recent Activities */}
+                <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-base font-bold text-[#191c1c]">Recent Activities</h2>
+                        <button
+                            type="button"
+                            onClick={onGoToHistory}
+                            className="text-xs font-semibold text-emerald-700 hover:underline"
+                        >
+                            View Full History
+                        </button>
+                    </div>
+
+                    <div className="flex-1 bg-white rounded-xl border border-zinc-200 shadow-sm divide-y divide-zinc-100">
+                        {recentActivities.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center gap-2 p-6 text-center min-h-[140px]">
+                                <div className="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center">
+                                    <ReceiptText size={20} className="text-emerald-600" />
+                                </div>
+                                <p className="text-sm font-medium text-[#191c1c]">No activity yet</p>
+                                <p className="text-xs text-[#72796e] max-w-[220px]">
+                                    Log a trip from the + menu to track your recycling here.
+                                </p>
+                            </div>
+                        ) : (
+                            recentActivities.map((activity) => {
+                                const Icon = activity.icon;
+                                return (
+                                    <button
+                                        key={activity.id}
+                                        type="button"
+                                        onClick={onGoToHistory}
+                                        className="w-full p-3 sm:p-4 hover:bg-emerald-50/40 transition-colors text-left group"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`${activity.iconBg} p-2.5 rounded-xl shrink-0`}>
+                                                <Icon size={18} className={activity.iconText} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h5 className="font-bold text-[#191c1c] text-sm truncate">
+                                                    {activity.material}
+                                                </h5>
+                                                <p className="text-xs text-[#72796e] truncate">
+                                                    {activity.date} · {activity.shop}
+                                                </p>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <p className="font-bold text-emerald-700 text-sm">
+                                                    {activity.amount}
+                                                </p>
+                                                <p className="text-xs text-[#72796e]">
+                                                    {activity.weight}
+                                                </p>
+                                            </div>
+                                            <ChevronRight
+                                                size={16}
+                                                className="text-zinc-300 group-hover:text-emerald-600 shrink-0 transition-colors"
+                                            />
+                                        </div>
+                                    </button>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            </section>
+
+            {/* Sell your recyclables */}
             <CustomerSellRecyclablesSection
                 onViewProfile={onViewShopProfile}
                 onBookNow={onBookShop}
             />
-
-            {/* Stats */}
-            <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <StatCard
-                    label="Total Recycled"
-                    value={overviewStats.totalKg}
-                    unit="kg"
-                    icon={Recycle}
-                    helper="From your logged trips and transactions"
-                    accentColor="green"
-                />
-                <StatCard
-                    label="Total Earnings"
-                    value={`₱${overviewStats.totalEarnings}`}
-                    icon={DollarSign}
-                    helper="Total from your recycling history"
-                    accentColor="amber"
-                />
-                <StatCard
-                    label="Transactions"
-                    value={String(overviewStats.transactions)}
-                    icon={ReceiptText}
-                    helper="Trips recorded in your account"
-                    accentColor="blue"
-                />
-                <StatCard
-                    label="Trees Saved"
-                    value={String(overviewStats.trees)}
-                    icon={TreePine}
-                    helper="Estimated environmental impact"
-                    accentColor="teal"
-                />
-            </section>
-
-            {/* Junkshops + Recent */}
-            <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 sm:gap-8">
-                <div className="xl:col-span-2 space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                        <h2 className="text-lg sm:text-xl font-bold text-[#191c1c]">
-                            Junkshops
-                        </h2>
-
-                        <div className="flex items-center gap-2">
-                            {junkshopCards.length > 3 && (
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        type="button"
-                                        onClick={goPrevShops}
-                                        className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-[#154212] hover:bg-emerald-50"
-                                        aria-label="Previous junkshops"
-                                    >
-                                        <ChevronLeft size={17} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={goNextShops}
-                                        className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-[#154212] hover:bg-emerald-50"
-                                        aria-label="Next junkshops"
-                                    >
-                                        <ChevronRight size={17} />
-                                    </button>
-                                </div>
-                            )}
-                            <button
-                                type="button"
-                                onClick={handleViewAllShops}
-                                className="text-emerald-700 font-semibold flex items-center gap-1 hover:underline"
-                            >
-                                View All <Navigation size={18} />
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="relative">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                        {visibleJunkshops.length === 0 ? (
-                            <EmptyState
-                                compact
-                                title={shopsLoading ? "Loading junkshops..." : "No junkshops available"}
-                            />
-                        ) : (
-                            visibleJunkshops.map((shop) => (
-                                <CustomerShopSummaryCard
-                                    key={shop.id}
-                                    shop={shop}
-                                    isFavorite={isFavoriteShopId(shop.id, favoriteIds)}
-                                    onToggleFavorite={() => onToggleFavorite(shop.id)}
-                                    onViewProfile={() => openShopProfile(shop, "Back to Overview")}
-                                    onRoute={() => onOpenShopRoute(shop)}
-                                />
-                            ))
-                        )}
-                    </div>
-                    </div>
-                </div>
-
-                {/* Recent Activities */}
-                <div className="space-y-4">
-                    <h2 className="text-lg sm:text-xl font-bold text-[#191c1c]">
-                        Recent Activities
-                    </h2>
-
-                    <div className="bg-white rounded-xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.15)] divide-y divide-zinc-100">
-                        {recentActivities.length === 0 && (
-                            <p className="p-4 text-sm text-[#72796e]">
-                                Log a trip to see recent activity here.
-                            </p>
-                        )}
-                        {recentActivities.map((activity) => {
-                            const Icon = activity.icon;
-
-                            return (
-                                <button
-                                    key={activity.id}
-                                    className="w-full p-3 sm:p-4 hover:bg-zinc-50/80 transition-colors text-left"
-                                >
-                                    <div className="flex items-center gap-3 sm:gap-4">
-                                        <div className={`${activity.iconBg} p-2.5 sm:p-3 rounded-xl shrink-0`}>
-                                            <Icon size={20} className={activity.iconText} />
-                                        </div>
-
-                                        <div className="flex-1 min-w-0">
-                                            <h5 className="font-bold text-[#191c1c] text-sm truncate">
-                                                {activity.material}
-                                            </h5>
-                                            <p className="text-xs text-[#72796e] truncate">
-                                                {activity.date} · {activity.shop}
-                                            </p>
-                                        </div>
-
-                                        <div className="text-right shrink-0">
-                                            <p className="font-bold text-emerald-700 text-sm">
-                                                {activity.amount}
-                                            </p>
-                                            <p className="text-xs text-[#72796e]">
-                                                {activity.weight}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={onGoToHistory}
-                        className="w-full text-center py-2.5 text-sm text-[#72796e] font-medium hover:text-emerald-700 transition-colors"
-                    >
-                        View Full History
-                    </button>
-                </div>
-            </section>
         </div>
     );
 }
@@ -1129,31 +1040,6 @@ function OverviewQuickAccess({ onOpenPanel }) {
                 ))}
             </div>
         </section>
-    );
-}
-
-function StatCard({ label, value, unit, icon: Icon, helper, accentColor = "green" }) {
-    const c = STAT_COLORS[accentColor] || STAT_COLORS.green;
-    return (
-        <div className={`bg-white p-4 sm:p-5 rounded-xl border border-zinc-200 border-t-2 ${c.border} shadow-[0_4px_12px_rgba(141,170,145,0.12)] flex flex-col gap-3`}>
-            <div className="flex items-start justify-between">
-                {Icon ? (
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${c.iconBg} ${c.iconText}`}>
-                        <Icon size={18} />
-                    </div>
-                ) : <div />}
-                <Info size={15} className="text-zinc-400 cursor-help shrink-0" title={helper} />
-            </div>
-            <div>
-                <p className="text-[10px] sm:text-xs text-[#72796e] uppercase tracking-wider font-semibold mb-1">
-                    {label}
-                </p>
-                <p className="text-xl sm:text-2xl font-bold text-[#191c1c] flex items-end gap-1.5 flex-wrap">
-                    {value}
-                    {unit && <span className="text-xs sm:text-sm font-semibold text-[#72796e] pb-0.5">{unit}</span>}
-                </p>
-            </div>
-        </div>
     );
 }
 
@@ -1353,58 +1239,57 @@ function HistoryTab({
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-white px-4 py-3 rounded-xl border border-t-2 border-t-emerald-400 shadow-sm flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                        <ReceiptText size={18} />
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-[#72796e] uppercase tracking-wide font-semibold">Trips</p>
-                        <p className="text-lg font-bold text-[#191c1c] leading-tight">
-                            {filteredRows.length} <span className="text-xs font-medium text-[#72796e]">/ {historyRows.length}</span>
-                        </p>
-                    </div>
-                </div>
-
-                <div className="bg-white px-4 py-3 rounded-xl border border-t-2 border-t-amber-400 shadow-sm flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                        <DollarSign size={18} />
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-[#72796e] uppercase tracking-wide font-semibold">Earned</p>
-                        <p className="text-lg font-bold text-[#191c1c] leading-tight">₱{totalEarnings.toFixed(2)}</p>
-                    </div>
-                </div>
-
-                <div className="bg-white px-4 py-3 rounded-xl border border-t-2 border-t-teal-400 shadow-sm flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
-                        <Recycle size={18} />
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-[#72796e] uppercase tracking-wide font-semibold">Weight recycled</p>
-                        <p className="text-lg font-bold text-[#191c1c] leading-tight">
-                            {totalWeightKg.toFixed(1)} <span className="text-xs font-medium text-[#72796e]">kg</span>
-                        </p>
-                    </div>
-                </div>
+                <StatCard
+                    layout="horizontal"
+                    label="Trips"
+                    value={filteredRows.length}
+                    suffix={
+                        <span className="text-xs font-medium text-[#72796e] ml-1">
+                            / {historyRows.length}
+                        </span>
+                    }
+                    icon={ReceiptText}
+                    accentColor="green"
+                />
+                <StatCard
+                    layout="horizontal"
+                    label="Earned"
+                    value={`₱${totalEarnings.toFixed(2)}`}
+                    icon={DollarSign}
+                    accentColor="amber"
+                />
+                <StatCard
+                    layout="horizontal"
+                    label="Weight recycled"
+                    value={totalWeightKg.toFixed(1)}
+                    unit="kg"
+                    icon={Recycle}
+                    accentColor="teal"
+                />
             </div>
 
             {loading ? (
-                <div className="text-center py-16 text-[#72796e] bg-white rounded-xl border border-zinc-200">
+                <div className="text-center py-16 text-[#72796e] bg-white rounded-xl border border-zinc-200 animate-pulse">
                     Loading history...
                 </div>
             ) : filteredRows.length === 0 ? (
-                <div className="text-center py-16 text-[#72796e] bg-white rounded-xl border border-zinc-200">
-                    No transactions yet. Log a trip from the + menu or clear filters.
-                    {onRefresh && (
-                        <button
-                            type="button"
-                            onClick={onRefresh}
-                            className="block mx-auto mt-3 text-sm font-semibold text-emerald-700 hover:underline"
-                        >
-                            Refresh
-                        </button>
-                    )}
-                </div>
+                <EmptyState
+                    compact
+                    icon={ReceiptText}
+                    title="No transactions yet"
+                    description="Log a trip from the + menu, or adjust your search and date filters."
+                    action={
+                        onRefresh ? (
+                            <button
+                                type="button"
+                                onClick={onRefresh}
+                                className="text-sm font-semibold text-emerald-700 hover:underline"
+                            >
+                                Refresh
+                            </button>
+                        ) : null
+                    }
+                />
             ) : (
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                     <div className="md:hidden divide-y divide-zinc-100">
@@ -1577,33 +1462,28 @@ function FavoritesTab({
                 ))}
 
                 {isLoadingFavorites && (
-                    <div className="col-span-full bg-white border border-zinc-200 rounded-xl flex flex-col items-center justify-center p-6 sm:p-8 text-center min-h-[min(50vh,20rem)] text-[#72796e]">
-                        Loading favorite shops...
+                    <div className="col-span-full min-h-[min(50vh,20rem)] flex items-center justify-center">
+                        <p className="text-sm text-[#72796e] animate-pulse">Loading favorite shops…</p>
                     </div>
                 )}
 
                 {!isLoadingFavorites && favoriteShops.length === 0 && (
-                    <div className="col-span-full bg-emerald-50/50 border-2 border-dashed border-emerald-200 rounded-xl flex flex-col items-center justify-center p-6 sm:p-8 text-center min-h-[min(50vh,20rem)]">
-                        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
-                            <Search size={42} className="text-emerald-600" />
-                        </div>
-
-                        <h3 className="text-xl sm:text-2xl font-bold text-[#154212] mb-2">
-                            Explore the Map
-                        </h3>
-
-                        <p className="text-[#42493e] text-sm max-w-[280px] mb-6">
-                            You haven&apos;t saved any shops yet. Tap the heart on any shop
-                            in Find Nearby Junkshops, or browse the map to find favorites.
-                        </p>
-
-                        <button
-                            type="button"
-                            onClick={onFindShops}
-                            className="text-emerald-700 font-semibold hover:underline"
-                        >
-                            Browse nearby centers
-                        </button>
+                    <div className="col-span-full">
+                        <EmptyState
+                            icon={Heart}
+                            title="No favorite shops yet"
+                            description="Tap the heart on any shop in Find Nearby Junkshops to save it here for quick access."
+                            action={
+                                <button
+                                    type="button"
+                                    onClick={onFindShops}
+                                    className="inline-flex items-center gap-2 rounded-xl bg-[#154212] px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 transition-colors"
+                                >
+                                    <Map size={16} />
+                                    Find nearby centers
+                                </button>
+                            }
+                        />
                     </div>
                 )}
             </div>

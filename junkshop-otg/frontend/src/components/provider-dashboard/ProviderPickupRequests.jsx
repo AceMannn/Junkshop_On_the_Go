@@ -394,7 +394,11 @@ export default function ProviderPickupRequests({
                     <>
                         <div className="md:hidden divide-y divide-zinc-100">
                             {filteredRequests.map((request) => (
-                                <div key={request.id} className={`p-4 space-y-3 border-l-4 ${REQUEST_STATUS_BORDERS[request.status] || "border-l-zinc-200"}`}>
+                                <div
+                                    key={request.id}
+                                    className={`p-4 space-y-3 border-l-4 cursor-pointer hover:bg-emerald-50/40 transition-colors active:bg-emerald-50 ${REQUEST_STATUS_BORDERS[request.status] || "border-l-zinc-200"}`}
+                                    onClick={() => openDetail(request.id)}
+                                >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <p className="font-semibold text-[#191c1c]">{request.customer}</p>
@@ -426,13 +430,15 @@ export default function ProviderPickupRequests({
                                         <MapPin size={16} className="mt-0.5 shrink-0 text-[#72796e]" />
                                         <span className="break-words">{request.location}</span>
                                     </div>
-                                    <ProviderRequestActions
-                                        request={request}
-                                        onAccept={handleAccept}
-                                        onReject={() => setRejectingId(request.id)}
-                                        onUpdateStatus={handleStatus}
-                                        onViewDetails={openDetail}
-                                    />
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                        <ProviderRequestActions
+                                            request={request}
+                                            onAccept={handleAccept}
+                                            onReject={() => setRejectingId(request.id)}
+                                            onUpdateStatus={handleStatus}
+                                            onViewDetails={openDetail}
+                                        />
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -453,7 +459,11 @@ export default function ProviderPickupRequests({
                                 </thead>
                                 <tbody className="divide-y divide-zinc-100">
                                     {filteredRequests.map((request) => (
-                                        <tr key={request.id} className="hover:bg-[#f9f9f8]">
+                                        <tr
+                                            key={request.id}
+                                            className="cursor-pointer hover:bg-emerald-50/40 transition-colors"
+                                            onClick={() => openDetail(request.id)}
+                                        >
                                             <td className={`px-6 py-4 border-l-4 ${REQUEST_STATUS_BORDERS[request.status] || "border-l-zinc-200"}`}>
                                                 <p className="font-semibold text-[#191c1c]">{request.customer}</p>
                                                 <p className="text-xs text-[#72796e]">
@@ -481,7 +491,7 @@ export default function ProviderPickupRequests({
                                                     <span className="text-xs text-[#72796e]">—</span>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                                 <ProviderRequestActions
                                                     request={request}
                                                     onAccept={handleAccept}

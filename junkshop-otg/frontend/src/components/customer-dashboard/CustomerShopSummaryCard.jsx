@@ -1,12 +1,9 @@
-import { Heart, MapPin, Clock, Phone } from "lucide-react";
+import { Heart, MapPin, Clock, Phone, Store } from "lucide-react";
 import VerifiedPartnerIcon, { isVerified } from "../ui/VerifiedPartnerIcon";
 import ShopRating from "../ui/ShopRating";
 import ShopBadges from "../ui/ShopBadges";
 import { shopStatusBadgeClass } from "../../utils/catalogMappers";
 import { useShopPhoto } from "../../hooks/useShopPhoto";
-
-const SHOP_IMAGE =
-    "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?q=80&w=1000&auto=format&fit=crop";
 
 /**
  * Unified shop summary card used in both Overview Nearby and Favorites.
@@ -28,21 +25,26 @@ export default function CustomerShopSummaryCard({
     className = "",
 }) {
     const lazyPhoto = useShopPhoto(shop);
-    const heroSrc = lazyPhoto || shop.image || SHOP_IMAGE;
     // Hide the text "Verified" badge when we already show the blue check icon
     const displayBadges = (shop.badges || []).filter((b) => b !== "verified");
 
     return (
         <div
-            className={`@container bg-white border border-[#c2c9bb] rounded-xl overflow-hidden shadow-[0_4px_12px_rgba(141,170,145,0.15)] flex flex-col group ${className}`}
+            className={`@container bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm flex flex-col group transition-shadow hover:shadow-md ${className}`}
         >
             {/* ── Hero ── */}
-            <div className="relative h-36 shrink-0 overflow-hidden bg-zinc-200">
-                <img
-                    alt={shop.name}
-                    src={heroSrc}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
+            <div className="relative h-36 shrink-0 overflow-hidden bg-zinc-100">
+                {lazyPhoto ? (
+                    <img
+                        alt={shop.name}
+                        src={lazyPhoto}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-50 to-zinc-100">
+                        <Store size={32} className="text-zinc-300" />
+                    </div>
+                )}
 
                 {/* Status badge — top left */}
                 {shop.status && (
@@ -136,14 +138,14 @@ export default function CustomerShopSummaryCard({
                     <button
                         type="button"
                         onClick={onViewProfile}
-                        className="flex-1 py-2.5 bg-[#154212] text-white rounded-lg text-xs font-semibold whitespace-nowrap text-center hover:bg-[#1f5c19] transition-colors active:scale-95"
+                        className="flex-1 py-2.5 bg-[#154212] text-white rounded-xl text-xs font-semibold whitespace-nowrap text-center hover:bg-emerald-900 transition-colors active:scale-95"
                     >
                         View Shop Profile
                     </button>
                     <button
                         type="button"
                         onClick={onRoute}
-                        className="flex-1 py-2.5 border border-[#c2c9bb] text-[#42493e] rounded-lg text-xs font-semibold whitespace-nowrap text-center hover:bg-[#edeeed] transition-colors"
+                        className="flex-1 py-2.5 border border-zinc-200 text-[#42493e] rounded-xl text-xs font-semibold whitespace-nowrap text-center hover:bg-zinc-50 transition-colors"
                     >
                         Route
                     </button>

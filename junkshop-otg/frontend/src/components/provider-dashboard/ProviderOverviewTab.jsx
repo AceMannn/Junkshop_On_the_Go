@@ -4,6 +4,7 @@ import { pickupApi, domainApi } from "../../services/api";
 import { useProviderMaterials } from "../../hooks/useProviderData";
 import { STATUS_STYLES, STATUS_LABELS } from "../../utils/pickupHelpers";
 import { normalizeTransaction } from "../../utils/catalogMappers";
+import StatCard from "../ui/StatCard";
 
 function getTimeGreeting() {
     const h = new Date().getHours();
@@ -11,13 +12,6 @@ function getTimeGreeting() {
     if (h < 17) return "Good afternoon";
     return "Good evening";
 }
-
-const OVERVIEW_STAT_COLORS = {
-    amber: { iconBg: "bg-amber-100",   iconText: "text-amber-700",   border: "border-t-amber-400"   },
-    green: { iconBg: "bg-emerald-100", iconText: "text-emerald-700", border: "border-t-emerald-400" },
-    blue:  { iconBg: "bg-blue-100",    iconText: "text-blue-700",    border: "border-t-blue-400"    },
-    teal:  { iconBg: "bg-teal-100",    iconText: "text-teal-700",    border: "border-t-teal-400"    },
-};
 
 const CATEGORY_CHIP_COLORS = {
     plastic:   "bg-blue-100 text-blue-700",
@@ -27,31 +21,6 @@ const CATEGORY_CHIP_COLORS = {
     "e-waste": "bg-purple-100 text-purple-700",
     other:     "bg-zinc-100 text-zinc-600",
 };
-
-function StatCard({ label, value, unit, helper, icon: Icon, accentColor = "green" }) {
-    const c = OVERVIEW_STAT_COLORS[accentColor] || OVERVIEW_STAT_COLORS.green;
-    return (
-        <div className={`bg-white p-4 sm:p-5 rounded-xl border border-zinc-200 border-t-2 ${c.border} shadow-[0_4px_12px_rgba(141,170,145,0.12)] flex flex-col gap-3`}>
-            <div className="flex items-start justify-between">
-                {Icon ? (
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${c.iconBg} ${c.iconText}`}>
-                        <Icon size={18} />
-                    </div>
-                ) : <div />}
-            </div>
-            <div>
-                <p className="text-[10px] sm:text-xs text-[#72796e] uppercase tracking-wider font-semibold mb-1">
-                    {label}
-                </p>
-                <p className="text-xl sm:text-2xl font-bold text-[#191c1c] flex items-end gap-1.5 flex-wrap">
-                    {value}
-                    {unit && <span className="text-xs sm:text-sm font-semibold text-[#72796e] pb-0.5">{unit}</span>}
-                </p>
-                {helper && <p className="text-xs text-[#72796e] mt-1">{helper}</p>}
-            </div>
-        </div>
-    );
-}
 
 export default function ProviderOverviewTab({ user, onNavigate }) {
     const { materials } = useProviderMaterials();
@@ -171,6 +140,7 @@ export default function ProviderOverviewTab({ user, onNavigate }) {
                     icon={Clock3}
                     accentColor="amber"
                     helper="Awaiting your response"
+                    helperMode="inline"
                 />
                 <StatCard
                     label="Completed"
@@ -178,6 +148,7 @@ export default function ProviderOverviewTab({ user, onNavigate }) {
                     icon={CheckCircle}
                     accentColor="green"
                     helper="Finished pickup requests"
+                    helperMode="inline"
                 />
                 <StatCard
                     label="Active Materials"
@@ -185,6 +156,7 @@ export default function ProviderOverviewTab({ user, onNavigate }) {
                     icon={Layers}
                     accentColor="blue"
                     helper="Listed and available"
+                    helperMode="inline"
                 />
                 <StatCard
                     label="Avg Price"
@@ -193,6 +165,7 @@ export default function ProviderOverviewTab({ user, onNavigate }) {
                     icon={DollarSign}
                     accentColor="teal"
                     helper="Across your material list"
+                    helperMode="inline"
                 />
             </section>
 

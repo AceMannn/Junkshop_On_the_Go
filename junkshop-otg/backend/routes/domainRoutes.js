@@ -235,7 +235,6 @@ router.get('/junkshops/:id/photo', async (req, res) => {
     const provider = await User.findOne({
       _id: shop.provider,
       role: 'provider',
-      verificationStatus: 'approved',
       status: 'active',
     })
       .select('verificationDocuments.shopPhotos')

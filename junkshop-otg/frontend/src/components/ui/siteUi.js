@@ -38,6 +38,13 @@ export const siteChipActiveClass =
 export const siteChipIdleClass =
   'bg-white text-[#42493e] border-zinc-200 hover:border-emerald-300 hover:bg-emerald-50/50';
 
+/** Pill filter chips (marketplace, sell section, etc.) */
+export function siteFilterChipClass(active) {
+  return `shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors ${
+    active ? siteChipActiveClass : siteChipIdleClass
+  }`;
+}
+
 export const siteBtnPrimaryClass =
   'inline-flex items-center justify-center gap-2 rounded-xl bg-[#154212] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900 disabled:opacity-50';
 
