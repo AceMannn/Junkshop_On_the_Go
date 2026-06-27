@@ -54,6 +54,51 @@ export function materialsSummary(materials = []) {
     .join(', ');
 }
 
+export function formatPeso(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return '—';
+  return `₱${amount.toLocaleString('en-PH', {
+    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export function materialUnitLabel(unit) {
+  return unit === 'piece' ? 'pc' : 'kg';
+}
+
+export function materialPriceLabel(material) {
+  const price = Number(material?.price);
+  if (!Number.isFinite(price) || price <= 0) {
+    return `Price not listed/${materialUnitLabel(material?.unit)}`;
+  }
+  return `${formatPeso(price)}/${materialUnitLabel(material?.unit)}`;
+}
+
+export function materialEstimatedSubtotal(material) {
+  const existing = Number(material?.estimatedSubtotal);
+  if (Number.isFinite(existing) && existing > 0) return existing;
+
+  const price = Number(material?.price);
+  const quantity = Number(material?.quantity ?? material?.qty);
+  if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(quantity) || quantity <= 0) {
+    return 0;
+  }
+  return Math.round(price * quantity * 100) / 100;
+}
+
+export function estimatedPayoutTotal(materials = []) {
+  return Math.round(
+    (materials || []).reduce((sum, material) => sum + materialEstimatedSubtotal(material), 0) * 100
+  ) / 100;
+}
+
+export function pickupEstimatedPayout(request) {
+  const stored = Number(request?.estimatedTotalAmount);
+  if (Number.isFinite(stored) && stored > 0) return stored;
+  return estimatedPayoutTotal(request?.materials || []);
+}
+
 export function canCustomerCancel(status) {
   return ['pending', 'accepted'].includes(status);
 }

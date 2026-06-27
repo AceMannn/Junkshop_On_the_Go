@@ -18,7 +18,14 @@ import { pickupApi } from '../../services/api';
 import { useFeaturedMaterials } from '../../hooks/useCatalogData';
 import EmptyState from '../ui/EmptyState';
 import MaterialPhotoUploader from '../ui/MaterialPhotoUploader';
-import { TIME_SLOTS, materialsSummary } from '../../utils/pickupHelpers';
+import {
+  TIME_SLOTS,
+  estimatedPayoutTotal,
+  formatPeso,
+  materialEstimatedSubtotal,
+  materialPriceLabel,
+  materialsSummary,
+} from '../../utils/pickupHelpers';
 import { getUserFullName } from '../../utils/userDisplay';
 
 const PICKUP_STEPS = ['Type', 'Shop', 'Materials', 'Photos', 'Schedule', 'Contact', 'Review'];
@@ -114,6 +121,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
             category: prefill.category || '',
             quantity: 1,
             unit: prefill.unit === 'piece' ? 'piece' : 'kg',
+            price: Number(prefill.price) || 0,
           },
         ]
       : []
@@ -149,6 +157,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
         name: row.name,
         category: row.category,
         unit: row.unit === 'piece' ? 'piece' : 'kg',
+        price: Number(row.price) || 0,
       }));
     }
     return marketMaterials.map((row) => ({
@@ -156,6 +165,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
       name: row.material,
       category: row.category,
       unit: row.unit === 'piece' ? 'piece' : 'kg',
+      price: Number(row.price) || 0,
     }));
   }, [assignmentMode, junkshopId, marketMaterials, selectedShop]);
 
@@ -229,6 +239,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
   const totalKg = selectedMaterials
     .filter((row) => row.unit === 'kg')
     .reduce((sum, row) => sum + (row.quantity || 0), 0);
+  const estimatedTotal = estimatedPayoutTotal(selectedMaterials);
 
   const handleSubmit = async () => {
     if (!validateStep()) return;
@@ -247,6 +258,8 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
           category: row.category,
           quantity: row.quantity,
           unit: row.unit,
+          price: Number(row.price) || 0,
+          estimatedSubtotal: materialEstimatedSubtotal(row),
         })),
         materialPhotos: photos,
         estimatedWeightKg: totalKg,
@@ -433,13 +446,23 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                           className="w-full text-left"
                         >
                           <p className="font-semibold text-sm">{item.name}</p>
-                          <p className="text-xs text-[#72796e] capitalize">
-                            Sold per {item.unit === 'piece' ? 'piece' : 'kg'}
-                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                            <span className="font-semibold text-[#154212]">
+                              {materialPriceLabel(item)}
+                            </span>
+                            <span className="text-[#72796e] capitalize">
+                              Sold per {item.unit === 'piece' ? 'piece' : 'kg'}
+                            </span>
+                          </div>
                         </button>
                         {selected && (
-                          <div className="mt-3 flex items-center justify-between">
-                            <span className="text-xs font-semibold text-[#72796e]">Quantity</span>
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <span className="text-xs font-semibold text-[#72796e]">Quantity</span>
+                              <p className="text-xs font-bold text-[#154212] mt-0.5">
+                                Est. subtotal: {formatPeso(materialEstimatedSubtotal(selected))}
+                              </p>
+                            </div>
                             <div className="inline-flex items-center gap-2">
                               <button
                                 type="button"
@@ -469,6 +492,19 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                       </div>
                     );
                   })}
+                  {estimatedTotal > 0 && (
+                    <div className="sticky bottom-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold text-emerald-900">Estimated total</p>
+                        <p className="text-base font-bold text-[#154212]">
+                          {formatPeso(estimatedTotal)}
+                        </p>
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-[#72796e]">
+                        Final amount may change after the junkshop verifies weight and materials.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -567,6 +603,17 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                   <span className="text-[#72796e]">Materials · </span>
                   <strong>{materialsSummary(selectedMaterials)}</strong>
                 </p>
+                {estimatedTotal > 0 && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-semibold text-emerald-900">Estimated total</span>
+                      <strong className="text-[#154212]">{formatPeso(estimatedTotal)}</strong>
+                    </div>
+                    <p className="mt-1 text-xs text-[#72796e]">
+                      Final amount may change after the junkshop verifies weight and materials.
+                    </p>
+                  </div>
+                )}
                 <p>
                   <span className="text-[#72796e]">When · </span>
                   <strong>

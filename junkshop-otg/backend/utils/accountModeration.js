@@ -177,6 +177,7 @@ function serializePickupForViewer(request, viewerRole, statusMap = {}) {
     materials: row.materials,
     materialPhotos: row.materialPhotos || [],
     estimatedWeightKg: row.estimatedWeightKg,
+    estimatedTotalAmount: row.estimatedTotalAmount || 0,
     address: row.address,
     pickupLocation: row.pickupLocation,
     scheduledDate: row.scheduledDate,

@@ -100,33 +100,33 @@ export default function MaterialPhotoUploader({ photos, onChange, maxPhotos = 3 
                 alt={`Material ${index + 1}`}
                 className="w-full aspect-[4/3] object-cover"
               />
-              <div className="absolute inset-x-0 bottom-0 flex gap-1 p-2 bg-gradient-to-t from-black/70 to-transparent">
+              <div className="absolute inset-x-0 bottom-0 flex justify-center gap-1.5 p-2 bg-gradient-to-t from-black/70 to-transparent">
                 <button
                   type="button"
                   onClick={() => handleRecrop(index)}
-                  className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg bg-white/95 text-[10px] font-bold text-[#154212]"
-                  title="Crop again"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/95 text-[#154212] shadow-sm hover:bg-white"
+                  title="Edit photo"
+                  aria-label={`Edit material photo ${index + 1}`}
                 >
-                  <Crop size={12} />
-                  Crop
+                  <Crop size={14} />
                 </button>
                 <button
                   type="button"
                   onClick={() => openFilePicker(index)}
-                  className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg bg-white/95 text-[10px] font-bold text-[#42493e]"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/95 text-[#42493e] shadow-sm hover:bg-white"
                   title="Replace photo"
+                  aria-label={`Replace material photo ${index + 1}`}
                 >
-                  <RefreshCw size={12} />
-                  Replace
+                  <RefreshCw size={14} />
                 </button>
                 <button
                   type="button"
                   onClick={() => handleRemove(index)}
-                  className="inline-flex items-center justify-center p-1.5 rounded-lg bg-red-600 text-white"
-                  title="Remove photo"
-                  aria-label="Remove photo"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-white shadow-sm hover:bg-red-700"
+                  title="Delete photo"
+                  aria-label={`Delete material photo ${index + 1}`}
                 >
-                  <Trash2 size={12} />
+                  <Trash2 size={14} />
                 </button>
               </div>
             </div>

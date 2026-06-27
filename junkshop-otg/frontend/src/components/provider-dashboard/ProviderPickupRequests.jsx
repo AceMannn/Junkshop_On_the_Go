@@ -32,8 +32,10 @@ import {
     STATUS_LABELS,
     STATUS_STYLES,
     formatPickupSchedule,
+    formatPeso,
     materialsSummary,
     getCustomerDisplayName,
+    pickupEstimatedPayout,
 } from "../../utils/pickupHelpers";
 import PickupTrackingMap, { formatLastUpdated } from "../maps/PickupTrackingMap";
 import NumberInput from "../ui/NumberInput";
@@ -729,6 +731,7 @@ function ProviderPickupDetailDrawer({
     const isHomePickup = request.requestType !== "drop_off";
     const isDropOff = !isHomePickup;
     const estimatedPoints = estimateDropOffPoints(actualWeight || request.estimatedWeightKg);
+    const estimatedTotal = pickupEstimatedPayout(request);
 
     const showMap = isHomePickup && ["accepted", "in_transit"].includes(statusKey);
     const showDropOffMap = isDropOff && statusKey === "accepted";
@@ -805,9 +808,23 @@ function ProviderPickupDetailDrawer({
                         )}
                     </div>
 
+                    {estimatedTotal > 0 && (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-1">
+                            <p className="text-sm font-semibold text-emerald-900">Estimated total</p>
+                            <p className="text-2xl font-bold text-[#154212]">
+                                {formatPeso(estimatedTotal)}
+                            </p>
+                            <p className="text-xs text-[#72796e]">
+                                Final amount may change after you verify weight and materials.
+                            </p>
+                        </div>
+                    )}
+
                     <PickupMaterialPhotosGallery
                         photos={request.materialPhotos}
                         title="Customer material photos"
+                        description="Photos submitted by the customer for this pickup."
+                        showEmpty
                     />
 
                     {showMap && (

@@ -1,6 +1,8 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { ClipboardList, Mail, Shield, Users } from 'lucide-react';
 import AdminTopbar from './AdminTopbar';
+import { adminApi } from '../services/api';
 import { adminSidebarLinkClass } from '../utils/adminUi';
 
 const navItems = [
@@ -11,9 +13,40 @@ const navItems = [
 ];
 
 export default function AdminLayout({ user, onLogout }) {
+  const navigate = useNavigate();
+  const [unreadContactCount, setUnreadContactCount] = useState(0);
+
+  const refreshUnreadContactCount = useCallback(async () => {
+    try {
+      const data = await adminApi.getOverview();
+      setUnreadContactCount(data.stats?.unreadContactMessages || 0);
+    } catch {
+      // Keep navigation usable even if the badge count cannot load.
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshUnreadContactCount();
+    const interval = window.setInterval(refreshUnreadContactCount, 30000);
+    window.addEventListener('admin-contact-updated', refreshUnreadContactCount);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('admin-contact-updated', refreshUnreadContactCount);
+    };
+  }, [refreshUnreadContactCount]);
+
+  const openContactInbox = () => {
+    navigate('/contact');
+  };
+
   return (
     <div className="min-h-screen bg-[#f9f9f8] text-[#191c1c]">
-      <AdminTopbar user={user} onLogout={onLogout} />
+      <AdminTopbar
+        user={user}
+        onLogout={onLogout}
+        unreadContactCount={unreadContactCount}
+        onOpenContact={openContactInbox}
+      />
 
       <div className="flex pt-16">
         <aside className="hidden md:flex fixed left-0 top-16 z-30 h-[calc(100vh-4rem)] w-56 flex-col border-r border-zinc-200 bg-zinc-50">
@@ -27,7 +60,12 @@ export default function AdminLayout({ user, onLogout }) {
                   className={({ isActive }) => adminSidebarLinkClass(isActive)}
                 >
                   <Icon size={18} />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {item.to === '/contact' && unreadContactCount > 0 && (
+                    <span className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                      {unreadContactCount > 9 ? '9+' : unreadContactCount}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}
@@ -49,7 +87,12 @@ export default function AdminLayout({ user, onLogout }) {
                     }`
                   }
                 >
-                  {item.label}
+                  <span>{item.label}</span>
+                  {item.to === '/contact' && unreadContactCount > 0 && (
+                    <span className="ml-1 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      {unreadContactCount > 9 ? '9+' : unreadContactCount}
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </div>

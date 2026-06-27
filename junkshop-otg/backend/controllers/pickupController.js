@@ -393,12 +393,16 @@ exports.createPickupRequest = async (req, res) => {
     const normalizedMaterials = materials.map((item) => {
       const quantity = Math.max(1, Math.floor(Number(item.quantity) || 0));
       const unit = item.unit === 'piece' ? 'piece' : 'kg';
+      const price = Math.max(0, Number(item.price) || 0);
+      const estimatedSubtotal = Math.round(price * quantity * 100) / 100;
       return {
         catalogId: String(item.catalogId || ''),
         name: String(item.name || '').trim(),
         category: String(item.category || ''),
         quantity,
         unit,
+        price,
+        estimatedSubtotal,
       };
     });
 
@@ -419,6 +423,10 @@ exports.createPickupRequest = async (req, res) => {
       .filter((item) => item.unit === 'kg')
       .reduce((sum, item) => sum + item.quantity, 0);
     const weight = Number(estimatedWeightKg) || totalKg;
+    const estimatedTotalAmount =
+      Math.round(
+        normalizedMaterials.reduce((sum, item) => sum + (Number(item.estimatedSubtotal) || 0), 0) * 100
+      ) / 100;
 
     let junkshop = null;
     if (assignmentMode === 'specific') {
@@ -481,6 +489,7 @@ exports.createPickupRequest = async (req, res) => {
       materials: normalizedMaterials,
       materialPhotos: processedPhotos.photos,
       estimatedWeightKg: weight,
+      estimatedTotalAmount,
       address: pickupAddress,
       pickupLocation: pickupLocation || undefined,
       scheduledDate,
@@ -671,6 +680,10 @@ exports.updatePickupStatus = async (req, res) => {
           message: 'Cannot cancel while pickup is on the way or already finished.',
         });
       }
+      const reason = String(req.body.reason || '').trim();
+      const message = String(req.body.message || '').trim();
+      request.rejectReason = reason || 'Cancelled by customer';
+      request.rejectMessage = message;
     } else if (!isProvider) {
       return res.status(403).json({ message: 'Not allowed to update this request.' });
     }

@@ -35,6 +35,8 @@ const pickupRequestSchema = new mongoose.Schema(
         category: { type: String, default: '' },
         quantity: { type: Number, min: 1, default: 1 },
         unit: { type: String, enum: ['kg', 'piece'], default: 'kg' },
+        price: { type: Number, min: 0, default: 0 },
+        estimatedSubtotal: { type: Number, min: 0, default: 0 },
       },
     ],
     materialPhotos: [
@@ -47,6 +49,11 @@ const pickupRequestSchema = new mongoose.Schema(
       },
     ],
     estimatedWeightKg: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    estimatedTotalAmount: {
       type: Number,
       min: 0,
       default: 0,

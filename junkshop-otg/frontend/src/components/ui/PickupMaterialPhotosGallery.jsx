@@ -1,19 +1,42 @@
 import { useState } from 'react';
-import { X, ZoomIn } from 'lucide-react';
+import { Camera, X, ZoomIn } from 'lucide-react';
 
-export default function PickupMaterialPhotosGallery({ photos = [], title = 'Material photos' }) {
+export default function PickupMaterialPhotosGallery({
+  photos = [],
+  title = 'Material photos',
+  description = '',
+  showEmpty = false,
+}) {
   const [lightboxIndex, setLightboxIndex] = useState(null);
 
   const validPhotos = (photos || [])
     .map((photo) => ({ ...photo, src: photo?.secureUrl || photo?.data || '' }))
     .filter((photo) => photo.src);
 
-  if (validPhotos.length === 0) return null;
+  if (validPhotos.length === 0) {
+    if (!showEmpty) return null;
+
+    return (
+      <div className="rounded-xl border border-dashed border-zinc-200 bg-[#f9f9f8] p-3 space-y-2">
+        <div>
+          <p className="text-sm font-semibold text-[#191c1c]">{title}</p>
+          {description && <p className="text-xs text-[#72796e] mt-0.5">{description}</p>}
+        </div>
+        <div className="flex items-center gap-2 rounded-lg bg-white border border-zinc-100 px-3 py-2 text-xs font-semibold text-[#72796e]">
+          <Camera size={15} className="text-zinc-400" />
+          No material photos attached
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       <div className="rounded-xl border border-zinc-200 bg-[#f9f9f8] p-3 space-y-2">
-        <p className="text-sm font-semibold text-[#191c1c]">{title}</p>
+        <div>
+          <p className="text-sm font-semibold text-[#191c1c]">{title}</p>
+          {description && <p className="text-xs text-[#72796e] mt-0.5">{description}</p>}
+        </div>
         <div className="grid grid-cols-3 gap-2">
           {validPhotos.map((photo, index) => (
             <button
