@@ -150,6 +150,7 @@ function AppRoutes() {
   const [needsPhoneSetup, setNeedsPhoneSetup] = useState(false);
   const [pickupWizardPrefill, setPickupWizardPrefill] = useState(null);
   const [pickupWizardSignal, setPickupWizardSignal] = useState(0);
+  const [loginRedirectFrom, setLoginRedirectFrom] = useState('');
 
   const persistSession = ({ token, user: sessionUser }) => {
     saveSession({ token, user: sessionUser });
@@ -163,7 +164,7 @@ function AppRoutes() {
 
   const redirectAfterAuth = useCallback(
     (sessionUser) => {
-      const from = location.state?.from;
+      const from = loginRedirectFrom || location.state?.from;
       const fallback = defaultDashboardPath(sessionUser?.role);
       const target =
         typeof from === 'string' &&
@@ -171,9 +172,10 @@ function AppRoutes() {
           (sessionUser?.role !== 'provider' && from.startsWith('/customer')))
           ? from
           : fallback;
+      setLoginRedirectFrom('');
       navigate(target, { replace: true });
     },
-    [location.state?.from, navigate]
+    [location.state?.from, loginRedirectFrom, navigate]
   );
 
   const handleAuthSuccess = (session) => {
@@ -235,12 +237,20 @@ function AppRoutes() {
   const handleCloseLogin = () => {
     setShowLoginModal(false);
     setLoginPrefill({ email: '', role: 'customer', message: '' });
+    setLoginRedirectFrom('');
+    if (location.state?.showLogin || location.state?.from || location.state?.message) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
   };
 
   const handleLogout = () => {
     clearSession();
     setUser(null);
-    navigate('/');
+    setShowLoginModal(false);
+    setShowSignUpModal(false);
+    setLoginPrefill({ email: '', role: 'customer', message: '' });
+    setLoginRedirectFrom('');
+    navigate('/', { replace: true, state: null });
   };
 
   const handleSessionExpired = useCallback(
@@ -291,14 +301,16 @@ function AppRoutes() {
   useEffect(() => {
     if (location.state?.showLogin) {
       setShowLoginModal(true);
+      setLoginRedirectFrom(location.state?.from || '');
       if (location.state?.message) {
         setLoginPrefill((prev) => ({
           ...prev,
           message: location.state.message,
         }));
       }
+      navigate(location.pathname, { replace: true, state: null });
     }
-  }, [location.state?.showLogin, location.state?.message]);
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     const token = getToken();
@@ -349,6 +361,7 @@ function AppRoutes() {
   const isAuthenticated = Boolean(user);
   const openLogin = () => {
     setLoginPrefill({ email: '', role: 'customer', message: '' });
+    setLoginRedirectFrom('');
     setShowLoginModal(true);
   };
 
