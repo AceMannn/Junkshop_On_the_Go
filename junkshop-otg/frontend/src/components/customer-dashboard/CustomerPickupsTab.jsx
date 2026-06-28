@@ -21,6 +21,8 @@ import {
     materialsSummary,
     pickupEstimatedPayout,
     canCustomerCancel,
+    isActivePickupStatus,
+    shouldAutoOpenPickupDetail,
 } from "../../utils/pickupHelpers";
 import { formatReviewDate } from "../../utils/reviewFormat";
 import PickupTrackingMap, { formatLastUpdated } from "../maps/PickupTrackingMap";
@@ -146,9 +148,18 @@ export default function CustomerPickupsTab({
 
     useEffect(() => {
         if (!focusPickupId) return;
-        setSelectedId(focusPickupId);
+
+        const target = requests.find((r) => r.id === focusPickupId);
+        if (!target) {
+            if (!loading) onFocusHandled?.();
+            return;
+        }
+
+        if (shouldAutoOpenPickupDetail(target)) {
+            setSelectedId(focusPickupId);
+        }
         onFocusHandled?.();
-    }, [focusPickupId, onFocusHandled]);
+    }, [focusPickupId, requests, loading, onFocusHandled]);
 
     const startWizard = () => {
         if (!user?.profileComplete) {
@@ -180,7 +191,7 @@ export default function CustomerPickupsTab({
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-[#191c1c]">My Pickups</h1>
                     <p className="text-[#72796e] mt-2 text-sm sm:text-base max-w-xl">
-                        Book home pickup or drop-off at a partner junkshop. Pickups are free â€” the shop pays you for your materials.
+                        Book home pickup or drop-off at a partner junkshop. Pickups are free — the shop pays you for your materials.
                     </p>
                 </div>
                 <button
@@ -292,7 +303,10 @@ export default function CustomerPickupsTab({
             {selected && (
                 <PickupDetailModal
                     request={selected}
-                    onClose={() => setSelectedId(null)}
+                    onClose={() => {
+                        setSelectedId(null);
+                        onFocusHandled?.();
+                    }}
                     onRefresh={load}
                     onNotify={onNotify}
                     onUserUpdate={onUserUpdate}
@@ -335,8 +349,9 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate
     const detailStatus = live.status || request.status;
     const detailPollMs =
         detailStatus === "in_transit" ? REFRESH_INTERVAL_FAST_MS : REFRESH_INTERVAL_MS;
+    const shouldPollDetail = isActivePickupStatus(detailStatus);
 
-    useAutoRefresh(refreshDetail, { intervalMs: detailPollMs });
+    useAutoRefresh(refreshDetail, { intervalMs: detailPollMs, enabled: shouldPollDetail });
 
     const isHomePickup = live.requestType !== "drop_off";
     const isDropOff = !isHomePickup;
@@ -411,7 +426,7 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate
 
                     <div className="space-y-1 text-sm">
                         <p className="text-[#72796e]">{formatPickupSchedule(live)}</p>
-                        <p>{materialsSummary(live.materials)} Â· {live.estimatedWeightKg} kg</p>
+                        <p>{materialsSummary(live.materials)} · {live.estimatedWeightKg} kg</p>
                         <p className="flex items-start gap-1 text-[#42493e]">
                             <MapPin size={14} className="shrink-0 mt-0.5" />
                             {live.address}
@@ -452,7 +467,7 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate
                             )}
                             {live.status === "in_transit" && !loc?.lat && (
                                 <p className="text-xs text-[#72796e]">
-                                    Waiting for provider locationâ€¦
+                                    Waiting for provider location…
                                 </p>
                             )}
                             {loc?.updatedAt && (
@@ -502,7 +517,7 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate
                                 ~{formatPoints(estimateDropOffPoints(live.estimatedWeightKg))} pts
                             </p>
                             <p className="text-xs text-[#72796e]">
-                                {live.estimatedWeightKg} kg Ã— {POINTS_PER_KG} pts/kg â€” final points when the shop weighs your items.
+                                {live.estimatedWeightKg} kg × {POINTS_PER_KG} pts/kg — final points when the shop weighs your items.
                             </p>
                         </div>
                     )}

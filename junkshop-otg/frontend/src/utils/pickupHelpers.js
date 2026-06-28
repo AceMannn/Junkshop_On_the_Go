@@ -99,6 +99,19 @@ export function pickupEstimatedPayout(request) {
   return estimatedPayoutTotal(request?.materials || []);
 }
 
+export const ACTIVE_PICKUP_STATUSES = ['pending', 'accepted', 'in_transit'];
+
+export function isActivePickupStatus(status) {
+  return ACTIVE_PICKUP_STATUSES.includes(status);
+}
+
+/** Auto-open pickup details from notifications/focus only when the user still needs to act. */
+export function shouldAutoOpenPickupDetail(request) {
+  if (!request) return false;
+  if (isActivePickupStatus(request.status)) return true;
+  return request.status === 'completed' && !request.rating?.score;
+}
+
 export function canCustomerCancel(status) {
   return ['pending', 'accepted'].includes(status);
 }

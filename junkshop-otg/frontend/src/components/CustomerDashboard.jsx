@@ -154,8 +154,15 @@ export default function CustomerDashboard({
         }
 
         if (location.state?.focusPickupId) {
+            const pickupId = location.state.focusPickupId;
             setPickupsTabMounted(true);
-            setFocusPickupId(location.state.focusPickupId);
+            setFocusPickupId(pickupId);
+
+            const { focusPickupId: _consumed, ...restState } = location.state;
+            navigate(location.pathname, {
+                replace: true,
+                state: Object.keys(restState).length > 0 ? restState : undefined,
+            });
         }
 
         if (parsed.tab === "pickups") {
