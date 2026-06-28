@@ -38,6 +38,7 @@ export default function CustomerTopbar({
     onLogout,
     onDeactivate,
     onNotificationNavigate,
+    onOpenPointsWallet,
 }) {
     const menuRef = useRef(null);
     const displayName = getDisplayName(user);
@@ -82,15 +83,15 @@ export default function CustomerTopbar({
                 </div>
 
                 <div className={dashboardTopbarActionsClass}>
-                    {(user?.recyclingPoints ?? 0) > 0 && (
-                        <span
-                            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800"
-                            title="Recycling points balance"
-                        >
-                            <Recycle size={14} />
-                            {formatPoints(user.recyclingPoints)} pts
-                        </span>
-                    )}
+                    <button
+                        type="button"
+                        onClick={onOpenPointsWallet}
+                        className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-300 transition-colors"
+                        title="View recycling points"
+                    >
+                        <Recycle size={14} />
+                        {formatPoints(user?.recyclingPoints ?? 0)} pts
+                    </button>
 
                     <DashboardNotificationMenu
                         isNavigable={isCustomerNotificationNavigable}

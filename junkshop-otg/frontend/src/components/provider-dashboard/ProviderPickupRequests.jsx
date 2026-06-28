@@ -722,7 +722,10 @@ function ProviderPickupDetailDrawer({
     const [actualWeight, setActualWeight] = useState(
         String(request.estimatedWeightKg || "")
     );
-    const [cashPaid, setCashPaid] = useState("");
+    const [cashPaid, setCashPaid] = useState(() => {
+        const est = pickupEstimatedPayout(request);
+        return est > 0 ? String(est) : "";
+    });
     const [completingDropOff, setCompletingDropOff] = useState(false);
     const [completingHomePickup, setCompletingHomePickup] = useState(false);
 
@@ -756,7 +759,7 @@ function ProviderPickupDetailDrawer({
         const weight = Number(actualWeight);
         const totalAmount = Number(cashPaid);
         if (!weight || weight < 0.1) return;
-        if (!Number.isFinite(totalAmount) || totalAmount < 0) return;
+        if (cashPaid === "" || !Number.isFinite(totalAmount) || totalAmount < 0) return;
         setCompletingHomePickup(true);
         try {
             await onCompleteHomePickup(request.id, { actualWeight: weight, totalAmount });
@@ -924,6 +927,11 @@ function ProviderPickupDetailDrawer({
                             <div className="space-y-1">
                                 <label className="block text-xs font-semibold text-[#42493e]">
                                     Cash paid to customer (₱)
+                                    {estimatedTotal > 0 && (
+                                        <span className="ml-1 font-normal text-[#72796e]">
+                                            — adjust if actual differs
+                                        </span>
+                                    )}
                                 </label>
                                 <NumberInput
                                     value={cashPaid}

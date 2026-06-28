@@ -91,18 +91,17 @@ function PanelStatus({ loading, error, source, onRetry }) {
 
 export function DashboardPanelShell({ title, onClose, children }) {
     return (
-        <div className="fixed inset-x-0 bottom-0 top-16 z-20 flex flex-col bg-white md:left-56">
+        <div className="fixed inset-x-0 bottom-0 top-16 z-20 flex flex-col bg-white md:left-[var(--dashboard-sidebar-offset)] transition-[left] duration-300">
             <div className="flex items-center gap-3 px-4 sm:px-6 lg:px-8 py-4 border-b border-zinc-200 shrink-0 bg-white">
                 <button
                     type="button"
                     onClick={onClose}
-                    className="shrink-0 inline-flex items-center gap-1.5 sm:gap-2 text-sm font-semibold text-[#154212] hover:bg-emerald-50 px-2 sm:px-3 py-2 rounded-lg transition-colors"
+                    className="md:hidden shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-full text-[#154212] hover:bg-emerald-50 transition-colors"
+                    aria-label="Close panel"
                 >
                     <ArrowLeft size={18} />
-                    <span className="hidden sm:inline">Back to Overview</span>
-                    <span className="sm:hidden">Back</span>
                 </button>
-                <h2 className="flex-1 min-w-0 text-base sm:text-xl font-bold text-[#191c1c] truncate text-center sm:text-left">
+                <h2 className="flex-1 min-w-0 text-base sm:text-xl font-bold text-[#191c1c] truncate">
                     {title}
                 </h2>
             </div>

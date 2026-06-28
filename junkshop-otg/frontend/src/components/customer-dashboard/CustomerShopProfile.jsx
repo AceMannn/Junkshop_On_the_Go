@@ -99,7 +99,7 @@ export default function CustomerShopProfile({
     const statusLabel = getShopStatusLabel(shop);
 
     return (
-        <div className="fixed inset-x-0 bottom-0 top-16 z-20 flex flex-col bg-white md:left-56">
+        <div className="fixed inset-x-0 bottom-0 top-16 z-20 flex flex-col bg-white md:left-[var(--dashboard-sidebar-offset)] transition-[left] duration-300">
             {/* Top bar */}
             <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-zinc-200 shrink-0 bg-white z-10">
                 <button

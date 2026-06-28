@@ -736,6 +736,7 @@ exports.updatePickupStatus = async (req, res) => {
         }
 
         request.actualWeightKg = actualWeight;
+        request.pointsAwarded = dropOffPoints(actualWeight);
 
         const existingTx = await Transaction.findOne({ pickupRequest: request._id });
         if (!existingTx && request.customer && request.provider) {
@@ -757,6 +758,10 @@ exports.updatePickupStatus = async (req, res) => {
             status: 'completed',
           });
         }
+
+        await User.findByIdAndUpdate(request.customer, {
+          $inc: { recyclingPoints: request.pointsAwarded },
+        });
       }
     }
 

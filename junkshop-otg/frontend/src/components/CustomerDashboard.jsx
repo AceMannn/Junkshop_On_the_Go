@@ -19,6 +19,8 @@ import {
     CheckCircle,
     Truck,
     MoreHorizontal,
+    Pin,
+    PinOff,
 } from "lucide-react";
 import CustomerPickupsTab from "./customer-dashboard/CustomerPickupsTab";
 import ProfileCompletionBanner from "./ui/ProfileCompletionBanner";
@@ -30,12 +32,9 @@ import { normalizeTransaction } from "../utils/catalogMappers";
 import { isFavoriteShopId } from "../utils/favorites";
 import {
     DashboardPanelShell,
-    LogTripPanel,
     OVERVIEW_PANELS,
 } from "./customer-dashboard/CustomerOverviewPanels";
 import CustomerSellRecyclablesSection from "./customer-dashboard/CustomerSellRecyclablesSection";
-import { QuickAddPanel, ScanPhotoPanel } from "./customer-dashboard/CustomerFabPanels";
-import CustomerSpeedDial from "./customer-dashboard/CustomerSpeedDial";
 import CustomerTopbar from "./customer-dashboard/CustomerTopbar";
 import HelpModal from "./ui/HelpModal";
 import EmptyState from "./ui/EmptyState";
@@ -48,6 +47,7 @@ import {
 } from "./customer-dashboard/CustomerAccountViews";
 import CustomerShopProfile from "./customer-dashboard/CustomerShopProfile";
 import CustomerShopSummaryCard from "./customer-dashboard/CustomerShopSummaryCard";
+import CustomerPointsWallet from "./customer-dashboard/CustomerPointsWallet";
 import {
     buildCustomerPath,
     parseCustomerPath,
@@ -67,7 +67,17 @@ const sidebarToolItems = [
 ];
 
 const primarySidebarButtonClass =
-    "w-full flex items-center justify-center gap-2.5 rounded-2xl border border-emerald-200/70 bg-emerald-100/80 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-sm hover:bg-emerald-100 hover:shadow transition-colors";
+    "w-full flex items-center rounded-2xl border border-[#154212] bg-[#154212] py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-900 hover:shadow transition-colors";
+
+function readSidebarPinnedPreference(key) {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(key) === "true";
+}
+
+function saveSidebarPinnedPreference(key, value) {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(key, String(value));
+}
 
 const SHOP_IMAGE =
     "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?q=80&w=1000&auto=format&fit=crop";
@@ -105,15 +115,18 @@ export default function CustomerDashboard({
     const [accountView, setAccountView] = useState(null);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+    const [sidebarPinned, setSidebarPinned] = useState(() =>
+        readSidebarPinnedPreference("customer-sidebar-pinned")
+    );
     const [historyRows, setHistoryRows] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(true);
-    const [fabOpen, setFabOpen] = useState(false);
     const [openPickupWizard, setOpenPickupWizard] = useState(false);
     const [focusPickupId, setFocusPickupId] = useState(null);
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
     const [passwordNoticeShown, setPasswordNoticeShown] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
+    const [showPointsWallet, setShowPointsWallet] = useState(false);
     const [pickupsTabMounted, setPickupsTabMounted] = useState(
         () => activeTab === "pickups"
     );
@@ -139,7 +152,6 @@ export default function CustomerDashboard({
         setAccountView(parsed.accountView);
         setJunkshopFocusId(parsed.junkshopFocusId);
         setRouteToShopId(location.state?.routeToShopId || null);
-        setFabOpen(false);
 
         if (parsed.shopId) {
             const found = shops.find(
@@ -296,44 +308,6 @@ export default function CustomerDashboard({
         toggleFavorite(shopId);
     };
 
-    const handleLogTrip = async (entry) => {
-        try {
-            const { transaction } = await domainApi.logTrip({
-                junkshopId: entry.junkshopId,
-                material: entry.material,
-                weight: entry.weightKg,
-                pricePerUnit: entry.pricePerUnit,
-            });
-            setHistoryRows((prev) => [normalizeTransaction(transaction), ...prev]);
-            closeOverviewPanel();
-            showNotification("Trip logged! Check History to see it.");
-        } catch (err) {
-            showNotification(err.message || "Could not log trip.");
-        }
-    };
-
-    const handleQuickAdd = async ({ mode, shopId, shopName, note, amount }) => {
-        if (mode === "favorite") {
-            showNotification(`${shopName || "Shop"} added to favorites.`);
-            return;
-        }
-
-        const type = mode === "note" ? "note" : "memo";
-        const text = mode === "note" ? note : amount;
-
-        await domainApi.createNote({ type, text, shopId: shopId || "" });
-        showNotification(mode === "note" ? "Note saved." : "Transaction memo saved.");
-    };
-
-    const handleScanPhoto = async ({ fileName, imageData }) => {
-        await domainApi.createNote({
-            type: "photo",
-            text: fileName,
-            imageData,
-        });
-        showNotification("Photo saved.");
-    };
-
     const openShopRoute = (shop) => {
         if (!shop?.id) return;
         navigate(
@@ -345,10 +319,13 @@ export default function CustomerDashboard({
         );
     };
 
-    const showFab =
-        activeTab === "overview" && !overviewPanel && !accountView;
-
     const isSidePanelOpen = !accountView && (overviewPanel !== null || shopProfile !== null);
+    const sidebarOffset = sidebarPinned ? "14rem" : "5rem";
+
+    const handleSidebarPinChange = (value) => {
+        setSidebarPinned(value);
+        saveSidebarPinnedPreference("customer-sidebar-pinned", value);
+    };
 
     useEffect(() => {
         if (!isSidePanelOpen) return;
@@ -365,6 +342,7 @@ export default function CustomerDashboard({
             className={`min-h-screen bg-[#f9f9f8] text-[#191c1c] font-sans overflow-x-hidden ${
                 isSidePanelOpen ? "h-dvh overflow-hidden" : ""
             }`}
+            style={{ "--dashboard-sidebar-offset": sidebarOffset }}
         >
             <CustomerTopbar
                 user={user}
@@ -379,6 +357,7 @@ export default function CustomerDashboard({
                     setShowDeactivateModal(true);
                 }}
                 onNotificationNavigate={handleNotificationNavigate}
+                onOpenPointsWallet={() => setShowPointsWallet(true)}
             />
 
             <HelpModal
@@ -394,10 +373,12 @@ export default function CustomerDashboard({
                 setActiveTab={handleTabChange}
                 overviewPanel={overviewPanel}
                 onOpenPanel={openOverviewPanel}
+                pinned={sidebarPinned}
+                onPinnedChange={handleSidebarPinChange}
             />
 
             <main
-                className={`md:pl-56 pt-16 min-h-screen ${
+                className={`md:pl-[var(--dashboard-sidebar-offset)] pt-16 min-h-screen transition-[padding] duration-300 ${
                     isSidePanelOpen ? "bg-white" : "pb-28 md:pb-8"
                 }`}
             >
@@ -460,9 +441,6 @@ export default function CustomerDashboard({
                             onRouteDrawn={() => setRouteToShopId(null)}
                             onClose={closeOverviewPanel}
                             onToggleFavorite={handleToggleFavorite}
-                            onLogTrip={handleLogTrip}
-                            onQuickAdd={handleQuickAdd}
-                            onScanPhoto={handleScanPhoto}
                             onNotify={showNotification}
                             onViewShopProfile={(shop) => openShopProfile(shop, "Back to Find a Shop")}
                         />
@@ -557,45 +535,56 @@ export default function CustomerDashboard({
                 />
             )}
 
-            {showFab && (
-                <CustomerSpeedDial
-                    open={fabOpen}
-                    onToggle={() => setFabOpen((value) => !value)}
-                    onClose={() => setFabOpen(false)}
-                    onSelect={(panelId) => {
-                        if (panelId === "request-pickup") {
-                            openPickupsTab(true);
-                        } else {
-                            openOverviewPanel(panelId);
-                        }
-                    }}
-                />
-            )}
-
             <DeactivateAccountModal
                 isOpen={showDeactivateModal}
                 onClose={() => setShowDeactivateModal(false)}
                 onConfirm={handleDeactivateConfirm}
             />
+
+            <CustomerPointsWallet
+                user={user}
+                isOpen={showPointsWallet}
+                onClose={() => setShowPointsWallet(false)}
+            />
         </div>
     );
 }
 
-function Sidebar({ activeTab, setActiveTab, overviewPanel, onOpenPanel }) {
+function Sidebar({ activeTab, setActiveTab, overviewPanel, onOpenPanel, pinned, onPinnedChange }) {
+    const sidebarWidthClass = pinned ? "w-56" : "w-20 hover:w-56";
+    const labelClass = pinned
+        ? "max-w-[10rem] opacity-100"
+        : "max-w-0 opacity-0 group-hover:max-w-[10rem] group-hover:opacity-100";
+    const itemLayoutClass = pinned
+        ? "justify-start"
+        : "justify-center group-hover:justify-start";
+    const itemPaddingClass = pinned
+        ? "px-3"
+        : "px-0 group-hover:px-3";
+    const primaryPaddingClass = pinned
+        ? "px-4"
+        : "px-0 group-hover:px-4";
+    const gapClass = pinned ? "gap-2.5" : "gap-0 group-hover:gap-2.5";
+
     return (
-        <aside className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-56 border-r border-zinc-200 bg-zinc-50 hidden md:flex flex-col z-30">
+        <aside
+            className={`group fixed left-0 top-16 h-[calc(100vh-4rem)] ${sidebarWidthClass} overflow-hidden border-r border-zinc-200 bg-zinc-50 hidden md:flex flex-col z-30 transition-[width] duration-300 ease-out`}
+        >
             <div className="p-3 pb-2">
                 <button
                     type="button"
                     onClick={() => onOpenPanel("junkshops")}
-                    className={primarySidebarButtonClass}
+                    className={`${primarySidebarButtonClass} ${itemLayoutClass} ${primaryPaddingClass} ${gapClass} min-h-10 whitespace-nowrap overflow-hidden transition-[padding,gap] duration-300`}
+                    title="Find a Shop"
                 >
-                    <MapPin size={20} />
-                    Find a Shop
+                    <MapPin size={20} className="shrink-0" />
+                    <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
+                        Find a Shop
+                    </span>
                 </button>
             </div>
 
-            <nav className="scroll-y-clean flex flex-col gap-0.5 px-3 flex-1">
+            <nav className="overflow-hidden flex flex-col gap-0.5 px-3 flex-1">
                 {navTabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id && !overviewPanel;
@@ -604,20 +593,23 @@ function Sidebar({ activeTab, setActiveTab, overviewPanel, onOpenPanel }) {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors text-left rounded-lg ${isActive
+                            title={tab.label}
+                            className={`flex min-h-11 items-center ${itemLayoutClass} ${gapClass} ${itemPaddingClass} py-2.5 text-sm font-medium transition-[padding,gap,colors] duration-300 text-left rounded-lg whitespace-nowrap overflow-hidden ${isActive
                                 ? "text-emerald-800 bg-emerald-100/80"
                                 : "text-zinc-600 hover:bg-zinc-100"
                                 }`}
                         >
-                            <Icon size={20} />
-                            {tab.label}
+                            <Icon size={20} className="shrink-0" />
+                            <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
+                                {tab.label}
+                            </span>
                         </button>
                     );
                 })}
 
                 <div className="my-2 border-t border-zinc-200/80" />
 
-                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#72796e]">
+                <p className={`overflow-hidden px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#72796e] transition-all duration-200 ${labelClass}`}>
                     Resources
                 </p>
                 {sidebarToolItems.map((item) => {
@@ -629,17 +621,31 @@ function Sidebar({ activeTab, setActiveTab, overviewPanel, onOpenPanel }) {
                             key={item.id}
                             type="button"
                             onClick={() => onOpenPanel(item.id)}
-                            className={`flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors text-left rounded-lg ${isActive
+                            title={item.label}
+                            className={`flex min-h-11 items-center ${itemLayoutClass} ${gapClass} ${itemPaddingClass} py-2.5 text-sm font-medium transition-[padding,gap,colors] duration-300 text-left rounded-lg whitespace-nowrap overflow-hidden ${isActive
                                 ? "text-emerald-800 bg-emerald-100/80"
                                 : "text-zinc-600 hover:bg-zinc-100"
                                 }`}
                         >
-                            <Icon size={20} />
-                            {item.label}
+                            <Icon size={20} className="shrink-0" />
+                            <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
+                                {item.label}
+                            </span>
                         </button>
                     );
                 })}
             </nav>
+            <div className="px-3 py-2 flex justify-end">
+                <button
+                    type="button"
+                    onClick={() => onPinnedChange(!pinned)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200 bg-white text-[#42493e] shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 transition-colors"
+                    title={pinned ? "Collapse sidebar" : "Pin sidebar open"}
+                    aria-pressed={pinned}
+                >
+                    {pinned ? <PinOff size={14} fill="currentColor" /> : <Pin size={14} fill="currentColor" />}
+                </button>
+            </div>
         </aside>
     );
 }
@@ -730,48 +736,6 @@ function MobileNav({ activeTab, setActiveTab, overviewPanel, onOpenPanel }) {
     );
 }
 
-const FAB_PANEL_CONFIG = {
-    "log-trip": {
-        title: "Log a Recycling Trip",
-        render: (props) => (
-            <LogTripPanel shops={props.shops} onSubmit={props.onLogTrip} />
-        ),
-    },
-    "quick-add": {
-        title: "Quick Add",
-        render: (props) => (
-            <QuickAddPanel
-                shops={props.shops}
-                favoriteIds={props.favoriteIds}
-                onToggleFavorite={props.onToggleFavorite}
-                onSubmit={async (payload) => {
-                    try {
-                        await props.onQuickAdd(payload);
-                        props.onClosePanel();
-                    } catch (err) {
-                        props.onNotify(err.message || "Could not save.");
-                    }
-                }}
-            />
-        ),
-    },
-    "scan-photo": {
-        title: "Scan / Photo",
-        render: (props) => (
-            <ScanPhotoPanel
-                onSubmit={async (payload) => {
-                    try {
-                        await props.onScanPhoto(payload);
-                        props.onClosePanel();
-                    } catch (err) {
-                        props.onNotify(err.message || "Could not save photo.");
-                    }
-                }}
-            />
-        ),
-    },
-};
-
 function CustomerSidePanel({
     panelId,
     shops,
@@ -781,30 +745,9 @@ function CustomerSidePanel({
     onRouteDrawn,
     onClose,
     onToggleFavorite,
-    onLogTrip,
-    onQuickAdd,
-    onScanPhoto,
     onNotify,
     onViewShopProfile,
 }) {
-    const fabPanel = FAB_PANEL_CONFIG[panelId];
-    if (fabPanel) {
-        return (
-            <DashboardPanelShell title={fabPanel.title} onClose={onClose}>
-                {fabPanel.render({
-                    shops,
-                    favoriteIds,
-                    onToggleFavorite,
-                    onLogTrip,
-                    onQuickAdd,
-                    onScanPhoto,
-                    onNotify,
-                    onClosePanel: onClose,
-                })}
-            </DashboardPanelShell>
-        );
-    }
-
     if (OVERVIEW_PANELS[panelId]) {
         const { title, Component } = OVERVIEW_PANELS[panelId];
 

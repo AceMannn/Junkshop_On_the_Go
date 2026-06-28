@@ -23,6 +23,16 @@ import { dashboardMainPaddingClass } from "./dashboard/dashboardTopbarUi";
 import { buildProviderPath, parseProviderPath } from "../utils/dashboardRoutes";
 import { getProviderNotificationTarget } from "../utils/notificationNavigation";
 
+function readSidebarPinnedPreference(key) {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(key) === "true";
+}
+
+function saveSidebarPinnedPreference(key, value) {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(key, String(value));
+}
+
 export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     const navigate = useNavigate();
     const location = useLocation();
@@ -35,6 +45,9 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     const [focusRequestId, setFocusRequestId] = useState(null);
     const [accountView, setAccountView] = useState(null);
     const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+    const [sidebarPinned, setSidebarPinned] = useState(() =>
+        readSidebarPinnedPreference("provider-sidebar-pinned")
+    );
 
     useEffect(() => {
         const path = location.pathname.replace(/\/+$/, "");
@@ -95,6 +108,13 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
         setTimeout(() => setShowToast(false), 3200);
     };
 
+    const sidebarOffset = sidebarPinned ? "14rem" : "5rem";
+
+    const handleSidebarPinChange = (value) => {
+        setSidebarPinned(value);
+        saveSidebarPinnedPreference("provider-sidebar-pinned", value);
+    };
+
     useEffect(() => {
         if (!user?.passwordNeedsUpdate || passwordNoticeShown) return;
         setToastMessage(user.passwordSecurityMessage || "For your security, change your password.");
@@ -104,7 +124,10 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     }, [passwordNoticeShown, user?.passwordNeedsUpdate, user?.passwordSecurityMessage]);
 
     return (
-        <div className="min-h-screen bg-[#f9f9f8] text-[#191c1c] font-sans overflow-x-hidden">
+        <div
+            className="min-h-screen bg-[#f9f9f8] text-[#191c1c] font-sans overflow-x-hidden"
+            style={{ "--dashboard-sidebar-offset": sidebarOffset }}
+        >
             <ProviderTopbar
                 user={user}
                 showProfileMenu={showProfileMenu}
@@ -129,9 +152,14 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                 }}
             />
 
-            <ProviderSidebar activeTab={activeTab} onNavigate={handleNavigate} />
+            <ProviderSidebar
+                activeTab={activeTab}
+                onNavigate={handleNavigate}
+                pinned={sidebarPinned}
+                onPinnedChange={handleSidebarPinChange}
+            />
 
-            <main className="md:pl-56 pt-16 min-h-screen pb-24 md:pb-8">
+            <main className="md:pl-[var(--dashboard-sidebar-offset)] pt-16 min-h-screen pb-24 md:pb-8 transition-[padding] duration-300">
                 <div className={dashboardMainPaddingClass}>
                     {showToast && (
                         <div className="fixed top-20 right-4 left-4 sm:left-auto z-50 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 sm:px-5 rounded-xl shadow-lg max-w-md sm:ml-auto">

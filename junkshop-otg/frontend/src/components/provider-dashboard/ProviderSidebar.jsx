@@ -7,6 +7,8 @@ import {
     ReceiptText,
     MoreHorizontal,
     ShieldCheck,
+    Pin,
+    PinOff,
 } from "lucide-react";
 
 export const providerTabs = [
@@ -22,27 +24,47 @@ const mobilePrimaryIds = ["dashboard", "verification", "requests", "materials"];
 const mobileMoreIds = ["availability", "transactions", "settings"];
 
 const primarySidebarButtonClass =
-    "w-full flex items-center justify-center gap-2.5 rounded-2xl border border-emerald-200/70 bg-emerald-100/80 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-sm hover:bg-emerald-100 hover:shadow transition-colors";
+    "w-full flex items-center rounded-2xl border border-[#154212] bg-[#154212] py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-900 hover:shadow transition-colors";
 
 const sidebarNavTabs = providerTabs.filter((tab) => tab.id !== "requests");
 
-export default function ProviderSidebar({ activeTab, onNavigate }) {
+export default function ProviderSidebar({ activeTab, onNavigate, pinned, onPinnedChange }) {
+    const sidebarWidthClass = pinned ? "w-56" : "w-20 hover:w-56";
+    const labelClass = pinned
+        ? "max-w-[10rem] opacity-100"
+        : "max-w-0 opacity-0 group-hover:max-w-[10rem] group-hover:opacity-100";
+    const itemLayoutClass = pinned
+        ? "justify-start"
+        : "justify-center group-hover:justify-start";
+    const itemPaddingClass = pinned
+        ? "px-3"
+        : "px-0 group-hover:px-3";
+    const primaryPaddingClass = pinned
+        ? "px-4"
+        : "px-0 group-hover:px-4";
+    const gapClass = pinned ? "gap-2.5" : "gap-0 group-hover:gap-2.5";
+
     return (
-        <aside className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-56 border-r border-zinc-200 bg-zinc-50 hidden md:flex flex-col z-30">
+        <aside
+            className={`group fixed left-0 top-16 h-[calc(100vh-4rem)] ${sidebarWidthClass} overflow-hidden border-r border-zinc-200 bg-zinc-50 hidden md:flex flex-col z-30 transition-[width] duration-300 ease-out`}
+        >
             <div className="p-3 pb-2">
                 <button
                     type="button"
                     onClick={() => onNavigate("requests")}
-                    className={`${primarySidebarButtonClass} ${
+                    title="Pickups"
+                    className={`${primarySidebarButtonClass} ${itemLayoutClass} ${primaryPaddingClass} ${gapClass} min-h-10 whitespace-nowrap overflow-hidden transition-[padding,gap] duration-300 ${
                         activeTab === "requests" ? "ring-2 ring-emerald-400/80" : ""
                     }`}
                 >
-                    <Truck size={20} />
-                    Pickups
+                    <Truck size={20} className="shrink-0" />
+                    <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
+                        Pickups
+                    </span>
                 </button>
             </div>
 
-            <nav className="scroll-y-clean flex flex-col gap-0.5 px-3 flex-1">
+            <nav className="overflow-hidden flex flex-col gap-0.5 px-3 flex-1">
                 {sidebarNavTabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -52,17 +74,31 @@ export default function ProviderSidebar({ activeTab, onNavigate }) {
                             key={tab.id}
                             type="button"
                             onClick={() => onNavigate(tab.id)}
-                            className={`flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors text-left rounded-lg ${isActive
+                            title={tab.label}
+                            className={`flex min-h-11 items-center ${itemLayoutClass} ${gapClass} ${itemPaddingClass} py-2.5 text-sm font-medium transition-[padding,gap,colors] duration-300 text-left rounded-lg whitespace-nowrap overflow-hidden ${isActive
                                 ? "text-emerald-800 bg-emerald-100/80"
                                 : "text-zinc-600 hover:bg-zinc-100"
                                 }`}
                         >
-                            <Icon size={20} />
-                            {tab.label}
+                            <Icon size={20} className="shrink-0" />
+                            <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
+                                {tab.label}
+                            </span>
                         </button>
                     );
                 })}
             </nav>
+            <div className="px-3 py-2 flex justify-end">
+                <button
+                    type="button"
+                    onClick={() => onPinnedChange(!pinned)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200 bg-white text-[#42493e] shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 transition-colors"
+                    title={pinned ? "Collapse sidebar" : "Pin sidebar open"}
+                    aria-pressed={pinned}
+                >
+                    {pinned ? <PinOff size={14} fill="currentColor" /> : <Pin size={14} fill="currentColor" />}
+                </button>
+            </div>
         </aside>
     );
 }
