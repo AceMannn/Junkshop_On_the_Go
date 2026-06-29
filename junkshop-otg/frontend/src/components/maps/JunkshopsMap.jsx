@@ -251,6 +251,15 @@ export default function JunkshopsMap({
         }
     }, [mappableShops, selectedId, mapReady, onSelectShop, refreshMapSize]);
 
+    // Pan & zoom to selected shop when selectedId changes
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !mapReady || !selectedId) return;
+        const shop = mappableShops.find((s) => s.id === selectedId);
+        if (!shop) return;
+        map.flyTo([Number(shop.lat), Number(shop.lng)], 16, { animate: true, duration: 0.6 });
+    }, [selectedId, mapReady, mappableShops]);
+
     useEffect(() => {
         const map = mapRef.current;
         if (!map || !mapReady || !routingEnabled || !origin) return;

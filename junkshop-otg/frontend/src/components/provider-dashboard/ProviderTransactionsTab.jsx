@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search, Download, Plus, ReceiptText, DollarSign } from "lucide-react";
+import { Search, Download, Plus, ReceiptText } from "lucide-react";
 import { domainApi } from "../../services/api";
 import LoadErrorBanner from "../ui/LoadErrorBanner";
 import { normalizeTransaction } from "../../utils/catalogMappers";
 import { REFRESH_INTERVAL_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
 import NumberInput from "../ui/NumberInput";
+
+function PesoIcon({ size = 18 }) {
+    return (
+        <span
+            className="font-bold leading-none select-none text-emerald-700"
+            style={{ fontSize: Math.round(size * 0.95) }}
+            aria-hidden
+        >
+            ₱
+        </span>
+    );
+}
 
 export default function ProviderTransactionsTab({ onNotify }) {
     const [rows, setRows] = useState([]);
@@ -208,7 +220,7 @@ export default function ProviderTransactionsTab({ onNotify }) {
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-zinc-200 border-t-2 border-t-emerald-400 shadow-sm flex flex-col gap-3">
                     <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-                        <DollarSign size={18} className="text-emerald-700" />
+                        <PesoIcon size={18} />
                     </div>
                     <div>
                         <p className="text-[10px] uppercase tracking-wider font-semibold text-[#72796e]">Filtered total</p>

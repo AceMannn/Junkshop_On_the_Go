@@ -7,7 +7,6 @@ import {
     Search,
     Map,
     Store,
-    DollarSign,
     BookOpen,
     Recycle,
     TreePine,
@@ -679,7 +678,7 @@ function Sidebar({ activeTab, setActiveTab, overviewPanel, onOpenPanel, pinned, 
 
 const mobileMoreItems = [
     { id: "junkshops", label: "Find a Shop", icon: MapPin },
-    { id: "prices", label: "Prices", icon: DollarSign },
+    { id: "prices", label: "Prices", icon: SidebarPesoIcon },
     { id: "guide", label: "Guide", icon: BookOpen },
 ];
 
@@ -1005,7 +1004,7 @@ function OverviewTab({
 
 function OverviewQuickAccess({ onOpenPanel }) {
     const items = [
-        { id: "prices", label: "Prices", icon: DollarSign },
+        { id: "prices", label: "Prices", icon: SidebarPesoIcon },
         { id: "guide", label: "Guide", icon: BookOpen },
     ];
 
@@ -1254,7 +1253,7 @@ function HistoryTab({
                     layout="horizontal"
                     label="Earned"
                     value={`₱${totalEarnings.toFixed(2)}`}
-                    icon={DollarSign}
+                    icon={PesoIcon}
                     accentColor="amber"
                 />
                 <StatCard
