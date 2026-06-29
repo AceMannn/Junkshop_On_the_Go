@@ -32,8 +32,6 @@ const TRANSACTION_CREATE_KEYS = [
   'status',
 ];
 
-const LOG_TRIP_KEYS = ['junkshopId', 'material', 'weight', 'pricePerUnit'];
-
 function pickAllowed(body, allowedKeys) {
   if (!body || typeof body !== 'object') {
     return {};
@@ -53,5 +51,4 @@ module.exports = {
   JUNKSHOP_WRITE_KEYS,
   MATERIAL_WRITE_KEYS,
   TRANSACTION_CREATE_KEYS,
-  LOG_TRIP_KEYS,
 };

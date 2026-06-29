@@ -4,7 +4,6 @@ const Material = require('../models/Material');
 const PickupRequest = require('../models/PickupRequest');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
-const CustomerNote = require('../models/CustomerNote');
 const { protect } = require('../middlewares/authMiddleware');
 const { contactLimiter } = require('../middlewares/rateLimiters');
 const pickupController = require('../controllers/pickupController');
@@ -22,7 +21,6 @@ const {
   JUNKSHOP_WRITE_KEYS,
   MATERIAL_WRITE_KEYS,
   TRANSACTION_CREATE_KEYS,
-  LOG_TRIP_KEYS,
 } = require('../utils/requestWhitelist');
 const {
   sanitizeOperatingHours,
@@ -34,10 +32,7 @@ const {
   loadUserStatusMap,
   applyJunkshopVisibility,
   filterTransactionsForViewer,
-  canStartNewActivity,
 } = require('../utils/accountModeration');
-
-const CATALOG_PROVIDER_EMAIL = 'catalog@junkshop.internal';
 
 const router = express.Router();
 
@@ -668,121 +663,6 @@ router.post('/transactions', protect, requireProvider, async (req, res) => {
   );
 
   res.status(201).json({ transaction: populated });
-});
-
-router.post('/transactions/log-trip', protect, async (req, res) => {
-  if (req.user.role !== 'customer') {
-    return res.status(403).json({ message: 'Customer account required.' });
-  }
-
-  if (!canStartNewActivity(req.user.status)) {
-    return res.status(403).json({ message: 'Your account cannot log trips right now.' });
-  }
-
-  const { junkshopId, material, weight, pricePerUnit } = pickAllowed(req.body, LOG_TRIP_KEYS);
-
-  if (!material || !weight || !pricePerUnit) {
-    return res.status(400).json({ message: 'Material, weight, and price are required.' });
-  }
-
-  const weightNum = Number(weight);
-  const price = Number(pricePerUnit);
-
-  if (!weightNum || weightNum <= 0 || !price || price < 0) {
-    return res.status(400).json({ message: 'Enter valid weight and price values.' });
-  }
-
-  let providerId = null;
-
-  if (junkshopId) {
-    const shopQuery = String(junkshopId).match(/^[a-f\d]{24}$/i)
-      ? { _id: junkshopId }
-      : { slug: junkshopId };
-    const shop = await Junkshop.findOne(shopQuery);
-    if (shop?.provider) {
-      const providerUser = await User.findById(shop.provider).select('status');
-      if (!providerUser || isBanned(providerUser.status) || !canStartNewActivity(providerUser.status)) {
-        return res.status(400).json({ message: 'Could not link trip to a provider.' });
-      }
-      providerId = shop.provider;
-    }
-  }
-
-  if (!providerId) {
-    const catalogProvider = await User.findOne({ email: CATALOG_PROVIDER_EMAIL });
-    providerId = catalogProvider?._id;
-  }
-
-  if (!providerId) {
-    return res.status(400).json({ message: 'Could not link trip to a provider.' });
-  }
-
-  const totalAmount = Math.round(weightNum * price * 100) / 100;
-  const transaction = await Transaction.create({
-    customer: req.user._id,
-    provider: providerId,
-    material: String(material).trim(),
-    weight: weightNum,
-    pricePerUnit: price,
-    totalAmount,
-    status: 'processing',
-  });
-
-  const populated = await Transaction.findById(transaction._id).populate(
-    'provider',
-    'firstName lastName junkshopName'
-  );
-
-  res.status(201).json({ transaction: populated });
-});
-
-router.get('/notes', protect, async (req, res) => {
-  if (req.user.role !== 'customer') {
-    return res.status(403).json({ message: 'Customer account required.' });
-  }
-
-  const notes = await CustomerNote.find({ customer: req.user._id })
-    .sort({ createdAt: -1 })
-    .select('-imageData');
-
-  res.json({ notes });
-});
-
-router.post('/notes', protect, async (req, res) => {
-  if (req.user.role !== 'customer') {
-    return res.status(403).json({ message: 'Customer account required.' });
-  }
-
-  const { type = 'note', text, shopId, imageData } = req.body;
-  const allowed = ['note', 'memo', 'photo'];
-
-  if (!allowed.includes(type)) {
-    return res.status(400).json({ message: 'Invalid note type.' });
-  }
-
-  if (!text?.trim() && !imageData) {
-    return res.status(400).json({ message: 'Note text or photo is required.' });
-  }
-
-  if (imageData && String(imageData).length > 600000) {
-    return res.status(400).json({ message: 'Image is too large. Try a smaller photo.' });
-  }
-
-  const note = await CustomerNote.create({
-    customer: req.user._id,
-    type,
-    text: String(text || '').trim(),
-    shopId: shopId ? String(shopId) : '',
-    imageData: imageData ? String(imageData) : '',
-  });
-
-  const safe = note.toObject();
-  if (safe.imageData) {
-    safe.hasImage = true;
-    delete safe.imageData;
-  }
-
-  res.status(201).json({ note: safe });
 });
 
 router.post('/contact', contactLimiter, contactController.submitContactMessage);

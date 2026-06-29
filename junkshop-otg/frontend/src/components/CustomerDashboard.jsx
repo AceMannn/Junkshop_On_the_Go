@@ -947,7 +947,7 @@ function OverviewTab({
                                 </div>
                                 <p className="text-sm font-medium text-[#191c1c]">No activity yet</p>
                                 <p className="text-xs text-[#72796e] max-w-[220px]">
-                                    Log a trip from the + menu to track your recycling here.
+                                    Completed pickups and paid transactions will appear here.
                                 </p>
                             </div>
                         ) : (
@@ -1275,7 +1275,7 @@ function HistoryTab({
                     compact
                     icon={ReceiptText}
                     title="No recycling records yet"
-                    description="Log a trip from the + menu, or adjust your search and date filters."
+                    description="Completed pickups and paid transactions will appear here. You can also adjust your search and date filters."
                     action={
                         onRefresh ? (
                             <button

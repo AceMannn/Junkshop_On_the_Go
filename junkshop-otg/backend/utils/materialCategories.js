@@ -19,16 +19,18 @@ function normalizeMaterialCategory(category, material = '') {
     return 'metal';
   }
 
+  if (raw === 'cardboard' || (!raw && materialName.includes('cardboard'))) {
+    return 'paper';
+  }
+
   if (
     raw === 'tires' ||
     raw === 'tire' ||
     raw === 'tyres' ||
     raw === 'tyre' ||
     raw === 'rubber-tires' ||
-    raw === 'cardboard' ||
     materialName.includes('tire') ||
-    materialName.includes('tyre') ||
-    materialName.includes('cardboard')
+    materialName.includes('tyre')
   ) {
     return 'tires';
   }

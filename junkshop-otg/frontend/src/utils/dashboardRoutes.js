@@ -3,9 +3,6 @@ const CUSTOMER_PANELS = new Set([
   'junkshops',
   'prices',
   'guide',
-  'log-trip',
-  'quick-add',
-  'scan-photo',
 ]);
 const CUSTOMER_ACCOUNT_VIEWS = new Set(['profile', 'settings']);
 

@@ -6,11 +6,8 @@ import {
     Shield,
     AlertTriangle,
     X,
-    StickyNote,
-    Camera,
 } from "lucide-react";
-import { authApi, domainApi } from "../../services/api";
-import EmptyState from "../ui/EmptyState";
+import { authApi } from "../../services/api";
 import { getUserInitials } from "../../utils/userDisplay";
 import { formatPoints } from "../../utils/pickupPoints";
 import { validatePasswordStrength } from "../../utils/passwordPolicy";
@@ -228,68 +225,6 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
     );
 }
 
-function CustomerNotesSection() {
-    const [notes, setNotes] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        domainApi
-            .getNotes()
-            .then(({ notes: rows }) => setNotes(rows || []))
-            .catch(() => setNotes([]))
-            .finally(() => setLoading(false));
-    }, []);
-
-    if (loading) {
-        return <p className="text-sm text-[#72796e] animate-pulse">Loading saved notes…</p>;
-    }
-
-    if (notes.length === 0) {
-        return (
-            <EmptyState
-                compact
-                icon={StickyNote}
-                title="No saved notes yet"
-                description="Use Quick Add or Scan Photo from the + menu on Overview to save notes and photos here."
-            />
-        );
-    }
-
-    return (
-        <ul className="scroll-y-clean space-y-2 max-h-64">
-            {notes.map((note) => (
-                <li
-                    key={note._id}
-                    className="rounded-xl border border-zinc-100 bg-[#f9f9f8] px-4 py-3 text-sm"
-                >
-                    <div className="flex items-center gap-2 text-xs text-[#72796e] mb-1">
-                        {note.type === "photo" ? (
-                            <Camera size={14} />
-                        ) : (
-                            <StickyNote size={14} />
-                        )}
-                        <span className="capitalize">{note.type}</span>
-                        <span>·</span>
-                        <span>
-                            {note.createdAt
-                                ? new Date(note.createdAt).toLocaleDateString()
-                                : "—"}
-                        </span>
-                    </div>
-                    <p className="text-[#191c1c] font-medium break-words">{note.text}</p>
-                    {note.type === "photo" && note.imageData && (
-                        <img
-                            src={note.imageData}
-                            alt={note.text}
-                            className="mt-2 max-h-24 rounded-lg border border-zinc-200"
-                        />
-                    )}
-                </li>
-            ))}
-        </ul>
-    );
-}
-
 export function AccountSettingsPage({
     user,
     onBack,
@@ -446,17 +381,6 @@ export function AccountSettingsPage({
                 )}
             </div>
 
-            {!isProvider && (
-                <section className="bg-white p-5 sm:p-8 rounded-2xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.12)]">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-9 h-9 rounded-full bg-[#c9e7cc] flex items-center justify-center">
-                        <StickyNote size={20} className="text-[#4e6953]" />
-                    </div>
-                    <h2 className="text-lg sm:text-xl font-bold">My saved notes</h2>
-                </div>
-                <CustomerNotesSection />
-            </section>
-            )}
         </AccountPageShell>
     );
 }

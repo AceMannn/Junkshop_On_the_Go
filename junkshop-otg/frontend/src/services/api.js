@@ -256,21 +256,6 @@ export const domainApi = {
       body: JSON.stringify(payload),
     });
   },
-  logTrip(payload) {
-    return request('/api/transactions/log-trip', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
-  getNotes() {
-    return request('/api/notes');
-  },
-  createNote(payload) {
-    return request('/api/notes', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
 };
 
 export const pickupApi = {

@@ -11,7 +11,6 @@ import {
     XCircle,
     Leaf,
     AlertCircle,
-    ReceiptText,
     RefreshCw,
     SlidersHorizontal,
 } from "lucide-react";
@@ -20,7 +19,6 @@ import JunkshopsMap from "../maps/JunkshopsMap";
 import EmptyState from "../ui/EmptyState";
 import ShopRating from "../ui/ShopRating";
 import VerifiedPartnerIcon, { isVerified } from "../ui/VerifiedPartnerIcon";
-import NumberInput from "../ui/NumberInput";
 import { isFavoriteShopId } from "../../utils/favorites";
 import { priceCategories } from "../../data/prices";
 import { useCatalogJunkshops, useFeaturedMaterials } from "../../hooks/useCatalogData";
@@ -713,163 +711,6 @@ export function RecyclingGuidePanel() {
                     instead of rejected as contaminated loads.
                 </p>
             </section>
-        </div>
-    );
-}
-
-const LOG_MATERIALS = [
-    { label: "PET Bottles (Clear)", rate: 17.5 },
-    { label: "Aluminum Cans", rate: 52.5 },
-    { label: "Used Tires", rate: 12 },
-    { label: "Mixed Paper", rate: 6.5 },
-    { label: "Scrap Metal (Iron)", rate: 42.5 },
-    { label: "Glass Bottles", rate: 10 },
-    { label: "Copper Wire", rate: 315 },
-    { label: "Hard Plastic", rate: 12.5 },
-];
-
-function formatTripDate(dateValue) {
-    const date = dateValue ? new Date(dateValue) : new Date();
-    return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
-}
-
-export function LogTripPanel({ shops = [], onSubmit }) {
-    const [material, setMaterial] = useState(LOG_MATERIALS[0].label);
-    const [weight, setWeight] = useState("");
-    const [shopId, setShopId] = useState(shops[0]?._id || shops[0]?.id || "");
-    const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-    const [error, setError] = useState("");
-
-    const selectedMaterial = LOG_MATERIALS.find((item) => item.label === material);
-    const weightNum = Number(weight);
-    const estimated =
-        selectedMaterial && weightNum > 0
-            ? (weightNum * selectedMaterial.rate).toFixed(2)
-            : null;
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        const selectedShop = shops.find(
-            (s) => String(s._id || s.id) === String(shopId)
-        );
-        if (!material || !selectedShop) {
-            setError("Please select a material and junkshop.");
-            return;
-        }
-        if (!weightNum || weightNum <= 0) {
-            setError("Enter a valid weight in kilograms.");
-            return;
-        }
-
-        onSubmit({
-            junkshopId: selectedShop._id || selectedShop.id,
-            material,
-            weightKg: weightNum,
-            pricePerUnit: selectedMaterial?.rate || 0,
-            date: formatTripDate(date),
-            shop: selectedShop.name,
-            weight: `${weightNum} kg`,
-            amount: `₱${estimated}`,
-            status: "Processing",
-        });
-    };
-
-    return (
-        <div className="space-y-6 max-w-xl">
-            <p className="text-sm text-[#72796e]">
-                Record a recycling trip you made. Saved to your account and shown in History.
-            </p>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-[#42493e]">
-                        Material sold
-                    </label>
-                    <select
-                        value={material}
-                        onChange={(e) => setMaterial(e.target.value)}
-                        className="w-full bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#154212]"
-                    >
-                        {LOG_MATERIALS.map((item) => (
-                            <option key={item.label} value={item.label}>
-                                {item.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-[#42493e]">
-                            Weight (kg)
-                        </label>
-                        <NumberInput
-                            min={0.1}
-                            step={0.1}
-                            value={weight}
-                            onChange={setWeight}
-                            placeholder="e.g. 12.5"
-                            inputClassName="w-full bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-[#154212]"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-[#42493e]">
-                            Date
-                        </label>
-                        <input
-                            type="date"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            className="w-full bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#154212]"
-                        />
-                    </div>
-                </div>
-
-                <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-[#42493e]">
-                        Junkshop
-                    </label>
-                    <select
-                        value={shopId}
-                        onChange={(e) => setShopId(e.target.value)}
-                        className="w-full bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#154212]"
-                    >
-                        {shops.map((s) => (
-                            <option key={s.id} value={s._id || s.id}>
-                                {s.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {estimated && (
-                    <div className="flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
-                        <ReceiptText size={20} className="text-emerald-700 shrink-0" />
-                        <p className="text-sm text-[#42493e]">
-                            Estimated payout:{" "}
-                            <span className="font-bold text-emerald-800">₱{estimated}</span>
-                            <span className="text-[#72796e]"> (based on typical rates)</span>
-                        </p>
-                    </div>
-                )}
-
-                {error && (
-                    <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                        {error}
-                    </p>
-                )}
-
-                <button
-                    type="submit"
-                    className="w-full sm:w-auto bg-[#154212] text-white px-8 py-3 rounded-xl text-sm font-semibold hover:bg-emerald-900 transition-colors"
-                >
-                    Save trip
-                </button>
-            </form>
         </div>
     );
 }

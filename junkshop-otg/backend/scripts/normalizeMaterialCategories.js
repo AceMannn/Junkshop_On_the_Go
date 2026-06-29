@@ -15,27 +15,9 @@ async function normalizeMaterialRows() {
 
   for (const material of materials) {
     const nextCategory = normalizeMaterialCategory(material.category, material.name);
-    const wasCardboard =
-      String(material.category || '').toLowerCase() === 'cardboard' ||
-      String(material.name || '').toLowerCase().includes('cardboard');
 
-    if (material.category !== nextCategory || wasCardboard) {
+    if (material.category !== nextCategory) {
       material.category = nextCategory;
-      if (wasCardboard) {
-        material.name = 'Used Tires';
-        material.unit = 'piece';
-        material.priceLabel = material.priceLabel || '₱5-20';
-        material.examples = material.examples || 'Car tires, motorcycle tires, bicycle tires';
-        material.notes =
-          material.notes || 'Keep dry and free from mud; confirm oversized tires before pickup';
-        const usedTiresSlugExists = await Material.exists({
-          slug: 'used-tires',
-          _id: { $ne: material._id },
-        });
-        if (material.slug === 'cardboard' && !usedTiresSlugExists) {
-          material.slug = 'used-tires';
-        }
-      }
       await material.save();
       changed += 1;
     }

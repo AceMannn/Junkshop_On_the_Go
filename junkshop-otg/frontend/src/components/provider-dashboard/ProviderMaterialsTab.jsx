@@ -28,6 +28,71 @@ const UNIT_OPTIONS = [
     { value: "kg", label: "Per kg" },
     { value: "piece", label: "Per piece" },
 ];
+const CUSTOM_SUBCATEGORY_VALUE = "__custom__";
+
+const SUBCATEGORY_OPTIONS_BY_CATEGORY = {
+    plastic: [
+        "PET Bottles (Clear)",
+        "PET Bottles (Colored)",
+        "Hard Plastic",
+        "Plastic Bags (Soft)",
+        "Plastic Chairs",
+        "Plastic Containers",
+    ],
+    paper: [
+        "White Paper",
+        "Newspaper",
+        "Mixed Paper",
+        "Cardboard",
+        "Magazines",
+        "Paper Bags",
+    ],
+    metal: [
+        "Scrap Metal (Iron)",
+        "Metal Bars",
+        "Aluminum Cans",
+        "Copper Wire",
+        "Brass",
+        "Steel Cans",
+    ],
+    glass: [
+        "Glass Bottles (Clear)",
+        "Glass Bottles (Colored)",
+        "Glass Jars",
+    ],
+    "e-waste": [
+        "Electric Fan",
+        "Computer Parts",
+        "Mobile Phones",
+        "Cables & Wires",
+        "Batteries",
+        "Chargers",
+    ],
+    tires: [
+        "Used Tires",
+        "Car Tires",
+        "Motorcycle Tires",
+        "Bicycle Tires",
+    ],
+};
+
+function getSubcategoryOptions(category) {
+    const rows = SUBCATEGORY_OPTIONS_BY_CATEGORY[category] || [];
+    return [
+        ...rows.map((name) => ({ value: name, label: name })),
+        { value: CUSTOM_SUBCATEGORY_VALUE, label: "Other / custom" },
+    ];
+}
+
+function getDefaultSubcategory(category) {
+    return SUBCATEGORY_OPTIONS_BY_CATEGORY[category]?.[0] || "";
+}
+
+function isKnownSubcategory(category, name) {
+    return (SUBCATEGORY_OPTIONS_BY_CATEGORY[category] || []).some(
+        (item) => item.toLowerCase() === String(name || "").trim().toLowerCase()
+    );
+}
 
 export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
     const { materials, loading, refresh } = useProviderMaterials({ autoRefresh: true });
@@ -37,8 +102,9 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
     const [editing, setEditing] = useState(null);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({
-        name: "",
         category: "plastic",
+        name: getDefaultSubcategory("plastic"),
+        customName: "",
         price: "",
         unit: "kg",
         available: true,
@@ -60,15 +126,24 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
 
     const openAdd = () => {
         setEditing(null);
-        setForm({ name: "", category: "plastic", price: "", unit: "kg", available: true });
+        setForm({
+            category: "plastic",
+            name: getDefaultSubcategory("plastic"),
+            customName: "",
+            price: "",
+            unit: "kg",
+            available: true,
+        });
         setModalOpen(true);
     };
 
     const openEdit = (item) => {
+        const known = isKnownSubcategory(item.category, item.name);
         setEditing(item);
         setForm({
-            name: item.name,
             category: item.category,
+            name: known ? item.name : CUSTOM_SUBCATEGORY_VALUE,
+            customName: known ? "" : item.name,
             price: String(item.price),
             unit: item.unit,
             available: item.available,
@@ -78,14 +153,17 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!form.name.trim() || !form.price || Number(form.price) <= 0) {
-            onNotify?.("Name and a price greater than ₱0 are required.");
+        const materialName =
+            form.name === CUSTOM_SUBCATEGORY_VALUE ? form.customName.trim() : form.name.trim();
+
+        if (!materialName || !form.price || Number(form.price) <= 0) {
+            onNotify?.("Subcategory and a price greater than ₱0 are required.");
             return;
         }
         setSaving(true);
         try {
             const payload = {
-                name: form.name.trim(),
+                name: materialName,
                 category: form.category,
                 price: Number(form.price),
                 unit: form.unit,
@@ -254,13 +332,6 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                         <h2 className="text-lg font-bold text-[#191c1c]">
                             {editing ? "Edit material" : "Add material"}
                         </h2>
-                        <input
-                            value={form.name}
-                            onChange={(e) => setForm({ ...form, name: e.target.value })}
-                            placeholder="Material name"
-                            className="w-full border border-zinc-200 rounded-xl px-4 py-2.5 text-sm"
-                            required
-                        />
                         <div className="space-y-2">
                             <label className="block text-sm font-semibold text-[#42493e]">
                                 Category
@@ -271,6 +342,8 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                                     setForm({
                                         ...form,
                                         category,
+                                        name: getDefaultSubcategory(category),
+                                        customName: "",
                                         unit: category === "tires" ? "piece" : form.unit,
                                     })
                                 }
@@ -278,6 +351,26 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                                 ariaLabel="Material category"
                             />
                         </div>
+                        <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-[#42493e]">
+                                Subcategory
+                            </label>
+                            <Select
+                                value={form.name}
+                                onChange={(name) => setForm({ ...form, name })}
+                                options={getSubcategoryOptions(form.category)}
+                                ariaLabel="Material subcategory"
+                            />
+                        </div>
+                        {form.name === CUSTOM_SUBCATEGORY_VALUE && (
+                            <input
+                                value={form.customName}
+                                onChange={(e) => setForm({ ...form, customName: e.target.value })}
+                                placeholder={`Custom ${formatMaterialCategoryLabel(form.category)} subcategory`}
+                                className="w-full border border-zinc-200 rounded-xl px-4 py-2.5 text-sm"
+                                required
+                            />
+                        )}
                         <div className="space-y-2">
                             <label className="block text-sm font-semibold text-[#42493e]">
                                 Unit
