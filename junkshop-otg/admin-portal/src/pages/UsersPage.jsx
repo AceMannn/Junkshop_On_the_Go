@@ -155,6 +155,7 @@ export default function UsersPage() {
                   <option value="active">Active</option>
                   <option value="suspended">Suspended</option>
                   <option value="banned">Banned</option>
+                  <option value="deleted">Deleted</option>
                 </select>
               </div>
 

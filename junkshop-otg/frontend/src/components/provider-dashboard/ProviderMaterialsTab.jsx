@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Search, Trash2, Pencil, Eye, EyeOff, Layers } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Eye, EyeOff, Layers, LayoutGrid, Table2 } from "lucide-react";
 import { domainApi } from "../../services/api";
 import { useProviderMaterials } from "../../hooks/useProviderData";
 import NumberInput from "../ui/NumberInput";
@@ -98,6 +98,7 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
     const { materials, loading, refresh } = useProviderMaterials({ autoRefresh: true });
     const [search, setSearch] = useState("");
     const [categoryFilter, setCategoryFilter] = useState("all");
+    const [viewMode, setViewMode] = useState("cards");
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState(null);
     const [saving, setSaving] = useState(false);
@@ -228,8 +229,8 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
             </div>
 
             <div className="flex min-w-0 flex-col sm:flex-row gap-3">
-                <div className="flex min-w-0 flex-1 items-center bg-white border border-zinc-200 rounded-xl px-4 py-2.5">
-                    <Search size={18} className="text-[#72796e] mr-2 shrink-0" />
+                <div className="flex min-w-0 h-10 flex-1 items-center bg-white border border-zinc-200 rounded-xl px-4">
+                    <Search size={16} className="text-[#72796e] mr-2 shrink-0" />
                     <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
@@ -244,6 +245,34 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                     ariaLabel="Filter by category"
                     className="w-full sm:w-auto sm:min-w-[10rem]"
                 />
+                <div className="inline-flex h-10 rounded-xl border border-zinc-200 bg-white p-0.5 shadow-sm">
+                    <button
+                        type="button"
+                        onClick={() => setViewMode("cards")}
+                        className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+                            viewMode === "cards"
+                                ? "bg-[#154212] text-white"
+                                : "text-[#42493e] hover:bg-emerald-50"
+                        }`}
+                        aria-pressed={viewMode === "cards"}
+                    >
+                        <LayoutGrid size={14} />
+                        Cards
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setViewMode("table")}
+                        className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+                            viewMode === "table"
+                                ? "bg-[#154212] text-white"
+                                : "text-[#42493e] hover:bg-emerald-50"
+                        }`}
+                        aria-pressed={viewMode === "table"}
+                    >
+                        <Table2 size={14} />
+                        Table
+                    </button>
+                </div>
             </div>
 
             {loading ? (
@@ -255,6 +284,85 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                     </div>
                     <p className="text-[#191c1c] font-semibold">No materials found</p>
                     <p className="text-sm text-[#72796e]">Add your first listing to start accepting pickups.</p>
+                </div>
+            ) : viewMode === "table" ? (
+                <div className="scroll-x-clean overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+                    <table className="w-full min-w-[760px] text-sm">
+                        <thead className="bg-[#f3f4f3] text-[#42493e]">
+                            <tr>
+                                <th className="px-4 py-3 text-left font-semibold">Material</th>
+                                <th className="px-4 py-3 text-left font-semibold">Category</th>
+                                <th className="px-4 py-3 text-left font-semibold">Status</th>
+                                <th className="px-4 py-3 text-left font-semibold">Price</th>
+                                <th className="px-4 py-3 text-left font-semibold">Posted</th>
+                                <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                            {filtered.map((item) => {
+                                const catKey = item.category?.toLowerCase() || "other";
+                                const cat = CATEGORY_COLORS[catKey] || CATEGORY_COLORS.other;
+
+                                return (
+                                    <tr key={item.id} className="hover:bg-zinc-50">
+                                        <td className="px-4 py-4">
+                                            <p className="font-bold text-[#191c1c]">{item.name}</p>
+                                            <p className="text-xs text-[#72796e]">per {item.unit}</p>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${cat.chip}`}>
+                                                {formatMaterialCategoryLabel(item.category)}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <span
+                                                className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${item.available
+                                                    ? "bg-emerald-100 text-emerald-800"
+                                                    : "bg-zinc-200 text-zinc-500"
+                                                }`}
+                                            >
+                                                {item.available ? "Available" : "Hidden"}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-4 font-bold text-emerald-700">
+                                            ₱{item.price}
+                                        </td>
+                                        <td className="px-4 py-4 text-[#72796e]">
+                                            {formatUpdatedDate(item.createdAt || item.updatedAt)}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openEdit(item)}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#154212] text-white px-3 py-1.5 rounded-lg"
+                                                >
+                                                    <Pencil size={13} />
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleAvailability(item)}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-semibold border border-zinc-300 text-[#42493e] px-3 py-1.5 rounded-lg"
+                                                >
+                                                    {item.available ? <EyeOff size={13} /> : <Eye size={13} />}
+                                                    {item.available ? "Hide" : "Show"}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDelete(item._id)}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-semibold border border-red-200 text-red-600 px-3 py-1.5 rounded-lg"
+                                                >
+                                                    <Trash2 size={13} />
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -384,6 +492,7 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                         </div>
                         <NumberInput
                             min={0.01}
+                            max={20000}
                             step={0.01}
                             value={form.price}
                             onChange={(v) => setForm({ ...form, price: v })}

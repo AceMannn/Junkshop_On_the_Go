@@ -13,6 +13,8 @@ const AUTH_LOCAL_ERROR_PATHS = [
   '/api/auth/register',
   '/api/auth/verify-email',
   '/api/auth/resend-verification',
+  '/api/auth/verify-account',
+  '/api/auth/resend-account-verification',
   '/api/auth/forgot-password',
   '/api/auth/reset-password',
   '/api/auth/password',
@@ -34,8 +36,11 @@ export class ApiError extends Error {
       isNetworkError = false,
       sessionExpired = false,
       accountSuspended = false,
+      requiresAccountVerification = false,
       requiresEmailVerification = false,
+      requiresPhoneVerification = false,
       email = '',
+      phone = '',
     } = {}
   ) {
     super(message);
@@ -44,8 +49,11 @@ export class ApiError extends Error {
     this.isNetworkError = isNetworkError;
     this.sessionExpired = sessionExpired;
     this.accountSuspended = accountSuspended;
+    this.requiresAccountVerification = requiresAccountVerification;
     this.requiresEmailVerification = requiresEmailVerification;
+    this.requiresPhoneVerification = requiresPhoneVerification;
     this.email = email;
+    this.phone = phone;
   }
 }
 
@@ -99,8 +107,11 @@ async function request(path, options = {}, attempt = 0) {
 
     throw new ApiError(message, {
       status: response.status,
+      requiresAccountVerification: Boolean(data.requiresAccountVerification),
       requiresEmailVerification: Boolean(data.requiresEmailVerification),
+      requiresPhoneVerification: Boolean(data.requiresPhoneVerification),
       email: data.email || '',
+      phone: data.phone || '',
     });
   }
 
@@ -122,6 +133,18 @@ export const authApi = {
   },
   verifyEmail(payload) {
     return request('/api/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  verifyAccount(payload) {
+    return request('/api/auth/verify-account', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  resendAccountVerification(payload) {
+    return request('/api/auth/resend-account-verification', {
       method: 'POST',
       body: JSON.stringify(payload),
     });

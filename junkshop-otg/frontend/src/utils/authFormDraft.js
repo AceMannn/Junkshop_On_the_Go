@@ -15,6 +15,7 @@ const CUSTOMER_FORM_DEFAULTS = {
   email: '',
   password: '',
   confirmPassword: '',
+  acceptedTerms: false,
 };
 
 function read(key) {

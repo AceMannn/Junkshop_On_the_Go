@@ -411,7 +411,11 @@ exports.serializeVerificationForAdmin = async (
     excludedFields.push('-verificationArchive.documents');
   }
 
-  const user = await User.findById(userId).select(excludedFields.join(' '));
+  const user = await User.findOne({
+    _id: userId,
+    status: { $ne: 'deleted' },
+    deletedAt: null,
+  }).select(excludedFields.join(' '));
   if (!user || user.role !== 'provider') {
     return null;
   }
@@ -419,6 +423,7 @@ exports.serializeVerificationForAdmin = async (
   const shop = await Junkshop.findOne({
     provider: user._id,
     isCatalog: { $ne: true },
+    deletedAt: null,
   })
     .sort({ createdAt: 1 })
     .lean();

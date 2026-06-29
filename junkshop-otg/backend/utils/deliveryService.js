@@ -1,30 +1,30 @@
-const sgMail = require('@sendgrid/mail');
-const twilio = require('twilio');
 const { normalizePhone } = require('./profileCompletion');
 
 const APP_NAME = 'JunkShop On-The-Go';
+const BREVO_EMAIL_API_URL = 'https://api.brevo.com/v3/smtp/email';
+const BREVO_SMS_API_URL = 'https://api.brevo.com/v3/transactionalSMS/send';
+const DEFAULT_SMS_SENDER = 'JunkShopOTG';
 
 function isEmailConfigured() {
-  return Boolean(process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL);
+  return Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL);
 }
 
 function isSmsConfigured() {
-  return Boolean(
-    process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      process.env.TWILIO_PHONE_NUMBER
-  );
+  return Boolean(process.env.BREVO_API_KEY);
 }
 
-function getTwilioClient() {
-  if (!isSmsConfigured()) return null;
-  return twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-}
-
-function toE164Philippines(phone) {
+function toBrevoSmsRecipient(phone) {
   const normalized = normalizePhone(phone);
-  if (!/^09\d{9}$/.test(normalized)) return null;
-  return `+63${normalized.slice(1)}`;
+  if (/^09\d{9}$/.test(normalized)) {
+    return `63${normalized.slice(1)}`;
+  }
+
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (/^63\d{10}$/.test(digits)) {
+    return digits;
+  }
+
+  return null;
 }
 
 async function sendEmail({ to, subject, text, html }) {
@@ -33,33 +33,64 @@ async function sendEmail({ to, subject, text, html }) {
     return { ok: true, stub: true };
   }
 
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
-  await sgMail.send({
-    to,
-    from: process.env.SENDGRID_FROM_EMAIL,
-    subject,
-    text,
-    html: html || text.replace(/\n/g, '<br>'),
+  const response = await fetch(BREVO_EMAIL_API_URL, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'api-key': process.env.BREVO_API_KEY,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: {
+        email: process.env.BREVO_FROM_EMAIL,
+        name: process.env.BREVO_FROM_NAME || APP_NAME,
+      },
+      to: [{ email: to }],
+      subject,
+      textContent: text,
+      htmlContent: html || text.replace(/\n/g, '<br>'),
+    }),
   });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Brevo email send failed (${response.status}): ${detail}`);
+  }
 
   return { ok: true, stub: false };
 }
 
 async function sendSms({ to, body }) {
-  const e164 = toE164Philippines(to) || to;
-
   if (!isSmsConfigured()) {
-    console.log(`[sms:stub] to=${e164} body=${body}`);
-    return { ok: true, stub: true };
+    throw new Error('Brevo SMS is not configured. Set BREVO_API_KEY before sending SMS.');
   }
 
-  const client = getTwilioClient();
-  await client.messages.create({
-    body,
-    from: process.env.TWILIO_PHONE_NUMBER,
-    to: e164,
+  const recipient = toBrevoSmsRecipient(to);
+  if (!recipient) {
+    throw new Error('Brevo SMS recipient must be a valid Philippine mobile number.');
+  }
+
+  const response = await fetch(BREVO_SMS_API_URL, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'api-key': process.env.BREVO_API_KEY,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: process.env.BREVO_SMS_SENDER || DEFAULT_SMS_SENDER,
+      recipient,
+      content: body,
+      type: 'transactional',
+      tag: 'otp',
+      unicodeEnabled: false,
+    }),
   });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Brevo SMS send failed (${response.status}): ${detail}`);
+  }
 
   return { ok: true, stub: false };
 }
@@ -101,6 +132,11 @@ async function sendEmailVerificationEmail(email, code, firstName = '') {
   return sendEmail({ to: email, subject, text });
 }
 
+async function sendPhoneVerificationSms(phone, code) {
+  const body = `${APP_NAME}: Your signup verification code is ${code}. Expires in 15 minutes.`;
+  return sendSms({ to: phone, body });
+}
+
 async function sendTransactionalEmail(email, subject, message) {
   if (!email) return { ok: false, skipped: true };
   const text = `${message}\n\n— ${APP_NAME}`;
@@ -119,6 +155,7 @@ module.exports = {
   sendPasswordResetEmail,
   sendPasswordResetSms,
   sendEmailVerificationEmail,
+  sendPhoneVerificationSms,
   sendTransactionalEmail,
   sendTransactionalSms,
 };

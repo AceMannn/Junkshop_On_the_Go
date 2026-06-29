@@ -35,8 +35,8 @@ const pickupRequestSchema = new mongoose.Schema(
         category: { type: String, default: '' },
         quantity: { type: Number, min: 1, default: 1 },
         unit: { type: String, enum: ['kg', 'piece'], default: 'kg' },
-        price: { type: Number, min: 0, default: 0 },
-        estimatedSubtotal: { type: Number, min: 0, default: 0 },
+        price: { type: Number, min: 0, max: 20000, default: 0 },
+        estimatedSubtotal: { type: Number, min: 0, max: 20000, default: 0 },
       },
     ],
     materialPhotos: [
@@ -56,6 +56,7 @@ const pickupRequestSchema = new mongoose.Schema(
     estimatedTotalAmount: {
       type: Number,
       min: 0,
+      max: 20000,
       default: 0,
     },
     address: {
@@ -86,6 +87,7 @@ const pickupRequestSchema = new mongoose.Schema(
     serviceFee: {
       type: Number,
       min: 0,
+      max: 20000,
       default: 0,
     },
     gcashNumber: { type: String, trim: true, default: '' },
@@ -118,6 +120,15 @@ const pickupRequestSchema = new mongoose.Schema(
       score: { type: Number, min: 1, max: 5 },
       comment: { type: String, trim: true, default: '' },
       createdAt: Date,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
   },
   { timestamps: true }

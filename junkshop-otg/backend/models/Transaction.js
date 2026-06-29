@@ -34,16 +34,27 @@ const transactionSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0.01,
+      max: 20000,
     },
     totalAmount: {
       type: Number,
       required: true,
       min: 0.01,
+      max: 20000,
     },
     status: {
       type: String,
-      enum: ['processing', 'completed', 'cancelled'],
+      enum: ['processing', 'completed', 'cancelled', 'deleted'],
       default: 'completed',
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
   },
   { timestamps: true }

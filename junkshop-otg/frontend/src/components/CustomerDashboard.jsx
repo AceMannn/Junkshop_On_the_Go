@@ -215,6 +215,11 @@ export default function CustomerDashboard({
         setTimeout(() => setShowToast(false), 3200);
     };
 
+    const profileCompletionMessage = () =>
+        user?.profileStatus?.missing?.includes("address")
+            ? "Add your street address in Profile Settings before booking a pickup."
+            : "Add your mobile number in Profile Settings before booking a pickup.";
+
     useEffect(() => {
         if (!user?.passwordNeedsUpdate || passwordNoticeShown) return;
         setToastMessage(user.passwordSecurityMessage || "For your security, change your password.");
@@ -258,7 +263,7 @@ export default function CustomerDashboard({
 
     const openPickupsTab = (withWizard = false) => {
         if (withWizard && !user?.profileComplete) {
-            showNotification("Add your mobile number in Profile Settings before booking a pickup.");
+            showNotification(profileCompletionMessage());
             navigate(buildCustomerPath({ accountView: "profile" }));
             return;
         }
@@ -449,7 +454,7 @@ export default function CustomerDashboard({
                             backLabel={shopProfileBackLabel}
                             onBookPickup={(shop, item) => {
                                 if (!user?.profileComplete) {
-                                    showNotification("Add your mobile number in Profile Settings before booking a pickup.");
+                                    showNotification(profileCompletionMessage());
                                     navigate(buildCustomerPath({ accountView: "profile" }));
                                     return;
                                 }

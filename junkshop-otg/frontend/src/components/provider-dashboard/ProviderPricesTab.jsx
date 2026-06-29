@@ -5,6 +5,8 @@ import { useProviderMaterials } from "../../hooks/useProviderData";
 import { formatMaterialCategoryLabel } from "../../utils/catalogMappers";
 import NumberInput from "../ui/NumberInput";
 
+const MAX_AMOUNT = 20000;
+
 export default function ProviderPricesTab({ onNotify }) {
     const { materials, loading, refresh } = useProviderMaterials();
     const [search, setSearch] = useState("");
@@ -30,6 +32,10 @@ export default function ProviderPricesTab({ onNotify }) {
         const price = Number(draftPrice);
         if (!price || price < 0) {
             onNotify?.("Enter a valid price.");
+            return;
+        }
+        if (price > MAX_AMOUNT) {
+            onNotify?.(`Price cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.`);
             return;
         }
         try {
@@ -95,6 +101,7 @@ export default function ProviderPricesTab({ onNotify }) {
                                     <div className="space-y-2">
                                         <NumberInput
                                             min={0}
+                                            max={MAX_AMOUNT}
                                             step={0.01}
                                             value={draftPrice}
                                             onChange={setDraftPrice}
@@ -148,6 +155,7 @@ export default function ProviderPricesTab({ onNotify }) {
                                             {editingId === item.id ? (
                                                 <NumberInput
                                                     min={0}
+                                                    max={MAX_AMOUNT}
                                                     step={0.01}
                                                     value={draftPrice}
                                                     onChange={setDraftPrice}

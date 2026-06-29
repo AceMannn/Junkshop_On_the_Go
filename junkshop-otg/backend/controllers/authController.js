@@ -25,12 +25,17 @@ const {
   sendPasswordResetEmail,
   sendPasswordResetSms,
   sendEmailVerificationEmail,
+  sendPhoneVerificationSms,
 } = require('../utils/deliveryService');
 const {
   assignEmailVerificationCode,
+  assignPhoneVerificationCode,
   clearEmailVerificationCode,
+  clearPhoneVerificationCode,
   isCustomerEmailVerified,
+  isPhoneVerified,
   verifyEmailCode,
+  verifyPhoneCode,
   maybeAttachDevVerificationCode,
 } = require('../utils/emailVerification');
 const {
@@ -50,8 +55,12 @@ const { AUTH_LOOKUP_EXCLUDE, SESSION_USER_EXCLUDE } = require('../utils/userQuer
 const { isBanned } = require('../utils/accountModeration');
 
 const DEFAULT_SHOP_LOCATION = { lat: 14.5995, lng: 121.0055 };
+const MAX_AMOUNT = 20000;
 const nameRegex = /^[A-Za-zÀ-ÿÑñ\s.'-]+$/;
 const phoneRegex = /^(\+63|0)9\d{9}$/;
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Temporary dev switch: keep SMS code intact, but do not require it for account login.
+const ACCOUNT_PHONE_VERIFICATION_ENABLED = false;
 
 // Create JWT token for logged-in users
 const createToken = (user) => {
@@ -77,6 +86,8 @@ const userPayload = (user) => ({
   phone: user.phone,
   junkshopName: user.junkshopName,
   address: user.address,
+  location: user.location || null,
+  addressConfirmed: Boolean(user.addressConfirmed),
   status: user.status,
   pickupServiceFee: user.pickupServiceFee ?? 0,
   pickupEnabled: user.pickupEnabled !== false,
@@ -89,6 +100,7 @@ const userPayload = (user) => ({
   verificationRejectNote: user.verificationRejectNote || '',
   badges: user.badges || [],
   emailVerified: isCustomerEmailVerified(user),
+  phoneVerified: isPhoneVerified(user),
   requiresPhoneSetup:
     user.role === 'customer' && !hasValidPhone(user.phone),
 });
@@ -100,6 +112,29 @@ async function buildUserResponse(user) {
     profileComplete: profileStatus.complete,
     profileStatus,
   };
+}
+
+function verificationPayload({ user, message, emailCode, emailDelivery, phoneCode, phoneDelivery }) {
+  const needsEmail = Boolean(user.email && user.emailVerified === false);
+  const needsPhone = Boolean(user.phone && user.phoneVerified !== true);
+  const payload = {
+    message,
+    requiresAccountVerification: needsEmail || needsPhone,
+    requiresEmailVerification: needsEmail,
+    requiresPhoneVerification: needsPhone,
+    email: user.email || '',
+    phone: user.phone || '',
+  };
+
+  if (emailDelivery?.stub && process.env.NODE_ENV !== 'production') {
+    payload.devEmailVerificationCode = emailCode;
+    payload.devVerificationCode = emailCode;
+  }
+  if (phoneDelivery?.stub && process.env.NODE_ENV !== 'production') {
+    payload.devPhoneVerificationCode = phoneCode;
+  }
+
+  return payload;
 }
 
 // Register new user
@@ -117,6 +152,8 @@ const registerUser = async (req, res) => {
       address,
       location,
       operatingHours,
+      termsAccepted,
+      termsVersion,
     } = req.body;
 
     const cleanedRole = role.trim().toLowerCase();
@@ -129,10 +166,15 @@ const registerUser = async (req, res) => {
     const cleanedAddress = address?.trim() || '';
 
     const allowedRoles = ['customer', 'provider'];
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!allowedRoles.includes(cleanedRole)) {
       return res.status(400).json({ message: 'Invalid account role.' });
+    }
+
+    if (termsAccepted !== true) {
+      return res.status(400).json({
+        message: 'Please read and accept the Terms and Conditions before creating an account.',
+      });
     }
 
     if (!cleanedFirstName || !cleanedLastName || !password) {
@@ -197,52 +239,49 @@ const registerUser = async (req, res) => {
         phone: normalizedPhone,
         password: hashedPassword,
         emailVerified: !hasRealEmail,
+        phoneVerified: false,
+        acceptedTermsAt: new Date(),
+        termsVersion: String(termsVersion || '').trim(),
       });
 
       if (hasRealEmail) {
         user.email = cleanedEmail;
       }
 
-      let verificationCode = null;
-      let delivery = { stub: true };
+      let emailCode = null;
+      let emailDelivery = null;
 
       if (hasRealEmail) {
-        verificationCode = assignEmailVerificationCode(user);
-        delivery = await sendEmailVerificationEmail(
-          cleanedEmail,
-          verificationCode,
-          cleanedFirstName
-        );
+        emailCode = assignEmailVerificationCode(user);
       }
+
+      const phoneCode = assignPhoneVerificationCode(user);
 
       await user.save();
       await syncProfileComplete(user._id);
 
       if (hasRealEmail) {
-        const payload = maybeAttachDevVerificationCode(
-          {
-            message: delivery.stub
-              ? 'Account created. Use the dev verification code below (no email provider configured).'
-              : 'Account created. Check your email for a verification code.',
-            requiresEmailVerification: true,
-            email: cleanedEmail,
-            phone: normalizedPhone,
-          },
-          verificationCode,
-          delivery
+        emailDelivery = await sendEmailVerificationEmail(
+          cleanedEmail,
+          emailCode,
+          cleanedFirstName
         );
-
-        return res.status(201).json(payload);
       }
 
-      const freshUser = await User.findById(user._id).select(SESSION_USER_EXCLUDE);
-      const token = createToken(freshUser);
+      const phoneDelivery = await sendPhoneVerificationSms(normalizedPhone, phoneCode);
 
-      return res.status(201).json({
-        message: 'Account created successfully.',
-        token,
-        user: await buildUserResponse(freshUser),
-      });
+      return res.status(201).json(
+        verificationPayload({
+          user,
+          message: hasRealEmail
+            ? 'Account created. Verify your mobile number and email to continue.'
+            : 'Account created. Verify your mobile number to continue.',
+          emailCode,
+          emailDelivery,
+          phoneCode,
+          phoneDelivery,
+        })
+      );
     }
 
     // Provider / junkshop owner registration
@@ -300,7 +339,8 @@ const registerUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
+    const hasProviderEmail = Boolean(cleanedEmail);
+    const user = new User({
       role: 'provider',
       firstName: cleanedFirstName,
       middleName: cleanedMiddleName,
@@ -311,8 +351,19 @@ const registerUser = async (req, res) => {
       junkshopName: cleanedJunkshopName,
       address: cleanedAddress,
       verificationStatus: 'draft',
-      emailVerified: true,
+      emailVerified: !hasProviderEmail,
+      phoneVerified: false,
+      acceptedTermsAt: new Date(),
+      termsVersion: String(termsVersion || '').trim(),
     });
+
+    let emailCode = null;
+    let emailDelivery = null;
+    if (hasProviderEmail) {
+      emailCode = assignEmailVerificationCode(user);
+    }
+    const phoneCode = assignPhoneVerificationCode(user);
+    await user.save();
 
     await Junkshop.create({
       provider: user._id,
@@ -328,14 +379,27 @@ const registerUser = async (req, res) => {
     });
 
     await syncProfileComplete(user._id);
-    const freshUser = await User.findById(user._id).select(SESSION_USER_EXCLUDE);
-    const token = createToken(freshUser);
+    if (hasProviderEmail) {
+      emailDelivery = await sendEmailVerificationEmail(
+        cleanedEmail,
+        emailCode,
+        cleanedFirstName
+      );
+    }
+    const phoneDelivery = await sendPhoneVerificationSms(normalizedPhone, phoneCode);
 
-    res.status(201).json({
-      message: 'Junkshop account created. Complete verification documents in your dashboard.',
-      token,
-      user: await buildUserResponse(freshUser),
-    });
+    res.status(201).json(
+      verificationPayload({
+        user,
+        message: hasProviderEmail
+          ? 'Junkshop account created. Verify your mobile number and email to continue.'
+          : 'Junkshop account created. Verify your mobile number to continue.',
+        emailCode,
+        emailDelivery,
+        phoneCode,
+        phoneDelivery,
+      })
+    );
   } catch (error) {
     console.error('registerUser', error);
     res.status(500).json({ message: 'Server error during registration.' });
@@ -428,6 +492,10 @@ const loginUser = async (req, res) => {
       });
     }
 
+    if (user.status === 'deleted' || user.deletedAt) {
+      return res.status(403).json({ message: 'This account has been deleted.' });
+    }
+
     if (user.status === 'banned') {
       return res.status(403).json({ message: 'This account has been banned.' });
     }
@@ -446,15 +514,25 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message });
     }
 
-    if (
-      user.role === 'customer' &&
-      publicUserEmail(user.email) &&
-      user.emailVerified === false
-    ) {
+    if (!ACCOUNT_PHONE_VERIFICATION_ENABLED && user.phone && user.phoneVerified !== true) {
+      user.phoneVerified = true;
+      clearPhoneVerificationCode(user);
+      await user.save();
+      await syncProfileComplete(user._id);
+    }
+
+    const needsEmailVerification = Boolean(publicUserEmail(user.email) && user.emailVerified === false);
+    const needsPhoneVerification = Boolean(
+      ACCOUNT_PHONE_VERIFICATION_ENABLED && user.phone && user.phoneVerified !== true
+    );
+    if (needsEmailVerification || needsPhoneVerification) {
       return res.status(403).json({
-        message: 'Verify your email before signing in. Check your inbox for the code.',
-        requiresEmailVerification: true,
+        message: 'Verify your account before signing in. Request a new code if yours expired.',
+        requiresAccountVerification: true,
+        requiresEmailVerification: needsEmailVerification,
+        requiresPhoneVerification: needsPhoneVerification,
         email: user.email,
+        phone: user.phone,
       });
     }
 
@@ -504,6 +582,9 @@ const updateProviderProfile = async (req, res) => {
 
     if (pickupServiceFee !== undefined) {
       const fee = Math.max(0, Number(pickupServiceFee) || 0);
+      if (fee > MAX_AMOUNT) {
+        return res.status(400).json({ message: `Pickup service fee cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.` });
+      }
       req.user.pickupServiceFee = fee;
     }
     if (pickupEnabled !== undefined) {
@@ -561,9 +642,11 @@ const updateProviderProfile = async (req, res) => {
 
     await req.user.save();
 
-    const shop = await Junkshop.findOne({ provider: req.user._id, isCatalog: { $ne: true } }).sort({
-      createdAt: 1,
-    });
+    const shop = await Junkshop.findOne({
+      provider: req.user._id,
+      isCatalog: { $ne: true },
+      deletedAt: null,
+    }).sort({ createdAt: 1 });
     if (shop) {
       if (junkshopName !== undefined) shop.name = req.user.junkshopName || shop.name;
       if (phone !== undefined) shop.phone = req.user.phone;
@@ -587,7 +670,19 @@ const updateProviderProfile = async (req, res) => {
 
 const updateMe = async (req, res) => {
   try {
-    const { firstName, middleName, lastName, phone, address, leaderboardVisible } = req.body;
+    const {
+      firstName,
+      middleName,
+      lastName,
+      email,
+      phone,
+      address,
+      location,
+      addressConfirmed,
+      leaderboardVisible,
+    } = req.body;
+    let emailCode = null;
+    let emailDelivery = null;
 
     if (firstName !== undefined) {
       const cleaned = String(firstName).trim();
@@ -610,6 +705,30 @@ const updateMe = async (req, res) => {
       }
       req.user.lastName = cleaned;
     }
+    if (email !== undefined) {
+      const cleaned = String(email || '').trim().toLowerCase();
+      const currentEmail = publicUserEmail(req.user.email);
+
+      if (!cleaned) {
+        req.user.email = undefined;
+        req.user.emailVerified = true;
+        clearEmailVerificationCode(req.user);
+      } else if (!emailRegex.test(cleaned)) {
+        return res.status(400).json({ message: 'Please enter a valid email address.' });
+      } else if (cleaned !== currentEmail) {
+        const emailConflict = await assertEmailAvailable(cleaned, {
+          intendedRole: 'customer',
+          excludeUserId: req.user._id,
+        });
+        if (emailConflict) {
+          return res.status(emailConflict.status).json({ message: emailConflict.message });
+        }
+
+        req.user.email = cleaned;
+        req.user.emailVerified = false;
+        emailCode = assignEmailVerificationCode(req.user);
+      }
+    }
     if (phone !== undefined) {
       const cleaned = normalizePhone(phone);
       if (!hasValidPhone(cleaned)) {
@@ -631,6 +750,38 @@ const updateMe = async (req, res) => {
     }
     if (address !== undefined) {
       req.user.address = String(address).trim();
+      if (req.user.role === 'customer') {
+        req.user.addressConfirmed = false;
+      }
+    }
+    if (location !== undefined) {
+      if (location == null) {
+        req.user.location = undefined;
+        req.user.addressConfirmed = false;
+      } else {
+        const lat = Number(location.lat);
+        const lng = Number(location.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return res.status(400).json({ message: 'Select a valid address on the map.' });
+        }
+        req.user.location = { lat, lng };
+        if (req.user.role === 'customer') {
+          req.user.addressConfirmed = false;
+        }
+      }
+    }
+    if (addressConfirmed !== undefined) {
+      const wantsConfirmed = Boolean(addressConfirmed);
+      if (wantsConfirmed) {
+        const lat = Number(req.user.location?.lat);
+        const lng = Number(req.user.location?.lng);
+        if (!req.user.address || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return res.status(400).json({
+            message: 'Search and confirm your address on the map before saving.',
+          });
+        }
+      }
+      req.user.addressConfirmed = wantsConfirmed;
     }
     if (leaderboardVisible !== undefined) {
       req.user.leaderboardVisible = Boolean(leaderboardVisible);
@@ -638,12 +789,22 @@ const updateMe = async (req, res) => {
 
     await req.user.save();
     await syncProfileComplete(req.user._id);
-    const freshUser = await User.findById(req.user._id).select(SESSION_USER_EXCLUDE);
 
-    res.json({
-      message: 'Profile updated.',
+    if (emailCode) {
+      emailDelivery = await sendEmailVerificationEmail(req.user.email, emailCode, req.user.firstName);
+    }
+
+    const freshUser = await User.findById(req.user._id).select(SESSION_USER_EXCLUDE);
+    const response = {
+      message: emailCode
+        ? 'Profile updated. Check your email for the verification code.'
+        : 'Profile updated.',
       user: await buildUserResponse(freshUser),
-    });
+      requiresEmailVerification: Boolean(emailCode),
+      email: freshUser.email || '',
+    };
+
+    res.json(maybeAttachDevVerificationCode(response, emailCode, emailDelivery));
   } catch (error) {
     res.status(500).json({ message: 'Could not update profile.' });
   }
@@ -699,6 +860,9 @@ const getFavorites = async (req, res) => {
     const favoriteShopIds = (user.favoriteShops || [])
       .filter((shop) => {
         if (!shop) return false;
+        if (shop.deletedAt) {
+          return false;
+        }
         if (shop.provider && isBanned(shop.provider.status)) {
           return false;
         }
@@ -720,8 +884,8 @@ const toggleFavorite = async (req, res) => {
     }
 
     const shopQuery = String(shopId).match(/^[a-f\d]{24}$/i)
-      ? { _id: shopId }
-      : { slug: shopId };
+      ? { _id: shopId, deletedAt: null }
+      : { slug: shopId, deletedAt: null };
     const shop = await Junkshop.findOne(shopQuery);
     if (!shop) {
       return res.status(404).json({ message: 'Junkshop not found.' });
@@ -746,6 +910,9 @@ const toggleFavorite = async (req, res) => {
     const favoriteShopIds = (populated.favoriteShops || [])
       .filter((shop) => {
         if (!shop) return false;
+        if (shop.deletedAt) {
+          return false;
+        }
         if (shop.provider && isBanned(shop.provider.status)) {
           return false;
         }
@@ -919,6 +1086,143 @@ const verifyEmail = async (req, res) => {
   }
 };
 
+async function findAccountForVerification({ email, phone, role }) {
+  const cleanedRole = String(role || '').trim().toLowerCase();
+  const roleQuery = ['customer', 'provider'].includes(cleanedRole) ? { role: cleanedRole } : {};
+
+  if (phone) {
+    const normalizedPhone = normalizePhone(phone);
+    if (hasValidPhone(normalizedPhone)) {
+      const user = await User.findOne({ phone: normalizedPhone, ...roleQuery });
+      if (user) return user;
+    }
+  }
+
+  if (email) {
+    return User.findOne({ email: String(email).trim().toLowerCase(), ...roleQuery });
+  }
+
+  return null;
+}
+
+const verifyAccount = async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const phone = String(req.body.phone || '').trim();
+    const role = String(req.body.role || '').trim().toLowerCase();
+    const emailCode = String(req.body.emailCode || req.body.code || '').trim();
+    const phoneCode = String(req.body.phoneCode || '').trim();
+
+    const user = await findAccountForVerification({ email, phone, role });
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found for verification.' });
+    }
+
+    const needsEmail = Boolean(user.email && user.emailVerified === false);
+    const bypassPhoneVerification = Boolean(
+      !ACCOUNT_PHONE_VERIFICATION_ENABLED && user.phone && user.phoneVerified !== true
+    );
+    const needsPhone = Boolean(
+      ACCOUNT_PHONE_VERIFICATION_ENABLED && user.phone && user.phoneVerified !== true
+    );
+
+    if (!needsEmail && !needsPhone && !bypassPhoneVerification) {
+      return res.status(400).json({ message: 'This account is already verified. You can log in.' });
+    }
+
+    if (needsEmail) {
+      const result = verifyEmailCode(user, emailCode);
+      if (!result.ok) {
+        return res.status(400).json({ message: result.message });
+      }
+      user.emailVerified = true;
+      clearEmailVerificationCode(user);
+    }
+
+    if (bypassPhoneVerification) {
+      user.phoneVerified = true;
+      clearPhoneVerificationCode(user);
+    } else if (needsPhone) {
+      const result = verifyPhoneCode(user, phoneCode);
+      if (!result.ok) {
+        return res.status(400).json({ message: result.message });
+      }
+      user.phoneVerified = true;
+      clearPhoneVerificationCode(user);
+    }
+
+    await user.save();
+    await syncProfileComplete(user._id);
+
+    const freshUser = await User.findById(user._id).select(SESSION_USER_EXCLUDE);
+    const token = createToken(freshUser);
+
+    res.json({
+      message: 'Account verified. Welcome to JunkShop On-The-Go!',
+      token,
+      user: await buildUserResponse(freshUser),
+    });
+  } catch (error) {
+    console.error('verifyAccount', error);
+    res.status(500).json({ message: 'Could not verify account.' });
+  }
+};
+
+const resendAccountVerification = async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const phone = String(req.body.phone || '').trim();
+    const role = String(req.body.role || '').trim().toLowerCase();
+
+    const user = await findAccountForVerification({ email, phone, role });
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found for verification.' });
+    }
+
+    const needsEmail = Boolean(user.email && user.emailVerified === false);
+    const needsPhone = Boolean(user.phone && user.phoneVerified !== true);
+
+    if (!needsEmail && !needsPhone) {
+      return res.status(400).json({ message: 'This account is already verified.' });
+    }
+
+    let emailCode = null;
+    let emailDelivery = null;
+    let phoneCode = null;
+    let phoneDelivery = null;
+
+    if (needsEmail) {
+      emailCode = assignEmailVerificationCode(user);
+    }
+    if (needsPhone) {
+      phoneCode = assignPhoneVerificationCode(user);
+    }
+
+    await user.save();
+
+    if (needsEmail) {
+      emailDelivery = await sendEmailVerificationEmail(user.email, emailCode, user.firstName);
+    }
+    if (needsPhone) {
+      phoneDelivery = await sendPhoneVerificationSms(user.phone, phoneCode);
+    }
+
+    res.json(
+      verificationPayload({
+        user,
+        message: 'A new verification code was sent.',
+        emailCode,
+        emailDelivery,
+        phoneCode,
+        phoneDelivery,
+      })
+    );
+  } catch (error) {
+    console.error('resendAccountVerification', error);
+    res.status(500).json({ message: 'Could not resend verification code.' });
+  }
+};
+
 const resendEmailVerification = async (req, res) => {
   try {
     const email = String(req.body.email || '').trim().toLowerCase();
@@ -965,6 +1269,8 @@ const resendEmailVerification = async (req, res) => {
 module.exports = {
   registerUser,
   loginUser,
+  verifyAccount,
+  resendAccountVerification,
   verifyEmail,
   resendEmailVerification,
   getCurrentUser,

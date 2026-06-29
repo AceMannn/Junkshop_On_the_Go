@@ -108,7 +108,17 @@ const junkshopSchema = new mongoose.Schema(
     pickupServiceFee: {
       type: Number,
       min: 0,
+      max: 20000,
       default: 0,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
   },
   { timestamps: true }

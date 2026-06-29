@@ -14,7 +14,8 @@ import {
   authRoleToggleWrapClass,
   authSubmitClass,
 } from './auth/authModalUi';
-import EmailVerificationStep from './auth/EmailVerificationStep';
+import AccountVerificationStep from './auth/AccountVerificationStep';
+import PasswordRequirements from './auth/PasswordRequirements';
 import {
   clearLoginDraft,
   loadLoginDraft,
@@ -51,12 +52,11 @@ export default function LoginScreen({
   const [selectedRole, setSelectedRole] = useState(
     () => initialRole || savedDraft.selectedRole || 'customer'
   );
+  const [rememberMe, setRememberMe] = useState(Boolean(savedDraft.rememberMe));
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [verificationEmail, setVerificationEmail] = useState('');
-  const [verificationDevCode, setVerificationDevCode] = useState('');
-  const [verificationMessage, setVerificationMessage] = useState('');
+  const [verificationData, setVerificationData] = useState(null);
   const otpInputRef = useRef(null);
 
   useEffect(() => {
@@ -84,8 +84,9 @@ export default function LoginScreen({
       email,
       recoveryContact,
       selectedRole,
+      rememberMe,
     });
-  }, [view, email, recoveryContact, selectedRole]);
+  }, [view, email, recoveryContact, selectedRole, rememberMe]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -126,13 +127,19 @@ export default function LoginScreen({
         password,
         role: selectedRole,
       });
-      onLoginSuccess(session);
+      onLoginSuccess({ ...session, rememberMe });
       clearLoginDraft();
     } catch (loginError) {
-      if (loginError.requiresEmailVerification) {
-        setVerificationEmail(loginError.email || email);
-        setVerificationMessage(loginError.message);
-        setView('verifyEmail');
+      if (loginError.requiresAccountVerification || loginError.requiresEmailVerification || loginError.requiresPhoneVerification) {
+        setVerificationData({
+          email: loginError.email || '',
+          phone: loginError.phone || email.replace(/\D/g, '').slice(0, 11),
+          role: selectedRole,
+          requiresEmail: Boolean(loginError.requiresEmailVerification),
+          requiresPhone: Boolean(loginError.requiresPhoneVerification),
+          message: loginError.message,
+        });
+        setView('verifyAccount');
         setError('');
         return;
       }
@@ -158,7 +165,7 @@ export default function LoginScreen({
 
       if (import.meta.env.DEV && data.resetToken) {
         setResetToken(String(data.resetToken).replace(/\D/g, '').slice(0, OTP_LENGTH));
-        setInfo(`${data.message} Dev code (no SendGrid/Twilio): ${data.resetToken}`);
+        setInfo(`${data.message} Dev code: ${data.resetToken}`);
       } else {
         setResetToken('');
         setInfo(
@@ -219,14 +226,14 @@ export default function LoginScreen({
     login: 'Welcome Back',
     forgot: 'Forgot Password',
     reset: 'Reset Password',
-    verifyEmail: 'Verify your email',
+    verifyAccount: 'Verify your account',
   };
 
   const subtitles = {
     login: 'Login to continue using JunkShop On-The-Go',
     forgot: 'Enter your email or mobile number (09XXXXXXXXX) to get a reset code',
     reset: `Enter the ${OTP_LENGTH}-digit code we sent, then choose a new password`,
-    verifyEmail: 'Enter the verification code to activate your customer account',
+    verifyAccount: 'Enter the verification code to activate your account',
   };
 
   return (
@@ -352,7 +359,16 @@ export default function LoginScreen({
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <div className="flex justify-end mt-1.5">
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 text-sm text-charcoal/65">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(event) => setRememberMe(event.target.checked)}
+                      disabled={isLoading}
+                    />
+                    Remember me
+                  </label>
                   <button
                     type="button"
                     onClick={() => {
@@ -508,6 +524,7 @@ export default function LoginScreen({
                     )}
                   </button>
                 </div>
+                <PasswordRequirements password={newPassword} className="mt-3" />
               </div>
 
               <button type="submit" disabled={isLoading} className={authSubmitClass}>
@@ -530,17 +547,21 @@ export default function LoginScreen({
             </form>
           )}
 
-          {view === 'verifyEmail' && (
-            <EmailVerificationStep
-              email={verificationEmail}
-              initialDevCode={verificationDevCode}
-              initialMessage={verificationMessage}
+          {view === 'verifyAccount' && (
+            <AccountVerificationStep
+              email={verificationData?.email || ''}
+              phone={verificationData?.phone || ''}
+              role={verificationData?.role || selectedRole}
+              requiresEmail={verificationData?.requiresEmail}
+              requiresPhone={verificationData?.requiresPhone}
+              initialMessage={verificationData?.message || ''}
               onVerified={(session) => {
-                onLoginSuccess(session);
-      clearLoginDraft();
+                onLoginSuccess({ ...session, rememberMe });
+                clearLoginDraft();
               }}
               onBack={() => {
                 setView('login');
+                setVerificationData(null);
                 setError('');
                 setInfo('');
               }}

@@ -1,18 +1,47 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 
-function clampValue(value, min, max) {
+function clampWholeValue(value, min, max) {
     let next = value;
-    if (min != null && next < Number(min)) next = Number(min);
-    if (max != null && next > Number(max)) next = Number(max);
+    if (min != null) {
+        const wholeMin = Math.ceil(Number(min));
+        if (next < wholeMin) next = wholeMin;
+    }
+    if (max != null) {
+        const wholeMax = Math.floor(Number(max));
+        if (next > wholeMax) next = wholeMax;
+    }
     return next;
 }
 
-function roundToStep(value, step) {
-    const stepNum = Number(step) || 1;
-    if (stepNum >= 1) return value;
-    const decimals = String(stepNum).split(".")[1]?.length ?? 1;
-    const factor = 10 ** decimals;
-    return Math.round(value * factor) / factor;
+function capTypedValue(value, max) {
+    if (value === "" || max == null) return value;
+
+    const numericValue = Number(value);
+    const numericMax = Number(max);
+
+    if (!Number.isNaN(numericMax) && numericValue > numericMax) {
+        return String(numericMax);
+    }
+
+    return value;
+}
+
+function sanitizeTypedValue(value, min) {
+    const allowsNegative = min == null || Number(min) < 0;
+    let hasDecimal = false;
+
+    return value
+        .split("")
+        .filter((char, index) => {
+            if (/\d/.test(char)) return true;
+            if (char === "." && !hasDecimal) {
+                hasDecimal = true;
+                return true;
+            }
+            if (char === "-" && allowsNegative && index === 0) return true;
+            return false;
+        })
+        .join("");
 }
 
 export default function NumberInput({
@@ -29,17 +58,29 @@ export default function NumberInput({
     id,
     name,
 }) {
+    const handleChange = (e) => {
+        const numericText = sanitizeTypedValue(e.target.value, min);
+        onChange?.(capTypedValue(numericText, max));
+    };
+
+    const handleKeyDown = (e) => {
+        if (["e", "E", "+"].includes(e.key)) {
+            e.preventDefault();
+        }
+        if (e.key === "-" && min != null && Number(min) >= 0) {
+            e.preventDefault();
+        }
+    };
+
     const bump = (direction) => {
         if (disabled) return;
 
-        const stepNum = Number(step) || 1;
         const current = value === "" || value == null ? 0 : Number(value);
         if (Number.isNaN(current)) return;
 
         let next =
-            direction === "up" ? current + stepNum : current - stepNum;
-        next = roundToStep(next, step);
-        next = clampValue(next, min, max);
+            direction === "up" ? Math.floor(current) + 1 : Math.ceil(current) - 1;
+        next = clampWholeValue(next, min, max);
 
         onChange?.(String(next));
     };
@@ -56,7 +97,8 @@ export default function NumberInput({
                 name={name}
                 type="number"
                 value={value ?? ""}
-                onChange={(e) => onChange?.(e.target.value)}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 min={min}
                 max={max}
                 step={step}

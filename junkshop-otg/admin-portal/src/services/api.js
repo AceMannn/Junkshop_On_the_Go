@@ -116,6 +116,25 @@ export const adminApi = {
       body: JSON.stringify({ status, note }),
     });
   },
+  listTransactions() {
+    return request('/api/admin/transactions');
+  },
+  deleteTransaction(id) {
+    return request(`/api/admin/transactions/${id}`, {
+      method: 'DELETE',
+    });
+  },
+  listAuditLogs() {
+    return request('/api/admin/audit-logs');
+  },
+  listDeletedRecords() {
+    return request('/api/admin/deleted-records');
+  },
+  restoreDeletedRecord(type, id) {
+    return request(`/api/admin/deleted-records/${type}/${id}/restore`, {
+      method: 'PATCH',
+    });
+  },
   listContactMessages() {
     return request('/api/admin/contact-messages');
   },
@@ -123,6 +142,11 @@ export const adminApi = {
     return request(`/api/admin/contact-messages/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    });
+  },
+  deleteContactMessage(id) {
+    return request(`/api/admin/contact-messages/${id}`, {
+      method: 'DELETE',
     });
   },
 };

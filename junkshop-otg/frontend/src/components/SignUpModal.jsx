@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../services/api';
 import ProviderSignUpWizard from './ProviderSignUpWizard';
-import EmailVerificationStep from './auth/EmailVerificationStep';
+import AccountVerificationStep from './auth/AccountVerificationStep';
 import {
   AUTH_DRAFT_KEYS,
   clearSignUpDrafts,
@@ -25,6 +25,8 @@ import {
   authSubmitClass,
 } from './auth/authModalUi';
 import { validatePasswordStrength } from '../utils/passwordPolicy';
+import PasswordRequirements from './auth/PasswordRequirements';
+import TermsAndConditionsModal, { TERMS_VERSION } from './auth/TermsAndConditionsModal';
 
 const EMPTY_CUSTOMER_FORM = {
   firstName: '',
@@ -34,6 +36,7 @@ const EMPTY_CUSTOMER_FORM = {
   email: '',
   password: '',
   confirmPassword: '',
+  acceptedTerms: false,
 };
 
 function readCustomerDraft() {
@@ -52,9 +55,8 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(customerDraft?.step || 'form');
-  const [pendingEmail, setPendingEmail] = useState('');
-  const [verificationMessage, setVerificationMessage] = useState('');
-  const [devVerificationCode, setDevVerificationCode] = useState('');
+  const [verificationData, setVerificationData] = useState(null);
+  const [showTerms, setShowTerms] = useState(false);
 
   useEffect(() => {
     saveAuthDraft(AUTH_DRAFT_KEYS.SIGNUP_META, { selectedRole });
@@ -120,6 +122,11 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
       return;
     }
 
+    if (!formData.acceptedTerms) {
+      setError('Please read and accept the Terms and Conditions before creating an account.');
+      return;
+    }
+
     try {
       setIsLoading(true);
       const result = await authApi.register({
@@ -130,12 +137,21 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
         phone: normalizedPhone,
         email: formData.email.trim() || undefined,
         password: formData.password,
+        termsAccepted: true,
+        termsVersion: TERMS_VERSION,
       });
 
-      if (result.requiresEmailVerification) {
-        setPendingEmail(formData.email.trim().toLowerCase());
-        setVerificationMessage(result.message || 'Check your email for a verification code.');
-        setDevVerificationCode(result.devVerificationCode || '');
+      if (result.requiresAccountVerification || result.requiresEmailVerification || result.requiresPhoneVerification) {
+        setVerificationData({
+          email: result.email || formData.email.trim().toLowerCase(),
+          phone: result.phone || normalizedPhone,
+          role: 'customer',
+          requiresEmail: Boolean(result.requiresEmailVerification),
+          requiresPhone: Boolean(result.requiresPhoneVerification),
+          message: result.message || 'Check your email/SMS for verification codes.',
+          devEmailCode: result.devEmailVerificationCode || result.devVerificationCode || '',
+          devPhoneCode: result.devPhoneVerificationCode || '',
+        });
         setStep('verify');
         setError('');
         return;
@@ -172,7 +188,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
 
           <header className="mb-4 pr-10">
             <h2 id="signup-title" className="text-xl font-bold text-charcoal mb-1">
-              {step === 'verify' ? 'Verify your email' : 'Create Account'}
+              {step === 'verify' ? 'Verify your account' : 'Create Account'}
             </h2>
             <p className="text-charcoal/60 text-sm">
               {step === 'verify'
@@ -182,15 +198,19 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
           </header>
 
           {step === 'verify' ? (
-            <EmailVerificationStep
-              email={pendingEmail}
-              initialDevCode={devVerificationCode}
-              initialMessage={verificationMessage}
+            <AccountVerificationStep
+              email={verificationData?.email || ''}
+              phone={verificationData?.phone || ''}
+              role={verificationData?.role || 'customer'}
+              requiresEmail={verificationData?.requiresEmail}
+              requiresPhone={verificationData?.requiresPhone}
+              initialDevEmailCode={verificationData?.devEmailCode || ''}
+              initialDevPhoneCode={verificationData?.devPhoneCode || ''}
+              initialMessage={verificationData?.message || ''}
               onVerified={(session) => {
                 setFormData(EMPTY_CUSTOMER_FORM);
                 setStep('form');
-                setPendingEmail('');
-                setDevVerificationCode('');
+                setVerificationData(null);
                 clearSignUpDrafts();
                 onSignUpComplete?.(session);
                 onClose();
@@ -304,7 +324,8 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label htmlFor="signup-password" className={authLabelClass}>
                   Password <span className="text-red-500">*</span>
@@ -330,9 +351,6 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <span className="block mt-1 text-xs text-charcoal/50">
-                  10+ characters with uppercase, lowercase, and a number
-                </span>
               </div>
 
               <div>
@@ -368,6 +386,29 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
                 </div>
               </div>
             </div>
+              <PasswordRequirements password={formData.password} />
+            </div>
+
+            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-charcoal/75">
+              <input
+                type="checkbox"
+                checked={formData.acceptedTerms}
+                onChange={(e) => handleInputChange('acceptedTerms', e.target.checked)}
+                className="mt-1"
+                disabled={isLoading}
+              />
+              <span>
+                I have read and agree to the{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowTerms(true)}
+                  className="font-semibold text-eco-green hover:text-eco-green/80"
+                >
+                  Terms and Conditions
+                </button>
+                .
+              </span>
+            </label>
 
             <button type="submit" disabled={isLoading} className={authSubmitClass}>
               {isLoading ? 'Creating Account...' : 'Sign up as Customer'}
@@ -390,6 +431,11 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
         </div>
         <AuthErrorPopup message={error} onDismiss={() => setError('')} />
       </div>
+      <TermsAndConditionsModal
+        isOpen={showTerms}
+        onClose={() => setShowTerms(false)}
+        role="customer"
+      />
     </div>
   );
 }

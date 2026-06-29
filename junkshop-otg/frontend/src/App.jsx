@@ -155,8 +155,8 @@ function AppRoutes() {
   const [pickupWizardSignal, setPickupWizardSignal] = useState(0);
   const [loginRedirectFrom, setLoginRedirectFrom] = useState('');
 
-  const persistSession = ({ token, user: sessionUser }) => {
-    saveSession({ token, user: sessionUser });
+  const persistSession = ({ token, user: sessionUser, rememberMe = false }) => {
+    saveSession({ token, user: sessionUser, rememberMe });
     setUser(sessionUser);
     setShowLoginModal(false);
     setShowSignUpModal(false);

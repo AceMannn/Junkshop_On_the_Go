@@ -9,13 +9,24 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_REGEX = /^[A-Za-zÀ-ÿÑñ\s.'-]{2,100}$/;
 
 function validateContactPayload(body) {
-  const name = String(body?.name || '').trim();
+  const firstName = String(body?.firstName || '').trim();
+  const lastName = String(body?.lastName || '').trim();
+  const legacyName = String(body?.name || '').trim();
+  const name = [firstName, lastName].filter(Boolean).join(' ') || legacyName;
   const email = String(body?.email || '').trim().toLowerCase();
   const subject = String(body?.subject || '').trim();
   const message = String(body?.message || '').trim();
 
   if (!name || !email || !subject || !message) {
     return { ok: false, message: 'Please complete all contact fields.' };
+  }
+
+  if (!firstName && !legacyName) {
+    return { ok: false, message: 'First name is required.' };
+  }
+
+  if (!lastName && !legacyName) {
+    return { ok: false, message: 'Last name is required.' };
   }
 
   if (name.length < 2 || name.length > 100 || !NAME_REGEX.test(name)) {
@@ -40,7 +51,7 @@ function validateContactPayload(body) {
 
   return {
     ok: true,
-    data: { name, email, subject, message },
+    data: { name, firstName, lastName, email, subject, message },
   };
 }
 

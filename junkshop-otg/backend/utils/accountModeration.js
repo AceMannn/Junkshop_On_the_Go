@@ -5,6 +5,7 @@ const PickupRequest = require('../models/PickupRequest');
 const ACTIVE = 'active';
 const SUSPENDED = 'suspended';
 const BANNED = 'banned';
+const DELETED = 'deleted';
 
 const IN_PROGRESS_STATUSES = ['accepted', 'in_transit'];
 
@@ -17,7 +18,7 @@ function isSuspended(status) {
 }
 
 function isBanned(status) {
-  return status === BANNED;
+  return status === BANNED || status === DELETED;
 }
 
 function isRestricted(status) {
@@ -93,7 +94,7 @@ async function loadProviderStatusByShopIds(shopIds = []) {
     return {};
   }
 
-  const shops = await Junkshop.find({ _id: { $in: uniqueIds } })
+  const shops = await Junkshop.find({ _id: { $in: uniqueIds }, deletedAt: null })
     .select('provider')
     .lean();
 
@@ -213,10 +214,12 @@ async function cancelPendingPickupsForProvider(providerId, message) {
   const shopIds = await Junkshop.find({
     provider: providerId,
     isCatalog: { $ne: true },
+    deletedAt: null,
   }).distinct('_id');
 
   const filter = {
     status: 'pending',
+    deletedAt: null,
     $or: [{ provider: providerId }],
   };
 
@@ -238,6 +241,7 @@ async function cancelPendingPickupsForCustomer(customerId, message) {
     {
       customer: customerId,
       status: 'pending',
+      deletedAt: null,
     },
     {
       $set: {
@@ -254,6 +258,7 @@ async function applyStatusSideEffects(user, previousStatus, nextStatus) {
     const shop = await Junkshop.findOne({
       provider: user._id,
       isCatalog: { $ne: true },
+      deletedAt: null,
     }).sort({ createdAt: 1 });
 
     if (shop) {

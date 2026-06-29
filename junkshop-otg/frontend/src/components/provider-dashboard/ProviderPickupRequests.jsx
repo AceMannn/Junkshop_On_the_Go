@@ -940,6 +940,7 @@ function ProviderPickupDetailDrawer({
                                     value={cashPaid}
                                     onChange={setCashPaid}
                                     min={0}
+                                    max={20000}
                                     step={1}
                                 />
                             </div>

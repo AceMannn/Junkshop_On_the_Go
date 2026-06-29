@@ -61,13 +61,25 @@ function phoneLookupQuery(normalizedPhone) {
 
 async function findUserByRecovery(parsed) {
   if (parsed.type === 'email') {
-    return User.findOne({ email: parsed.email });
+    return User.findOne({
+      email: parsed.email,
+      status: { $ne: 'deleted' },
+      deletedAt: null,
+    });
   }
 
-  let user = await User.findOne(phoneLookupQuery(parsed.phone));
+  let user = await User.findOne({
+    ...phoneLookupQuery(parsed.phone),
+    status: { $ne: 'deleted' },
+    deletedAt: null,
+  });
   if (user) return user;
 
-  const candidates = await User.find({ phone: { $ne: '' } }).select('phone');
+  const candidates = await User.find({
+    phone: { $ne: '' },
+    status: { $ne: 'deleted' },
+    deletedAt: null,
+  }).select('phone');
   const match = candidates.find((row) => normalizePhone(row.phone) === parsed.phone);
   if (!match) return null;
   return User.findById(match._id);

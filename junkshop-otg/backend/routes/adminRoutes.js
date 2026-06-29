@@ -19,7 +19,13 @@ router.patch('/applications/:id/reset-verification', adminController.hardResetVe
 router.get('/users', adminController.listUsers);
 router.patch('/users/:id/badges', adminController.updateUserBadges);
 router.patch('/users/:id/status', adminController.updateUserStatus);
+router.get('/transactions', adminController.listTransactions);
+router.delete('/transactions/:id', adminController.deleteTransaction);
+router.get('/audit-logs', adminController.listAuditLogs);
+router.get('/deleted-records', adminController.listDeletedRecords);
+router.patch('/deleted-records/:type/:id/restore', adminController.restoreDeletedRecord);
 router.get('/contact-messages', adminController.listContactMessages);
 router.patch('/contact-messages/:id/status', adminController.updateContactMessageStatus);
+router.delete('/contact-messages/:id', adminController.deleteContactMessage);
 
 module.exports = router;

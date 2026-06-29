@@ -6,12 +6,14 @@ async function syncJunkshopMaterialTags(providerId) {
   const materials = await Material.find({
     provider: providerId,
     isCatalog: { $ne: true },
+    deletedAt: null,
     available: { $ne: false },
   }).sort({ price: -1 });
 
   const shop = await Junkshop.findOne({
     provider: providerId,
     isCatalog: { $ne: true },
+    deletedAt: null,
   }).sort({ createdAt: 1 });
 
   if (!shop) {

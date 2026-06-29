@@ -139,7 +139,8 @@ export default function ContactPage() {
   const tabsRef = useRef(null);
 
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     subject: 'General question',
     message: '',
@@ -182,7 +183,13 @@ export default function ContactPage() {
     try {
       await contactApi.sendMessage(formData);
       setIsSubmitted(true);
-      setFormData({ name: '', email: '', subject: 'General question', message: '' });
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        subject: 'General question',
+        message: '',
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -297,34 +304,48 @@ export default function ContactPage() {
                 )}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="name" className="mb-1 block text-xs font-medium text-gray-600">
-                      Name
+                    <label htmlFor="firstName" className="mb-1 block text-xs font-medium text-gray-600">
+                      First name
                     </label>
                     <input
-                      id="name"
-                      name="name"
-                      value={formData.name}
+                      id="firstName"
+                      name="firstName"
+                      value={formData.firstName}
                       onChange={handleChange}
                       required
-                      placeholder="Juan dela Cruz"
+                      placeholder="Juan"
                       className={inputClass}
                     />
                   </div>
                   <div>
-                    <label htmlFor="email" className="mb-1 block text-xs font-medium text-gray-600">
-                      Email
+                    <label htmlFor="lastName" className="mb-1 block text-xs font-medium text-gray-600">
+                      Last name
                     </label>
                     <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
+                      id="lastName"
+                      name="lastName"
+                      value={formData.lastName}
                       onChange={handleChange}
                       required
-                      placeholder="juan@email.com"
+                      placeholder="Dela Cruz"
                       className={inputClass}
                     />
                   </div>
+                </div>
+                <div>
+                  <label htmlFor="email" className="mb-1 block text-xs font-medium text-gray-600">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    placeholder="juan@email.com"
+                    className={inputClass}
+                  />
                 </div>
                 <div>
                   <label htmlFor="subject" className="mb-1 block text-xs font-medium text-gray-600">

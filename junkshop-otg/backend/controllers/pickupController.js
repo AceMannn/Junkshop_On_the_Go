@@ -29,9 +29,11 @@ const {
   sendTransactionalEmail,
   sendTransactionalSms,
 } = require('../utils/deliveryService');
+const { writeAuditLog } = require('../utils/auditLogger');
 
 const POPULATE_FIELDS =
   'firstName lastName email phone junkshopName name address pickupServiceFee gcashNumber gcashQrUrl pickupEnabled status role';
+const MAX_AMOUNT = 20000;
 
 const REJECT_PRESETS = [
   'We cannot accept this pickup right now.',
@@ -221,7 +223,11 @@ const filterPickupQueryForModeration = async (query, viewerRole) => {
 };
 
 const getProviderShopIds = async (providerId) => {
-  const shops = await Junkshop.find({ provider: providerId, isCatalog: { $ne: true } }).select('_id');
+  const shops = await Junkshop.find({
+    provider: providerId,
+    isCatalog: { $ne: true },
+    deletedAt: null,
+  }).select('_id');
   return shops.map((s) => s._id);
 };
 
@@ -231,13 +237,14 @@ exports.getRejectPresets = (req, res) => {
 
 exports.listPickupRequests = async (req, res) => {
   try {
-    let query = {};
+    let query = { deletedAt: null };
 
     if (req.user.role === 'customer') {
-      query = { customer: req.user._id };
+      query = { customer: req.user._id, deletedAt: null };
     } else if (req.user.role === 'provider') {
       const shopIds = await getProviderShopIds(req.user._id);
       query = {
+        deletedAt: null,
         $or: [
           { provider: req.user._id },
           { status: 'pending', assignmentMode: 'nearest', provider: null },
@@ -246,7 +253,7 @@ exports.listPickupRequests = async (req, res) => {
       };
       query = await filterPickupQueryForModeration(query, req.user.role);
     } else if (req.user.role === 'admin') {
-      query = {};
+      query = { deletedAt: null };
     } else {
       return res.status(403).json({ message: 'Not allowed.' });
     }
@@ -287,7 +294,7 @@ exports.listPickupRequests = async (req, res) => {
 
 exports.getPickupRequest = async (req, res) => {
   try {
-    const request = await PickupRequest.findById(req.params.id)
+    const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null })
       .populate('customer', POPULATE_FIELDS)
       .populate('provider', POPULATE_FIELDS)
       .populate('junkshop', 'name address phone status rating location provider');
@@ -341,8 +348,11 @@ exports.createPickupRequest = async (req, res) => {
 
     const customerProfile = await evaluateProfile(req.user);
     if (!customerProfile.complete) {
+      const missing = customerProfile.missing || [];
       return res.status(403).json({
-        message: 'Add your mobile number in Account Settings before booking a pickup.',
+        message: missing.includes('address')
+          ? 'Add your street address in Account Settings before booking a pickup.'
+          : 'Add your mobile number in Account Settings before booking a pickup.',
         profileStatus: customerProfile,
       });
     }
@@ -371,7 +381,9 @@ exports.createPickupRequest = async (req, res) => {
       return res.status(400).json({ message: 'Please complete all required booking fields.' });
     }
 
-    if (!isDropOff && !address?.trim()) {
+    const requestedAddress = String(address || req.user.address || '').trim();
+
+    if (!isDropOff && !requestedAddress) {
       return res.status(400).json({ message: 'Pickup address is required.' });
     }
 
@@ -411,6 +423,9 @@ exports.createPickupRequest = async (req, res) => {
     if (normalizedMaterials.some((item) => !item.name)) {
       return res.status(400).json({ message: 'Each material must have a name.' });
     }
+    if (normalizedMaterials.some((item) => item.price > MAX_AMOUNT || item.estimatedSubtotal > MAX_AMOUNT)) {
+      return res.status(400).json({ message: `Material prices cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.` });
+    }
 
     const photos = Array.isArray(materialPhotos) ? materialPhotos.slice(0, 3) : [];
     if (photos.length < 1) {
@@ -429,18 +444,21 @@ exports.createPickupRequest = async (req, res) => {
       Math.round(
         normalizedMaterials.reduce((sum, item) => sum + (Number(item.estimatedSubtotal) || 0), 0) * 100
       ) / 100;
+    if (estimatedTotalAmount > MAX_AMOUNT) {
+      return res.status(400).json({ message: `Estimated total cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.` });
+    }
 
     let junkshop = null;
     if (assignmentMode === 'specific') {
       if (!junkshopId) {
         return res.status(400).json({ message: 'Please select a junkshop.' });
       }
-      junkshop = await Junkshop.findById(junkshopId);
+      junkshop = await Junkshop.findOne({ _id: junkshopId, deletedAt: null });
       if (!junkshop) {
         return res.status(404).json({ message: 'Junkshop not found.' });
       }
       if (junkshop.provider) {
-        const providerUser = await User.findById(junkshop.provider).select('status');
+        const providerUser = await User.findById(junkshop.provider).select('status pickupEnabled');
         if (!providerUser || isBanned(providerUser.status)) {
           return res.status(404).json({ message: 'Junkshop not found.' });
         }
@@ -449,6 +467,16 @@ exports.createPickupRequest = async (req, res) => {
             message: 'This shop is not accepting requests right now. Choose another shop.',
           });
         }
+        if (requestType === 'home_pickup' && providerUser.pickupEnabled === false) {
+          return res.status(400).json({
+            message: 'This shop is not accepting home pickups right now. Choose another shop or drop-off.',
+          });
+        }
+      }
+      if (requestType === 'home_pickup' && junkshop.pickupEnabled === false) {
+        return res.status(400).json({
+          message: 'This shop is not accepting home pickups right now. Choose another shop or drop-off.',
+        });
       }
       if (junkshop.provider && junkshop.isPublished === false) {
         return res.status(400).json({
@@ -463,7 +491,7 @@ exports.createPickupRequest = async (req, res) => {
     }
 
     const pickupAddress =
-      isDropOff && junkshop ? junkshop.address : String(address || '').trim();
+      isDropOff && junkshop ? junkshop.address : requestedAddress;
 
     if (!pickupAddress) {
       return res.status(400).json({ message: 'Address is required for this booking.' });
@@ -526,6 +554,8 @@ exports.createPickupRequest = async (req, res) => {
     } else if (assignmentMode === 'nearest') {
       const providers = await User.find({
         role: 'provider',
+        status: 'active',
+        deletedAt: null,
         pickupEnabled: true,
         profileComplete: true,
       }).select('_id');
@@ -561,7 +591,7 @@ exports.acceptPickupRequest = async (req, res) => {
       });
     }
 
-    const request = await PickupRequest.findById(req.params.id);
+    const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null });
     if (!request) {
       return res.status(404).json({ message: 'Pickup request not found.' });
     }
@@ -577,16 +607,22 @@ exports.acceptPickupRequest = async (req, res) => {
 
     let junkshop = null;
     if (request.junkshop) {
-      junkshop = await Junkshop.findOne({ _id: request.junkshop, provider: req.user._id });
+      junkshop = await Junkshop.findOne({
+        _id: request.junkshop,
+        provider: req.user._id,
+        deletedAt: null,
+      });
       if (!junkshop && request.assignmentMode === 'specific') {
         return res.status(403).json({ message: 'This request is assigned to another shop.' });
       }
     }
 
     if (!junkshop) {
-      junkshop = await Junkshop.findOne({ provider: req.user._id, isCatalog: { $ne: true } }).sort({
-        createdAt: 1,
-      });
+      junkshop = await Junkshop.findOne({
+        provider: req.user._id,
+        isCatalog: { $ne: true },
+        deletedAt: null,
+      }).sort({ createdAt: 1 });
     }
 
     if (!junkshop) {
@@ -641,7 +677,7 @@ exports.rejectPickupRequest = async (req, res) => {
     }
 
     const { reason = '', message = '' } = req.body;
-    const request = await PickupRequest.findById(req.params.id);
+    const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null });
 
     if (!request || request.status !== 'pending') {
       return res.status(400).json({ message: 'This request cannot be rejected.' });
@@ -675,7 +711,7 @@ exports.updatePickupStatus = async (req, res) => {
       return res.status(400).json({ message: 'Invalid status.' });
     }
 
-    const request = await PickupRequest.findById(req.params.id);
+    const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null });
     if (!request) {
       return res.status(404).json({ message: 'Pickup request not found.' });
     }
@@ -748,6 +784,9 @@ exports.updatePickupStatus = async (req, res) => {
         const totalAmount = Number(req.body.totalAmount);
         if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
           return res.status(400).json({ message: 'Enter cash paid to the customer (must be greater than ₱0).' });
+        }
+        if (totalAmount > MAX_AMOUNT) {
+          return res.status(400).json({ message: `Cash paid cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.` });
         }
 
         request.actualWeightKg = actualWeight;
@@ -826,7 +865,7 @@ exports.updateProviderLocation = async (req, res) => {
     }
 
     const { lat, lng } = req.body;
-    const request = await PickupRequest.findById(req.params.id);
+    const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null });
 
     if (!request || request.provider?.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not allowed.' });
@@ -851,7 +890,7 @@ exports.updateProviderLocation = async (req, res) => {
 
 exports.submitPaymentProof = async (req, res) => {
   try {
-    const request = await PickupRequest.findById(req.params.id);
+    const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null });
     if (!request || request.customer.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not allowed.' });
     }
@@ -910,7 +949,7 @@ exports.submitPaymentProof = async (req, res) => {
 
 exports.confirmReadyForPickup = async (req, res) => {
   try {
-    const request = await PickupRequest.findById(req.params.id);
+    const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null });
     if (!request || request.customer.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not allowed.' });
     }
@@ -957,7 +996,7 @@ exports.confirmPayment = async (req, res) => {
       return res.status(403).json({ message: 'Provider account required.' });
     }
 
-    const request = await PickupRequest.findById(req.params.id);
+    const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null });
     if (!request || request.provider?.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not allowed.' });
     }
@@ -998,7 +1037,7 @@ exports.rejectPayment = async (req, res) => {
       return res.status(403).json({ message: 'Provider account required.' });
     }
 
-    const request = await PickupRequest.findById(req.params.id);
+    const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null });
     if (!request || request.provider?.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not allowed.' });
     }
@@ -1049,7 +1088,7 @@ exports.ratePickupRequest = async (req, res) => {
       return res.status(400).json({ message: 'Rating must be between 1 and 5.' });
     }
 
-    const request = await PickupRequest.findById(req.params.id);
+    const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null });
     if (!request || request.customer.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not allowed.' });
     }
@@ -1077,7 +1116,7 @@ exports.ratePickupRequest = async (req, res) => {
 
 exports.listNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ user: req.user._id })
+    const notifications = await Notification.find({ user: req.user._id, deletedAt: null })
       .sort({ createdAt: -1 })
       .limit(50);
     res.json({ notifications });
@@ -1089,7 +1128,7 @@ exports.listNotifications = async (req, res) => {
 exports.markNotificationRead = async (req, res) => {
   try {
     await Notification.findOneAndUpdate(
-      { _id: req.params.id, user: req.user._id },
+      { _id: req.params.id, user: req.user._id, deletedAt: null },
       { read: true }
     );
     res.json({ message: 'ok' });
@@ -1100,7 +1139,17 @@ exports.markNotificationRead = async (req, res) => {
 
 exports.clearNotifications = async (req, res) => {
   try {
-    await Notification.deleteMany({ user: req.user._id });
+    const result = await Notification.updateMany(
+      { user: req.user._id, deletedAt: null },
+      { deletedAt: new Date(), deletedBy: req.user._id }
+    );
+    await writeAuditLog({
+      actor: req.user,
+      action: 'soft_delete_many',
+      targetType: 'notification',
+      targetId: req.user._id,
+      details: { count: result.modifiedCount || 0 },
+    });
     res.json({ message: 'Notifications cleared.' });
   } catch (error) {
     res.status(500).json({ message: 'Could not clear notifications.' });

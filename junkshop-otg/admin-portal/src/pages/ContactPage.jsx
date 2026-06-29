@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ExternalLink, Inbox, Loader2, Mail, Send, X } from 'lucide-react';
+import { ExternalLink, Inbox, Loader2, Mail, Send, Trash2, X } from 'lucide-react';
 import { adminApi } from '../services/api';
 import { formatDate, statusPillClass } from '../utils/format';
 import {
@@ -15,6 +15,7 @@ export default function ContactPage() {
   const [error, setError] = useState('');
   const [messages, setMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
+  const [deletingId, setDeletingId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +67,26 @@ export default function ContactPage() {
       window.dispatchEvent(new Event('admin-contact-updated'));
     } catch (err) {
       setError(err.message || 'Could not mark message as read.');
+    }
+  };
+
+  const deleteMessage = async (messageId) => {
+    const confirmed = window.confirm(
+      'Move this contact message to Deleted Records? You can restore it later.'
+    );
+    if (!confirmed) return;
+
+    setDeletingId(messageId);
+    setError('');
+    try {
+      await adminApi.deleteContactMessage(messageId);
+      setMessages((prev) => prev.filter((row) => row._id !== messageId));
+      setSelectedMessage((prev) => (prev?._id === messageId ? null : prev));
+      window.dispatchEvent(new Event('admin-contact-updated'));
+    } catch (err) {
+      setError(err.message || 'Could not delete contact message.');
+    } finally {
+      setDeletingId('');
     }
   };
 
@@ -164,6 +185,8 @@ export default function ContactPage() {
           message={selectedMessage}
           onClose={() => setSelectedMessage(null)}
           onStatusChange={handleContactStatus}
+          onDelete={deleteMessage}
+          deleting={deletingId === selectedMessage._id}
         />
       )}
     </div>
@@ -178,7 +201,7 @@ function buildReplyUrl(message) {
   return `mailto:${message.email}?subject=${subject}&body=${body}`;
 }
 
-function ContactMessageDrawer({ message, onClose, onStatusChange }) {
+function ContactMessageDrawer({ message, onClose, onStatusChange, onDelete, deleting }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/35">
       <div
@@ -267,6 +290,15 @@ function ContactMessageDrawer({ message, onClose, onStatusChange }) {
               className={`${adminSecondaryButtonClass} flex-1`}
             >
               Mark resolved
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(message._id)}
+              disabled={deleting}
+              className="inline-flex flex-1 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {deleting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </div>

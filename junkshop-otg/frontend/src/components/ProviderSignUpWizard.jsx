@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, MapPin } from 'lucide-react';
 import { authApi } from '../services/api';
 import LocationPickerMap from './maps/LocationPickerMap';
 import {
@@ -25,13 +25,15 @@ import {
   sanitizeOperatingHours,
 } from '../utils/operatingHours';
 import { validatePasswordStrength } from '../utils/passwordPolicy';
+import AccountVerificationStep from './auth/AccountVerificationStep';
+import PasswordRequirements from './auth/PasswordRequirements';
+import TermsAndConditionsModal, { TERMS_VERSION } from './auth/TermsAndConditionsModal';
 
 const STEPS = [
   { id: 1, title: 'Business info' },
   { id: 2, title: 'Owner account' },
-  { id: 3, title: 'Map location' },
-  { id: 4, title: 'Operating hours' },
-  { id: 5, title: 'Review' },
+  { id: 3, title: 'Operating hours' },
+  { id: 4, title: 'Review' },
 ];
 
 const initialForm = {
@@ -45,8 +47,10 @@ const initialForm = {
   password: '',
   confirmPassword: '',
   location: null,
+  addressConfirmed: false,
   operatingHours: DEFAULT_OPERATING_HOURS,
   confirmAccurate: false,
+  acceptedTerms: false,
 };
 
 function readProviderDraft() {
@@ -56,6 +60,7 @@ function readProviderDraft() {
     ...initialForm,
     ...draft.form,
     operatingHours: draft.form.operatingHours || DEFAULT_OPERATING_HOURS,
+    addressConfirmed: Boolean(draft.form.addressConfirmed),
     password: '',
     confirmPassword: '',
   };
@@ -91,12 +96,14 @@ export default function ProviderSignUpWizard({
 }) {
   const providerDraft = loadProviderSignUpDraft();
 
-  const [step, setStep] = useState(providerDraft?.step ?? 1);
+  const [step, setStep] = useState(Math.min(providerDraft?.step ?? 1, STEPS.length));
   const [form, setForm] = useState(() => readProviderDraft() || initialForm);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [verificationData, setVerificationData] = useState(null);
 
   const hoursSummary = useMemo(
     () => formatOperatingHoursSummary(form.operatingHours),
@@ -112,10 +119,42 @@ export default function ProviderSignUpWizard({
     setError('');
   };
 
+  const handleLocationChange = (nextLocation) => {
+    setForm((prev) => ({
+      ...prev,
+      location: nextLocation,
+      address: nextLocation.address || prev.address,
+      addressConfirmed: false,
+    }));
+    setError('');
+  };
+
+  const canConfirmAddress =
+    form.address.trim() &&
+    Number.isFinite(Number(form.location?.lat)) &&
+    Number.isFinite(Number(form.location?.lng));
+
+  const confirmAddress = () => {
+    if (!canConfirmAddress) {
+      setError('Search and select your business address on the map first.');
+      return;
+    }
+    updateField('addressConfirmed', true);
+  };
+
   const validateStep = (currentStep) => {
     if (currentStep === 1) {
       if (!form.junkshopName.trim() || !form.address.trim()) {
         return 'Business name and address are required.';
+      }
+      if (
+        !Number.isFinite(Number(form.location?.lat)) ||
+        !Number.isFinite(Number(form.location?.lng))
+      ) {
+        return 'Search your business address and set the map pin.';
+      }
+      if (!form.addressConfirmed) {
+        return 'Please confirm your business address before continuing.';
       }
     }
 
@@ -141,8 +180,13 @@ export default function ProviderSignUpWizard({
       }
     }
 
-    if (currentStep === 5 && !form.confirmAccurate) {
-      return 'Please confirm that your information is accurate.';
+    if (currentStep === 4) {
+      if (!form.confirmAccurate) {
+        return 'Please confirm that your information is accurate.';
+      }
+      if (!form.acceptedTerms) {
+        return 'Please read and accept the Terms and Conditions before creating an account.';
+      }
     }
 
     return '';
@@ -163,7 +207,7 @@ export default function ProviderSignUpWizard({
   };
 
   const handleSubmit = async () => {
-    const message = validateStep(5);
+    const message = validateStep(4);
     if (message) {
       setError(message);
       return;
@@ -185,7 +229,23 @@ export default function ProviderSignUpWizard({
         password: form.password,
         location: form.location,
         operatingHours: sanitizeOperatingHours(form.operatingHours),
+        termsAccepted: true,
+        termsVersion: TERMS_VERSION,
       });
+
+      if (session.requiresAccountVerification || session.requiresEmailVerification || session.requiresPhoneVerification) {
+        setVerificationData({
+          email: session.email || form.email.trim().toLowerCase(),
+          phone: session.phone || form.phone.replace(/\D/g, '').slice(0, 11),
+          role: 'provider',
+          requiresEmail: Boolean(session.requiresEmailVerification),
+          requiresPhone: Boolean(session.requiresPhoneVerification),
+          message: session.message || 'Check your email/SMS for verification codes.',
+          devEmailCode: session.devEmailVerificationCode || session.devVerificationCode || '',
+          devPhoneCode: session.devPhoneVerificationCode || '',
+        });
+        return;
+      }
 
       setForm(initialForm);
       setStep(1);
@@ -201,6 +261,58 @@ export default function ProviderSignUpWizard({
 
   if (!isOpen) {
     return null;
+  }
+
+  if (verificationData) {
+    return (
+      <div
+        className={authOverlayClass}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="provider-verification-title"
+        onClick={onClose}
+      >
+        <div
+          className={`${authModalShellClass} max-w-lg`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="scroll-y-clean relative min-h-0 flex-1 p-5 sm:p-6">
+            <AuthModalClose onClick={onClose} label="Close verification" />
+            <header className="mb-4 pr-10">
+              <h2 id="provider-verification-title" className="text-xl font-bold text-charcoal mb-1">
+                Verify your account
+              </h2>
+              <p className="text-charcoal/60 text-sm">
+                Enter the codes we sent before opening your junkshop dashboard.
+              </p>
+            </header>
+            <AccountVerificationStep
+              email={verificationData.email}
+              phone={verificationData.phone}
+              role={verificationData.role}
+              requiresEmail={verificationData.requiresEmail}
+              requiresPhone={verificationData.requiresPhone}
+              initialDevEmailCode={verificationData.devEmailCode}
+              initialDevPhoneCode={verificationData.devPhoneCode}
+              initialMessage={verificationData.message}
+              onVerified={(session) => {
+                setForm(initialForm);
+                setStep(1);
+                setVerificationData(null);
+                clearSignUpDrafts();
+                onComplete?.(session);
+                onClose?.();
+              }}
+              onBack={() => {
+                setVerificationData(null);
+                setError('');
+              }}
+              verifyLabel="Verify & continue"
+            />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -256,19 +368,73 @@ export default function ProviderSignUpWizard({
                     disabled={isLoading}
                   />
                 </div>
-                <div>
-                  <label htmlFor="businessAddress" className={authLabelClass}>
-                    Business address <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id="businessAddress"
-                    value={form.address}
-                    onChange={(event) => updateField('address', event.target.value)}
-                    placeholder="Street, barangay, Teresa, Sta. Mesa"
-                    rows={3}
-                    className={`${authInputClass} min-h-[88px] resize-none`}
-                    disabled={isLoading}
-                  />
+                <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50/30">
+                  <div className="border-b border-emerald-100 bg-white px-4 py-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-charcoal">
+                          Business address <span className="text-red-500">*</span>
+                        </p>
+                        <p className="mt-0.5 text-xs text-charcoal/60">
+                          Search your shop address, then confirm the pin location.
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                          form.addressConfirmed
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {form.addressConfirmed ? (
+                          <>
+                            <CheckCircle2 size={13} />
+                            Confirmed
+                          </>
+                        ) : (
+                          'Needs confirmation'
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 p-4">
+                    <LocationPickerMap
+                      lat={form.location?.lat}
+                      lng={form.location?.lng}
+                      onChange={handleLocationChange}
+                      className="min-h-[260px]"
+                    />
+
+                    <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                      <div className="flex items-start gap-2">
+                        <MapPin size={16} className="mt-0.5 shrink-0 text-emerald-700" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-charcoal/50">
+                            Selected address
+                          </p>
+                          <p className="mt-1 text-sm font-medium leading-relaxed text-charcoal">
+                            {form.address || 'No address selected yet.'}
+                          </p>
+                          {form.location?.lat != null && (
+                            <p className="mt-1 font-mono text-[11px] text-charcoal/45">
+                              {Number(form.location.lat).toFixed(5)}, {Number(form.location.lng).toFixed(5)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={confirmAddress}
+                      disabled={isLoading || !canConfirmAddress || form.addressConfirmed}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#154212] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    >
+                      <CheckCircle2 size={16} />
+                      {form.addressConfirmed ? 'Address confirmed' : 'Confirm address'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -355,92 +521,74 @@ export default function ProviderSignUpWizard({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="ownerPassword" className={authLabelClass}>
-                      Password <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="ownerPassword"
-                        type={showPassword ? 'text' : 'password'}
-                        value={form.password}
-                        onChange={(event) => updateField('password', event.target.value)}
-                        className={authInputWithIconClass}
-                        disabled={isLoading}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((open) => !open)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
-                        disabled={isLoading}
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="ownerPassword" className={authLabelClass}>
+                        Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="ownerPassword"
+                          type={showPassword ? 'text' : 'password'}
+                          value={form.password}
+                          onChange={(event) => updateField('password', event.target.value)}
+                          className={authInputWithIconClass}
+                          disabled={isLoading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((open) => !open)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
+                          disabled={isLoading}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="ownerConfirmPassword" className={authLabelClass}>
+                        Confirm password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="ownerConfirmPassword"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={form.confirmPassword}
+                          onChange={(event) => updateField('confirmPassword', event.target.value)}
+                          className={authInputWithIconClass}
+                          disabled={isLoading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword((open) => !open)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
+                          disabled={isLoading}
+                          aria-label={
+                            showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'
+                          }
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <label htmlFor="ownerConfirmPassword" className={authLabelClass}>
-                      Confirm password <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="ownerConfirmPassword"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        value={form.confirmPassword}
-                        onChange={(event) => updateField('confirmPassword', event.target.value)}
-                        className={authInputWithIconClass}
-                        disabled={isLoading}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword((open) => !open)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
-                        disabled={isLoading}
-                        aria-label={
-                          showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'
-                        }
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                  <PasswordRequirements password={form.password} />
                 </div>
               </div>
             )}
 
             {step === 3 && (
-              <div className="space-y-4">
-                <p className="text-sm text-charcoal/70">
-                  Pin your junkshop on the map so customers can find you later. You can skip this
-                  for now and set it in Settings.
-                </p>
-                <LocationPickerMap
-                  lat={form.location?.lat}
-                  lng={form.location?.lng}
-                  onChange={(next) => updateField('location', next)}
-                  className="min-h-[280px]"
-                />
-                {form.location?.lat != null && (
-                  <p className="text-xs text-charcoal/60">
-                    Pin set at {Number(form.location.lat).toFixed(5)},{' '}
-                    {Number(form.location.lng).toFixed(5)}
-                    {form.location.address ? ` · ${form.location.address}` : ''}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {step === 4 && (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm text-charcoal/70">Set your weekly shop hours.</p>
@@ -603,7 +751,7 @@ export default function ProviderSignUpWizard({
               </div>
             )}
 
-            {step === 5 && (
+            {step === 4 && (
               <div className="space-y-4">
                 <div className="border border-gray-200 bg-light-gray/40 p-4 text-sm space-y-2">
                   <p>
@@ -642,6 +790,27 @@ export default function ProviderSignUpWizard({
                     className="mt-1"
                   />
                   <span>I confirm this information is accurate.</span>
+                </label>
+
+                <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-charcoal/80">
+                  <input
+                    type="checkbox"
+                    checked={form.acceptedTerms}
+                    onChange={(event) => updateField('acceptedTerms', event.target.checked)}
+                    disabled={isLoading}
+                    className="mt-1"
+                  />
+                  <span>
+                    I have read and agree to the{' '}
+                    <button
+                      type="button"
+                      onClick={() => setShowTerms(true)}
+                      className="font-semibold text-eco-green hover:text-eco-green/80"
+                    >
+                      Terms and Conditions
+                    </button>
+                    .
+                  </span>
                 </label>
 
                 <p className="text-xs text-charcoal/60">
@@ -688,6 +857,11 @@ export default function ProviderSignUpWizard({
 
         <AuthErrorPopup message={error} onDismiss={() => setError('')} />
       </div>
+      <TermsAndConditionsModal
+        isOpen={showTerms}
+        onClose={() => setShowTerms(false)}
+        role="provider"
+      />
     </div>
   );
 }

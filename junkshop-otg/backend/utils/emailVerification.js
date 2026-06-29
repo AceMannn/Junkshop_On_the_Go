@@ -18,13 +18,25 @@ function assignEmailVerificationCode(user) {
   return code;
 }
 
+function assignPhoneVerificationCode(user) {
+  const code = generateResetCode();
+  user.phoneVerificationCodeHash = hashResetCode(code);
+  user.phoneVerificationExpiresAt = buildVerificationExpiry();
+  return code;
+}
+
 function clearEmailVerificationCode(user) {
   user.emailVerificationCodeHash = null;
   user.emailVerificationExpiresAt = null;
 }
 
+function clearPhoneVerificationCode(user) {
+  user.phoneVerificationCodeHash = null;
+  user.phoneVerificationExpiresAt = null;
+}
+
 function isCustomerEmailVerified(user) {
-  if (!user || user.role !== 'customer') {
+  if (!user) {
     return true;
   }
 
@@ -33,6 +45,14 @@ function isCustomerEmailVerified(user) {
   }
 
   return user.emailVerified !== false;
+}
+
+function isPhoneVerified(user) {
+  if (!user || !user.phone || !String(user.phone).trim()) {
+    return true;
+  }
+
+  return user.phoneVerified === true;
 }
 
 function verifyEmailCode(user, code) {
@@ -56,6 +76,27 @@ function verifyEmailCode(user, code) {
   return { ok: true };
 }
 
+function verifyPhoneCode(user, code) {
+  if (!isValidResetCode(code)) {
+    return { ok: false, message: `Enter the ${RESET_CODE_LENGTH}-digit code from your SMS.` };
+  }
+
+  if (!user.phoneVerificationCodeHash || !user.phoneVerificationExpiresAt) {
+    return { ok: false, message: 'No active SMS verification code. Request a new one.' };
+  }
+
+  if (user.phoneVerificationExpiresAt.getTime() < Date.now()) {
+    return { ok: false, message: 'SMS verification code expired. Request a new one.' };
+  }
+
+  const hashed = hashResetCode(String(code).trim());
+  if (hashed !== user.phoneVerificationCodeHash) {
+    return { ok: false, message: 'Invalid SMS verification code.' };
+  }
+
+  return { ok: true };
+}
+
 function maybeAttachDevVerificationCode(payload, code, delivery) {
   if (delivery?.stub && process.env.NODE_ENV !== 'production') {
     payload.devVerificationCode = code;
@@ -67,8 +108,12 @@ module.exports = {
   RESET_CODE_LENGTH,
   VERIFICATION_TTL_MS,
   assignEmailVerificationCode,
+  assignPhoneVerificationCode,
   clearEmailVerificationCode,
+  clearPhoneVerificationCode,
   isCustomerEmailVerified,
+  isPhoneVerified,
   verifyEmailCode,
+  verifyPhoneCode,
   maybeAttachDevVerificationCode,
 };

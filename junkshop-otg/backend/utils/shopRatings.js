@@ -6,6 +6,7 @@ async function syncJunkshopRating(junkshopId) {
 
   const pickups = await PickupRequest.find({
     junkshop: junkshopId,
+    deletedAt: null,
     status: 'completed',
     'rating.score': { $gte: 1 },
   }).select('rating.score');
@@ -31,7 +32,10 @@ async function syncJunkshopRating(junkshopId) {
 }
 
 async function syncAllJunkshopRatings() {
-  const shops = await Junkshop.find({ isCatalog: { $ne: true } }).select('_id');
+  const shops = await Junkshop.find({
+    isCatalog: { $ne: true },
+    deletedAt: null,
+  }).select('_id');
   let updated = 0;
 
   for (const shop of shops) {

@@ -19,6 +19,9 @@ export default function LocationPickerMap({
     lng,
     onChange,
     className = "",
+    searchPlaceholder = "Search address in Metro Manila...",
+    helpText = "Tap the map or drag the pin to set your shop location.",
+    ariaLabel = "Shop location picker map",
 }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
@@ -182,7 +185,7 @@ export default function LocationPickerMap({
                         type="search"
                         value={addressQuery}
                         onChange={(e) => setAddressQuery(e.target.value)}
-                        placeholder="Search address in Metro Manila..."
+                        placeholder={searchPlaceholder}
                         className="w-full bg-transparent outline-none text-sm"
                     />
                 </div>
@@ -206,7 +209,7 @@ export default function LocationPickerMap({
 
             <p className="text-xs text-[#72796e] flex items-center gap-1.5">
                 <MapPin size={14} className="text-emerald-700 shrink-0" />
-                Tap the map or drag the pin to set your shop location.
+                {helpText}
                 {searching || resolving ? " Updating…" : ""}
             </p>
 
@@ -214,7 +217,7 @@ export default function LocationPickerMap({
                 <div
                     ref={containerRef}
                     className="aspect-[16/10] min-h-[220px] w-full z-0"
-                    aria-label="Shop location picker map"
+                    aria-label={ariaLabel}
                 />
             </div>
 

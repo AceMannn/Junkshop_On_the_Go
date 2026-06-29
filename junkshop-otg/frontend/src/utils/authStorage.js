@@ -1,28 +1,16 @@
 const TOKEN_KEY = 'junkshop_token';
 const USER_KEY = 'junkshop_user';
 
-function migrateLegacyLocalStorage() {
-  if (sessionStorage.getItem(TOKEN_KEY)) return;
-
-  const legacyToken = localStorage.getItem(TOKEN_KEY);
-  if (!legacyToken) return;
-
-  sessionStorage.setItem(TOKEN_KEY, legacyToken);
-  const legacyUser = localStorage.getItem(USER_KEY);
-  if (legacyUser) sessionStorage.setItem(USER_KEY, legacyUser);
-
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+function activeStorage() {
+  return localStorage.getItem(TOKEN_KEY) ? localStorage : sessionStorage;
 }
 
 export function getToken() {
-  migrateLegacyLocalStorage();
-  return sessionStorage.getItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
 }
 
 export function getStoredUser() {
-  migrateLegacyLocalStorage();
-  const raw = sessionStorage.getItem(USER_KEY);
+  const raw = sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY);
   if (!raw) return null;
 
   try {
@@ -32,16 +20,23 @@ export function getStoredUser() {
   }
 }
 
-export function persistSession({ token, user }) {
-  sessionStorage.setItem(TOKEN_KEY, token);
-  sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+export function persistSession({ token, user, rememberMe = false }) {
+  const storage = rememberMe ? localStorage : sessionStorage;
+  const otherStorage = rememberMe ? sessionStorage : localStorage;
+
+  otherStorage.removeItem(TOKEN_KEY);
+  otherStorage.removeItem(USER_KEY);
+  storage.setItem(TOKEN_KEY, token);
+  storage.setItem(USER_KEY, JSON.stringify(user));
 }
 
 export function setStoredUser(user) {
-  sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+  activeStorage().setItem(USER_KEY, JSON.stringify(user));
 }
 
 export function clearSession() {
   sessionStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(USER_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
 }

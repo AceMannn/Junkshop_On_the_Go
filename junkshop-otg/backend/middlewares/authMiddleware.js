@@ -18,6 +18,10 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ message: 'Account no longer exists.' });
     }
 
+    if (user.status === 'deleted' || user.deletedAt) {
+      return res.status(403).json({ message: 'This account has been deleted.' });
+    }
+
     if (user.status !== 'active') {
       return res.status(403).json({ message: 'This account is not active.' });
     }

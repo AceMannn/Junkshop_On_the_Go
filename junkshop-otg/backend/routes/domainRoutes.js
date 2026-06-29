@@ -26,6 +26,7 @@ const {
   sanitizeOperatingHours,
   formatOperatingHoursSummary,
 } = require('../utils/operatingHours');
+const { writeAuditLog } = require('../utils/auditLogger');
 const {
   isBanned,
   isSuspended,
@@ -35,6 +36,7 @@ const {
 } = require('../utils/accountModeration');
 
 const router = express.Router();
+const MAX_AMOUNT = 20000;
 
 const requireProvider = (req, res, next) => {
   if (req.user.role !== 'provider') {
@@ -50,7 +52,7 @@ router.get('/junkshops', async (req, res) => {
   const partnersOnly = req.query.partners === 'true';
   const withPending = req.query.withPending === 'true';
 
-  let query = {};
+  let query = { deletedAt: null };
   if (partnersOnly) {
     const providerFilter = withPending
       ? { role: 'provider', verificationStatus: { $in: ['approved', 'pending'] }, status: 'active' }
@@ -64,6 +66,7 @@ router.get('/junkshops', async (req, res) => {
     query = {
       provider: { $in: providerIds },
       isCatalog: { $ne: true },
+      deletedAt: null,
     };
   }
 
@@ -134,6 +137,7 @@ router.get('/junkshops', async (req, res) => {
     const partnerMaterials = await Material.find({
       provider: { $in: partnerProviderIds },
       isCatalog: { $ne: true },
+      deletedAt: null,
       available: { $ne: false },
     })
       .sort({ category: 1, name: 1 })
@@ -218,8 +222,8 @@ router.get('/junkshops', async (req, res) => {
 router.get('/junkshops/:id/photo', async (req, res) => {
   try {
     const shopQuery = String(req.params.id).match(/^[a-f\d]{24}$/i)
-      ? { _id: req.params.id }
-      : { slug: req.params.id };
+      ? { _id: req.params.id, deletedAt: null }
+      : { slug: req.params.id, deletedAt: null };
 
     const shop = await Junkshop.findOne(shopQuery)
       .select('_id provider isCatalog')
@@ -233,6 +237,7 @@ router.get('/junkshops/:id/photo', async (req, res) => {
       _id: shop.provider,
       role: 'provider',
       status: 'active',
+      deletedAt: null,
     })
       .select('verificationDocuments.shopPhotos')
       .lean();
@@ -258,14 +263,17 @@ router.get('/junkshops/:id/photo', async (req, res) => {
 });
 
 router.get('/junkshops/mine', protect, requireProvider, async (req, res) => {
-  const junkshops = await Junkshop.find({ provider: req.user._id }).sort({ createdAt: -1 });
+  const junkshops = await Junkshop.find({
+    provider: req.user._id,
+    deletedAt: null,
+  }).sort({ createdAt: -1 });
   res.json({ junkshops });
 });
 
 router.get('/junkshops/:id/reviews', async (req, res) => {
   const shopQuery = String(req.params.id).match(/^[a-f\d]{24}$/i)
-    ? { _id: req.params.id }
-    : { slug: req.params.id };
+    ? { _id: req.params.id, deletedAt: null }
+    : { slug: req.params.id, deletedAt: null };
   const shop = await Junkshop.findOne(shopQuery).select('_id name rating reviewCount isPublished provider isCatalog');
 
   if (!shop || (!shop.isCatalog && shop.provider && shop.isPublished === false)) {
@@ -284,6 +292,7 @@ router.get('/junkshops/:id/reviews', async (req, res) => {
 
   const requests = await PickupRequest.find({
     junkshop: shop._id,
+    deletedAt: null,
     status: 'completed',
     'rating.score': { $gte: 1 },
   })
@@ -338,7 +347,7 @@ router.patch('/junkshops/:id', protect, requireProvider, async (req, res) => {
   }
 
   const junkshop = await Junkshop.findOneAndUpdate(
-    { _id: req.params.id, provider: req.user._id },
+    { _id: req.params.id, provider: req.user._id, deletedAt: null },
     data,
     { new: true, runValidators: true }
   );
@@ -353,16 +362,25 @@ router.patch('/junkshops/:id', protect, requireProvider, async (req, res) => {
 });
 
 router.delete('/junkshops/:id', protect, requireProvider, async (req, res) => {
-  const junkshop = await Junkshop.findOneAndDelete({
-    _id: req.params.id,
-    provider: req.user._id,
-  });
+  const junkshop = await Junkshop.findOneAndUpdate(
+    { _id: req.params.id, provider: req.user._id, deletedAt: null },
+    { deletedAt: new Date(), deletedBy: req.user._id, isPublished: false },
+    { new: true }
+  );
 
   if (!junkshop) {
     return res.status(404).json({ message: 'Junkshop not found.' });
   }
 
-  res.json({ message: 'Junkshop deleted.' });
+  await writeAuditLog({
+    actor: req.user,
+    action: 'soft_delete',
+    targetType: 'junkshop',
+    targetId: junkshop._id,
+    details: { name: junkshop.name },
+  });
+
+  res.json({ message: 'Junkshop deleted.', junkshop });
 });
 
 router.get('/materials', async (req, res) => {
@@ -384,13 +402,14 @@ router.get('/materials', async (req, res) => {
       ? await Material.find({
           provider: { $in: providerIds },
           isCatalog: { $ne: true },
+          deletedAt: null,
           available: { $ne: false },
         })
           .sort({ updatedAt: -1 })
           .lean()
       : [];
 
-    const catalogMaterials = await Material.find({ isCatalog: true })
+    const catalogMaterials = await Material.find({ isCatalog: true, deletedAt: null })
       .sort({ category: 1, name: 1 })
       .lean();
 
@@ -430,6 +449,7 @@ router.get('/materials', async (req, res) => {
       const shops = await Junkshop.find({
         provider: { $in: materialProviderIds },
         isCatalog: { $ne: true },
+        deletedAt: null,
       })
         .sort({ createdAt: 1 })
         .select('_id provider name address')
@@ -466,7 +486,7 @@ router.get('/materials', async (req, res) => {
     return res.json({ materials });
   }
 
-  const query = {};
+  const query = { deletedAt: null };
 
   if (req.query.catalog === 'true') {
     query.isCatalog = true;
@@ -487,6 +507,7 @@ router.get('/materials/mine', protect, requireProvider, async (req, res) => {
   const materials = await Material.find({
     provider: req.user._id,
     isCatalog: { $ne: true },
+    deletedAt: null,
   }).sort({ category: 1, name: 1 }).lean();
   res.json({
     materials: materials.map((item) => ({
@@ -501,6 +522,9 @@ router.post('/materials', protect, requireProvider, async (req, res) => {
   const price = Number(data.price);
   if (!Number.isFinite(price) || price <= 0) {
     return res.status(400).json({ message: 'Price must be greater than ₱0.' });
+  }
+  if (price > MAX_AMOUNT) {
+    return res.status(400).json({ message: `Price cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.` });
   }
   if (data.unit && !['kg', 'piece'].includes(String(data.unit))) {
     data.unit = 'kg';
@@ -519,7 +543,11 @@ router.post('/materials', protect, requireProvider, async (req, res) => {
 });
 
 router.patch('/materials/:id', protect, requireProvider, async (req, res) => {
-  const existing = await Material.findOne({ _id: req.params.id, provider: req.user._id });
+  const existing = await Material.findOne({
+    _id: req.params.id,
+    provider: req.user._id,
+    deletedAt: null,
+  });
 
   if (!existing) {
     return res.status(404).json({ message: 'Material not found.' });
@@ -529,6 +557,9 @@ router.patch('/materials/:id', protect, requireProvider, async (req, res) => {
   const nextPrice = data.price !== undefined ? Number(data.price) : existing.price;
   if (!Number.isFinite(nextPrice) || nextPrice <= 0) {
     return res.status(400).json({ message: 'Price must be greater than ₱0.' });
+  }
+  if (nextPrice > MAX_AMOUNT) {
+    return res.status(400).json({ message: `Price cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.` });
   }
   if (data.unit && !['kg', 'piece'].includes(String(data.unit))) {
     data.unit = existing.unit || 'kg';
@@ -549,10 +580,11 @@ router.patch('/materials/:id', protect, requireProvider, async (req, res) => {
 });
 
 router.delete('/materials/:id', protect, requireProvider, async (req, res) => {
-  const material = await Material.findOneAndDelete({
-    _id: req.params.id,
-    provider: req.user._id,
-  });
+  const material = await Material.findOneAndUpdate(
+    { _id: req.params.id, provider: req.user._id, deletedAt: null },
+    { deletedAt: new Date(), deletedBy: req.user._id, available: false },
+    { new: true }
+  );
 
   if (!material) {
     return res.status(404).json({ message: 'Material not found.' });
@@ -561,7 +593,15 @@ router.delete('/materials/:id', protect, requireProvider, async (req, res) => {
   await syncJunkshopMaterialTags(req.user._id);
   await syncProfileComplete(req.user._id);
 
-  res.json({ message: 'Material deleted.' });
+  await writeAuditLog({
+    actor: req.user,
+    action: 'soft_delete',
+    targetType: 'material',
+    targetId: material._id,
+    details: { name: material.name, category: material.category },
+  });
+
+  res.json({ message: 'Material deleted.', material });
 });
 
 router.get('/pickup-requests/reject-presets', protect, pickupController.getRejectPresets);
@@ -585,7 +625,7 @@ router.delete('/notifications', protect, pickupController.clearNotifications);
 
 router.get('/transactions', protect, async (req, res) => {
   const key = req.user.role === 'provider' ? 'provider' : 'customer';
-  const query = { [key]: req.user._id, totalAmount: { $gt: 0 } };
+  const query = { [key]: req.user._id, totalAmount: { $gt: 0 }, deletedAt: null };
 
   if (req.query.from || req.query.to) {
     query.createdAt = {};
@@ -627,6 +667,8 @@ router.post('/transactions', protect, requireProvider, async (req, res) => {
     const customer = await User.findOne({
       email: String(customerEmail).trim().toLowerCase(),
       role: 'customer',
+      status: { $ne: 'deleted' },
+      deletedAt: null,
     });
     if (!customer) {
       return res.status(404).json({ message: 'Customer email not found.' });
@@ -643,8 +685,14 @@ router.post('/transactions', protect, requireProvider, async (req, res) => {
   if (!weightNum || weightNum <= 0 || !price || price <= 0) {
     return res.status(400).json({ message: 'Enter valid weight and price values greater than zero.' });
   }
+  if (price > MAX_AMOUNT) {
+    return res.status(400).json({ message: `Price cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.` });
+  }
 
   const totalAmount = Math.round(weightNum * price * 100) / 100;
+  if (totalAmount > MAX_AMOUNT) {
+    return res.status(400).json({ message: `Transaction total cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.` });
+  }
 
   const transaction = await Transaction.create({
     customer: customerId,

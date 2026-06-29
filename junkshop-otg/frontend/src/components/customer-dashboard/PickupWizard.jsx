@@ -105,6 +105,17 @@ const inputClass =
 export default function PickupWizard({ user, shops, onClose, onSuccess, prefill = null }) {
   const { materials: marketMaterials } = useFeaturedMaterials({ autoRefresh: false });
   const scheduleDates = useMemo(() => buildScheduleDates(), []);
+  const savedAddress = String(user?.address || '').trim();
+  const savedLocation =
+    Number.isFinite(Number(user?.location?.lat)) &&
+    Number.isFinite(Number(user?.location?.lng))
+      ? {
+          lat: Number(user.location.lat),
+          lng: Number(user.location.lng),
+          label: savedAddress,
+        }
+      : null;
+  const hasConfirmedSavedAddress = Boolean(savedAddress && user?.addressConfirmed && savedLocation);
 
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -135,8 +146,10 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
   const [contactEmail, setContactEmail] = useState(
     user?.email || ''
   );
-  const [pickupLocation, setPickupLocation] = useState(null); // { lat, lng, label }
-  const [addressConfirmed, setAddressConfirmed] = useState(false);
+  const [pickupLocation, setPickupLocation] = useState(
+    hasConfirmedSavedAddress ? savedLocation : null
+  ); // { lat, lng, label }
+  const [addressConfirmed, setAddressConfirmed] = useState(hasConfirmedSavedAddress);
   const [landmark, setLandmark] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -150,6 +163,8 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
     const status = String(shop.status).toLowerCase();
     if (status === 'suspended') return false;
     const closed = status === 'closed';
+    const acceptsPickup = shop.pickupEnabled !== false;
+    if (!isDropOff && !acceptsPickup) return false;
     return !closed || isDropOff;
   });
 
@@ -275,7 +290,10 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
         scheduledDate,
         timeSlot,
         address: isDropOff ? selectedShop?.address || address.trim() : address.trim(),
-        ...(pickupLocation && !isDropOff
+        ...(pickupLocation &&
+        !isDropOff &&
+        Number.isFinite(Number(pickupLocation.lat)) &&
+        Number.isFinite(Number(pickupLocation.lng))
           ? { pickupLocation: { lat: pickupLocation.lat, lng: pickupLocation.lng } }
           : {}),
         landmark: landmark.trim(),

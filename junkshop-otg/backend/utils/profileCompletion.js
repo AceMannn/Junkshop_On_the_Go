@@ -30,12 +30,18 @@ function buildChecklist(items) {
 
 async function evaluateCustomerProfile(user) {
   const phone = normalizePhone(user.phone);
+  const address = String(user.address || '').trim();
 
   return buildChecklist([
     {
       id: 'phone',
       label: 'Mobile number (for pickups & recovery)',
       done: hasValidPhone(phone),
+    },
+    {
+      id: 'address',
+      label: 'Street address (for home pickups)',
+      done: Boolean(address),
     },
   ]);
 }
@@ -44,11 +50,13 @@ async function evaluateProviderProfile(user) {
   const shop = await Junkshop.findOne({
     provider: user._id,
     isCatalog: { $ne: true },
+    deletedAt: null,
   }).sort({ createdAt: 1 });
 
   const materialCount = await Material.countDocuments({
     provider: user._id,
     isCatalog: { $ne: true },
+    deletedAt: null,
     available: { $ne: false },
   });
 
@@ -116,6 +124,7 @@ async function syncProfileComplete(userId) {
     const shop = await Junkshop.findOne({
       provider: user._id,
       isCatalog: { $ne: true },
+      deletedAt: null,
     }).sort({ createdAt: 1 });
 
     if (shop) {

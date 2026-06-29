@@ -1,6 +1,14 @@
 const User = require('../models/User');
 const ContactMessage = require('../models/ContactMessage');
+const Junkshop = require('../models/Junkshop');
+const Material = require('../models/Material');
+const PickupRequest = require('../models/PickupRequest');
+const Transaction = require('../models/Transaction');
+const Notification = require('../models/Notification');
+const AuditLog = require('../models/AuditLog');
 const { syncProfileComplete } = require('../utils/profileCompletion');
+const { syncJunkshopMaterialTags } = require('../utils/syncJunkshopTags');
+const { writeAuditLog } = require('../utils/auditLogger');
 const { applyStatusSideEffects } = require('../utils/accountModeration');
 const { BADGE_OPTIONS } = require('../utils/verificationConstants');
 const { serializeVerificationForAdmin } = require('./verificationController');
@@ -13,8 +21,18 @@ const {
 
 const ALLOWED_BADGES = BADGE_OPTIONS.map((item) => item.id);
 
+const RESTORABLE_MODELS = {
+  users: User,
+  junkshops: Junkshop,
+  materials: Material,
+  pickups: PickupRequest,
+  transactions: Transaction,
+  contacts: ContactMessage,
+  notifications: Notification,
+};
+
 async function listProviderApplications({ status } = {}) {
-  const query = { role: 'provider' };
+  const query = { role: 'provider', status: { $ne: 'deleted' }, deletedAt: null };
 
   if (status) {
     query.verificationStatus = status;
@@ -45,12 +63,12 @@ async function listProviderApplications({ status } = {}) {
 exports.getOverview = async (req, res) => {
   try {
     const [pending, approved, rejected, draft, users, messages] = await Promise.all([
-      User.countDocuments({ role: 'provider', verificationStatus: 'pending' }),
-      User.countDocuments({ role: 'provider', verificationStatus: 'approved' }),
-      User.countDocuments({ role: 'provider', verificationStatus: 'rejected' }),
-      User.countDocuments({ role: 'provider', verificationStatus: 'draft' }),
-      User.countDocuments({ role: { $in: ['customer', 'provider'] } }),
-      ContactMessage.countDocuments({ status: 'new' }),
+      User.countDocuments({ role: 'provider', verificationStatus: 'pending', status: { $ne: 'deleted' }, deletedAt: null }),
+      User.countDocuments({ role: 'provider', verificationStatus: 'approved', status: { $ne: 'deleted' }, deletedAt: null }),
+      User.countDocuments({ role: 'provider', verificationStatus: 'rejected', status: { $ne: 'deleted' }, deletedAt: null }),
+      User.countDocuments({ role: 'provider', verificationStatus: 'draft', status: { $ne: 'deleted' }, deletedAt: null }),
+      User.countDocuments({ role: { $in: ['customer', 'provider'] }, status: { $ne: 'deleted' }, deletedAt: null }),
+      ContactMessage.countDocuments({ status: 'new', deletedAt: null }),
     ]);
 
     res.json({
@@ -374,7 +392,7 @@ exports.hardResetVerification = async (req, res) => {
 exports.listUsers = async (req, res) => {
   try {
     const role = String(req.query.role || '').trim();
-    const query = {};
+    const query = { status: { $ne: 'deleted' }, deletedAt: null };
 
     if (['customer', 'provider', 'admin'].includes(role)) {
       query.role = role;
@@ -384,7 +402,7 @@ exports.listUsers = async (req, res) => {
 
     const users = await User.find(query)
       .select(
-        'firstName lastName email phone role junkshopName status verificationStatus badges createdAt'
+        'firstName lastName email phone role junkshopName status verificationStatus badges createdAt deletedAt'
       )
       .sort({ createdAt: -1 })
       .limit(200)
@@ -402,6 +420,7 @@ exports.listUsers = async (req, res) => {
         verificationStatus: user.verificationStatus || 'draft',
         badges: user.badges || [],
         createdAt: user.createdAt,
+        deletedAt: user.deletedAt,
       })),
     });
   } catch (error) {
@@ -446,12 +465,19 @@ exports.updateUserStatus = async (req, res) => {
     }
 
     const nextStatus = String(req.body.status || '').trim();
-    if (!['active', 'suspended', 'banned'].includes(nextStatus)) {
+    if (!['active', 'suspended', 'banned', 'deleted'].includes(nextStatus)) {
       return res.status(400).json({ message: 'Invalid account status.' });
     }
 
     const previousStatus = user.status;
     user.status = nextStatus;
+    if (nextStatus === 'deleted') {
+      user.deletedAt = user.deletedAt || new Date();
+      user.deletedBy = req.user._id;
+    } else if (previousStatus === 'deleted') {
+      user.deletedAt = null;
+      user.deletedBy = null;
+    }
 
     if (req.body.note !== undefined) {
       user.moderationNote = String(req.body.note || '').trim();
@@ -459,6 +485,13 @@ exports.updateUserStatus = async (req, res) => {
 
     await user.save();
     await applyStatusSideEffects(user, previousStatus, nextStatus);
+    await writeAuditLog({
+      actor: req.user,
+      action: nextStatus === 'deleted' ? 'soft_delete' : 'status_update',
+      targetType: 'user',
+      targetId: user._id,
+      details: { previousStatus, nextStatus, note: user.moderationNote || '' },
+    });
 
     if (user.role === 'provider') {
       await syncProfileComplete(user._id);
@@ -479,7 +512,7 @@ exports.updateUserStatus = async (req, res) => {
 
 exports.listContactMessages = async (req, res) => {
   try {
-    const messages = await ContactMessage.find({})
+    const messages = await ContactMessage.find({ deletedAt: null })
       .sort({ createdAt: -1 })
       .limit(100)
       .lean();
@@ -490,6 +523,79 @@ exports.listContactMessages = async (req, res) => {
   }
 };
 
+exports.listTransactions = async (req, res) => {
+  try {
+    const transactions = await Transaction.find({})
+      .populate('customer provider', 'firstName lastName email phone junkshopName role status')
+      .populate('pickupRequest', 'requestType status')
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+
+    res.json({
+      transactions: transactions.map((tx) => ({
+        id: String(tx._id),
+        material: tx.material,
+        weight: tx.weight,
+        unit: tx.unit,
+        pricePerUnit: tx.pricePerUnit,
+        totalAmount: tx.totalAmount,
+        status: tx.status,
+        deletedAt: tx.deletedAt,
+        createdAt: tx.createdAt,
+        customer: tx.customer
+          ? {
+              name: [tx.customer.firstName, tx.customer.lastName].filter(Boolean).join(' '),
+              email: tx.customer.email || '',
+              phone: tx.customer.phone || '',
+              status: tx.customer.status || '',
+            }
+          : null,
+        provider: tx.provider
+          ? {
+              name: tx.provider.junkshopName || [tx.provider.firstName, tx.provider.lastName].filter(Boolean).join(' '),
+              email: tx.provider.email || '',
+              phone: tx.provider.phone || '',
+              status: tx.provider.status || '',
+            }
+          : null,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load transaction logs.' });
+  }
+};
+
+exports.listAuditLogs = async (req, res) => {
+  try {
+    const logs = await AuditLog.find({})
+      .populate('actor', 'firstName lastName email role')
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+
+    res.json({
+      logs: logs.map((log) => ({
+        id: String(log._id),
+        action: log.action,
+        targetType: log.targetType,
+        targetId: String(log.targetId),
+        details: log.details || {},
+        createdAt: log.createdAt,
+        actor: log.actor
+          ? {
+              name: [log.actor.firstName, log.actor.lastName].filter(Boolean).join(' '),
+              email: log.actor.email || '',
+              role: log.actor.role || log.actorRole || '',
+            }
+          : { name: 'System', email: '', role: log.actorRole || '' },
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load audit logs.' });
+  }
+};
+
 exports.updateContactMessageStatus = async (req, res) => {
   try {
     const status = String(req.body.status || '').trim();
@@ -497,8 +603,8 @@ exports.updateContactMessageStatus = async (req, res) => {
       return res.status(400).json({ message: 'Invalid message status.' });
     }
 
-    const message = await ContactMessage.findByIdAndUpdate(
-      req.params.id,
+    const message = await ContactMessage.findOneAndUpdate(
+      { _id: req.params.id, deletedAt: null },
       { status },
       { new: true }
     );
@@ -510,5 +616,155 @@ exports.updateContactMessageStatus = async (req, res) => {
     res.json({ message: 'Contact message updated.', contactMessage: message });
   } catch (error) {
     res.status(500).json({ message: 'Could not update contact message.' });
+  }
+};
+
+exports.deleteContactMessage = async (req, res) => {
+  try {
+    const message = await ContactMessage.findOneAndUpdate(
+      { _id: req.params.id, deletedAt: null },
+      {
+        status: 'deleted',
+        deletedAt: new Date(),
+        deletedBy: req.user._id,
+      },
+      { new: true }
+    );
+
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found.' });
+    }
+
+    await writeAuditLog({
+      actor: req.user,
+      action: 'soft_delete',
+      targetType: 'contacts',
+      targetId: message._id,
+      details: { subject: message.subject, email: message.email },
+    });
+
+    res.json({ message: 'Contact message moved to deleted records.', contactMessage: message });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not delete contact message.' });
+  }
+};
+
+exports.deleteTransaction = async (req, res) => {
+  try {
+    const transaction = await Transaction.findOneAndUpdate(
+      { _id: req.params.id, deletedAt: null },
+      {
+        status: 'deleted',
+        deletedAt: new Date(),
+        deletedBy: req.user._id,
+      },
+      { new: true }
+    );
+
+    if (!transaction) {
+      return res.status(404).json({ message: 'Transaction not found.' });
+    }
+
+    await writeAuditLog({
+      actor: req.user,
+      action: 'soft_delete',
+      targetType: 'transactions',
+      targetId: transaction._id,
+      details: { material: transaction.material, totalAmount: transaction.totalAmount },
+    });
+
+    res.json({ message: 'Transaction moved to deleted records.', transaction });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not delete transaction.' });
+  }
+};
+
+exports.listDeletedRecords = async (req, res) => {
+  try {
+    const rows = [];
+
+    for (const [type, Model] of Object.entries(RESTORABLE_MODELS)) {
+      const query =
+        type === 'users'
+          ? { $or: [{ status: 'deleted' }, { deletedAt: { $ne: null } }] }
+          : { deletedAt: { $ne: null } };
+
+      const records = await Model.find(query)
+        .sort({ deletedAt: -1, updatedAt: -1 })
+        .limit(30)
+        .lean();
+
+      records.forEach((record) => {
+        rows.push({
+          id: String(record._id),
+          type,
+          label:
+            record.name ||
+            record.junkshopName ||
+            record.material ||
+            record.subject ||
+            [record.firstName, record.lastName].filter(Boolean).join(' ') ||
+            record.title ||
+            String(record._id),
+          status: record.status || '',
+          deletedAt: record.deletedAt,
+          createdAt: record.createdAt,
+        });
+      });
+    }
+
+    rows.sort((a, b) => new Date(b.deletedAt || 0) - new Date(a.deletedAt || 0));
+    res.json({ records: rows.slice(0, 100) });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load deleted records.' });
+  }
+};
+
+exports.restoreDeletedRecord = async (req, res) => {
+  try {
+    const type = String(req.params.type || '').trim();
+    const Model = RESTORABLE_MODELS[type];
+    if (!Model) {
+      return res.status(400).json({ message: 'Invalid restore record type.' });
+    }
+
+    const record = await Model.findById(req.params.id);
+    if (!record) {
+      return res.status(404).json({ message: 'Deleted record not found.' });
+    }
+
+    record.deletedAt = null;
+    record.deletedBy = null;
+
+    if (type === 'users' && record.status === 'deleted') record.status = 'active';
+    if (type === 'transactions' && record.status === 'deleted') record.status = 'completed';
+    if (type === 'contacts' && record.status === 'deleted') record.status = 'read';
+    if (type === 'materials') record.available = true;
+
+    await record.save();
+
+    if (type === 'materials' && record.provider) {
+      await syncJunkshopMaterialTags(record.provider);
+      await syncProfileComplete(record.provider);
+    }
+    if (type === 'junkshops' && record.provider) {
+      await syncJunkshopMaterialTags(record.provider);
+      await syncProfileComplete(record.provider);
+    }
+    if (type === 'users') {
+      await syncProfileComplete(record._id);
+    }
+
+    await writeAuditLog({
+      actor: req.user,
+      action: 'restore',
+      targetType: type,
+      targetId: record._id,
+      details: {},
+    });
+
+    res.json({ message: 'Record restored.', record: { id: String(record._id), type } });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not restore deleted record.' });
   }
 };

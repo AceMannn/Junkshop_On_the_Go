@@ -1,16 +1,19 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
     ArrowLeft,
     User,
     Lock,
     Shield,
     AlertTriangle,
+    CheckCircle2,
+    MapPin,
     X,
 } from "lucide-react";
 import { authApi } from "../../services/api";
 import { getUserInitials } from "../../utils/userDisplay";
 import { formatPoints } from "../../utils/pickupPoints";
 import { validatePasswordStrength } from "../../utils/passwordPolicy";
+import LocationPickerMap from "../maps/LocationPickerMap";
 
 function getDisplayName(user) {
     if (!user) return "Eco Warrior";
@@ -70,32 +73,157 @@ function isPlaceholderEmail(email) {
     );
 }
 
+const OTP_LENGTH = 6;
+
+function normalizeOtp(value) {
+    return String(value || "").replace(/\D/g, "").slice(0, OTP_LENGTH);
+}
+
 export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
     const isProvider = user?.role === "provider";
     const displayName = getDisplayName(user);
     const hasRealEmail = Boolean(user?.email) && !isPlaceholderEmail(user.email);
     const emailDisplay = hasRealEmail ? user.email : "";
+    const savedLocation =
+        Number.isFinite(Number(user?.location?.lat)) &&
+        Number.isFinite(Number(user?.location?.lng))
+            ? user.location
+            : null;
     const [form, setForm] = useState({
         firstName: user?.firstName || "",
         lastName: user?.lastName || "",
+        email: emailDisplay,
         phone: user?.phone || "",
         address: user?.address || "",
+        location: savedLocation,
+        addressConfirmed: Boolean(user?.addressConfirmed && savedLocation),
     });
+    const [emailVerification, setEmailVerification] = useState(
+        !isProvider && emailDisplay && user?.emailVerified === false
+            ? { email: emailDisplay, message: "Verify this email to finish setup." }
+            : null
+    );
+    const [emailCode, setEmailCode] = useState("");
+    const [emailVerifying, setEmailVerifying] = useState(false);
+    const [emailResending, setEmailResending] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
+    const handleLocationChange = (nextLocation) => {
+        setForm((prev) => ({
+            ...prev,
+            location: nextLocation,
+            address: nextLocation.address || prev.address,
+            addressConfirmed: false,
+        }));
+        setError("");
+    };
+
+    const canConfirmAddress =
+        form.address.trim() &&
+        Number.isFinite(Number(form.location?.lat)) &&
+        Number.isFinite(Number(form.location?.lng));
+
+    const confirmAddress = () => {
+        if (!canConfirmAddress) {
+            setError("Search and select your street address on the map first.");
+            return;
+        }
+        setForm((prev) => ({ ...prev, addressConfirmed: true }));
+        setError("");
+    };
+
     const handleSave = async (e) => {
         e.preventDefault();
+        if (!isProvider && !form.addressConfirmed) {
+            setError("Please confirm your street address on the map before saving.");
+            return;
+        }
         setSaving(true);
         setError("");
         try {
-            const { user: updated } = await authApi.updateMe(form);
+            const payload = isProvider
+                ? {
+                    firstName: form.firstName,
+                    lastName: form.lastName,
+                    phone: form.phone,
+                    address: form.address,
+                }
+                : form;
+            const data = await authApi.updateMe(payload);
+            const updated = data.user;
             onUserUpdate?.(updated);
+            if (!isProvider && data.requiresEmailVerification) {
+                setEmailVerification({
+                    email: data.email || updated.email || form.email,
+                    message: data.devVerificationCode
+                        ? `${data.message} Dev code: ${data.devVerificationCode}`
+                        : data.message,
+                });
+                setEmailCode(normalizeOtp(data.devVerificationCode));
+            } else if (!isProvider && updated?.email && updated.emailVerified === false) {
+                setEmailVerification({
+                    email: updated.email,
+                    message: "Email saved. Enter the verification code to confirm it.",
+                });
+            } else {
+                setEmailVerification(null);
+                setEmailCode("");
+            }
             onSaveSuccess?.();
         } catch (err) {
             setError(err.message);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleVerifyEmail = async () => {
+        if (!emailVerification?.email) return;
+        if (emailCode.length !== OTP_LENGTH) {
+            setError(`Enter the ${OTP_LENGTH}-digit code from your email.`);
+            return;
+        }
+
+        setEmailVerifying(true);
+        setError("");
+        try {
+            const session = await authApi.verifyEmail({
+                email: emailVerification.email,
+                code: emailCode,
+            });
+            onUserUpdate?.(session.user);
+            setForm((prev) => ({ ...prev, email: session.user?.email || emailVerification.email }));
+            setEmailVerification(null);
+            setEmailCode("");
+            onSaveSuccess?.();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setEmailVerifying(false);
+        }
+    };
+
+    const handleResendEmailCode = async () => {
+        if (!emailVerification?.email) return;
+
+        setEmailResending(true);
+        setError("");
+        try {
+            const data = await authApi.resendVerification({ email: emailVerification.email });
+            setEmailVerification((prev) => ({
+                ...prev,
+                message: data.devVerificationCode
+                    ? `${data.message} Dev code: ${data.devVerificationCode}`
+                    : data.message || "A new verification code was sent.",
+            }));
+            if (data.devVerificationCode) {
+                setEmailCode(normalizeOtp(data.devVerificationCode));
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setEmailResending(false);
         }
     };
 
@@ -166,15 +294,49 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                             value={form.lastName}
                             onChange={(v) => setForm({ ...form, lastName: v })}
                         />
-                        <InputField
-                            label="Email address"
-                            required={false}
-                            type="email"
-                            value={emailDisplay || "Not provided"}
-                            readOnly
-                        />
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                                <label className="block text-sm font-semibold text-[#42493e]">
+                                    Email address
+                                </label>
+                                {!isProvider && form.email ? (
+                                    user?.emailVerified === false || emailVerification ? (
+                                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700">
+                                            Not verified
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                                            <CheckCircle2 size={12} />
+                                            Verified
+                                        </span>
+                                    )
+                                ) : (
+                                    <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-bold text-zinc-500">
+                                        No email
+                                    </span>
+                                )}
+                            </div>
+                            <input
+                                className="w-full bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#154212] focus:border-transparent outline-none transition-all disabled:opacity-70"
+                                type="email"
+                                value={isProvider ? emailDisplay : form.email}
+                                onChange={(e) => {
+                                    setForm({ ...form, email: e.target.value });
+                                    setEmailVerification(null);
+                                    setEmailCode("");
+                                }}
+                                placeholder="name@example.com"
+                                readOnly={isProvider}
+                            />
+                            {!isProvider && (
+                                <p className="text-xs text-[#72796e]">
+                                    Optional. Save a new email to receive a verification code.
+                                </p>
+                            )}
+                        </div>
                         <InputField
                             label={isProvider ? "Mobile number (login)" : "Mobile number"}
+                            required={!isProvider}
                             type="tel"
                             value={form.phone}
                             onChange={(v) =>
@@ -192,17 +354,136 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                         </p>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-[#42493e]">
-                            {isProvider ? "Business address" : "Street address"}
-                        </label>
-                        <textarea
-                            className="w-full bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#154212] focus:border-transparent outline-none transition-all resize-none text-sm"
-                            rows={3}
-                            value={form.address}
-                            onChange={(e) => setForm({ ...form, address: e.target.value })}
-                        />
-                    </div>
+                    {!isProvider && emailVerification && (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                            <div>
+                                <p className="text-sm font-bold text-amber-950">Verify email address</p>
+                                <p className="mt-1 text-xs text-amber-900/80">
+                                    Enter the {OTP_LENGTH}-digit code sent to{" "}
+                                    <strong>{emailVerification.email}</strong>.
+                                </p>
+                            </div>
+                            {emailVerification.message && (
+                                <p className="break-all rounded-xl border border-amber-100 bg-white/70 px-3 py-2 text-xs text-amber-900">
+                                    {emailVerification.message}
+                                </p>
+                            )}
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="one-time-code"
+                                    value={emailCode}
+                                    onChange={(e) => setEmailCode(normalizeOtp(e.target.value))}
+                                    placeholder="000000"
+                                    className="flex-1 rounded-xl border border-amber-200 bg-white px-4 py-3 text-center text-sm font-semibold tracking-[0.35em] outline-none focus:ring-2 focus:ring-amber-200"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleVerifyEmail}
+                                    disabled={emailVerifying}
+                                    className="rounded-xl bg-[#154212] px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-900 disabled:opacity-60"
+                                >
+                                    {emailVerifying ? "Verifying..." : "Verify email"}
+                                </button>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleResendEmailCode}
+                                disabled={emailResending || emailVerifying}
+                                className="text-xs font-semibold text-[#154212] hover:underline disabled:opacity-60"
+                            >
+                                {emailResending ? "Sending..." : "Resend code"}
+                            </button>
+                        </div>
+                    )}
+
+                    {isProvider ? (
+                        <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-[#42493e]">
+                                Business address
+                            </label>
+                            <textarea
+                                className="w-full bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#154212] focus:border-transparent outline-none transition-all resize-none text-sm"
+                                rows={3}
+                                value={form.address}
+                                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                            />
+                        </div>
+                    ) : (
+                        <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50/30">
+                            <div className="border-b border-emerald-100 bg-white px-4 py-3">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <p className="text-sm font-bold text-[#42493e]">
+                                            Street address <span className="text-red-600">*</span>
+                                        </p>
+                                        <p className="mt-0.5 text-xs text-[#72796e]">
+                                            Search your address, then confirm the pin location for pickups.
+                                        </p>
+                                    </div>
+                                    <span
+                                        className={`inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                                            form.addressConfirmed
+                                                ? "bg-emerald-100 text-emerald-800"
+                                                : "bg-amber-100 text-amber-800"
+                                        }`}
+                                    >
+                                        {form.addressConfirmed ? (
+                                            <>
+                                                <CheckCircle2 size={13} />
+                                                Confirmed
+                                            </>
+                                        ) : (
+                                            "Needs confirmation"
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3 p-4">
+                                <LocationPickerMap
+                                    lat={form.location?.lat}
+                                    lng={form.location?.lng}
+                                    onChange={handleLocationChange}
+                                    searchPlaceholder="Search your street address..."
+                                    helpText="Tap the map or drag the pin to set your exact pickup address."
+                                    ariaLabel="Customer address picker map"
+                                    className="min-h-[260px]"
+                                />
+
+                                <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                                    <div className="flex items-start gap-2">
+                                        <MapPin size={16} className="mt-0.5 shrink-0 text-emerald-700" />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-[11px] font-bold uppercase tracking-wide text-[#72796e]">
+                                                Selected address
+                                            </p>
+                                            <p className="mt-1 text-sm font-medium leading-relaxed text-[#191c1c]">
+                                                {form.address || "No address selected yet."}
+                                            </p>
+                                            {form.location?.lat != null && (
+                                                <p className="mt-1 font-mono text-[11px] text-[#72796e]">
+                                                    {Number(form.location.lat).toFixed(5)},{" "}
+                                                    {Number(form.location.lng).toFixed(5)}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={confirmAddress}
+                                    disabled={!canConfirmAddress || form.addressConfirmed}
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#154212] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                                >
+                                    <CheckCircle2 size={16} />
+                                    {form.addressConfirmed ? "Address confirmed" : "Confirm address"}
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {error && (
                         <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">

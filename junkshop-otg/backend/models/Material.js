@@ -22,10 +22,12 @@ const materialSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
+      max: 20000,
     },
     previousPrice: {
       type: Number,
       min: 0,
+      max: 20000,
       default: 0,
     },
     unit: {
@@ -61,6 +63,15 @@ const materialSchema = new mongoose.Schema(
     isCatalog: {
       type: Boolean,
       default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
   },
   { timestamps: true }

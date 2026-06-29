@@ -179,6 +179,7 @@ export default function ProviderTransactionsTab({ onNotify }) {
                     />
                     <NumberInput
                         min={0.01}
+                        max={20000}
                         step={0.01}
                         required
                         placeholder="Price per kg (₱)"

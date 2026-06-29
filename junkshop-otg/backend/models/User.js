@@ -149,6 +149,21 @@ const userSchema = new mongoose.Schema(
       default: '',
     },
 
+    phoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    phoneVerificationCodeHash: {
+      type: String,
+      default: null,
+    },
+
+    phoneVerificationExpiresAt: {
+      type: Date,
+      default: null,
+    },
+
     password: {
       type: String,
       required: true,
@@ -166,10 +181,42 @@ const userSchema = new mongoose.Schema(
       default: '',
     },
 
+    location: {
+      lat: Number,
+      lng: Number,
+    },
+
+    addressConfirmed: {
+      type: Boolean,
+      default: false,
+    },
+
+    acceptedTermsAt: {
+      type: Date,
+      default: null,
+    },
+
+    termsVersion: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+
     status: {
       type: String,
-      enum: ['active', 'suspended', 'banned'],
+      enum: ['active', 'suspended', 'banned', 'deleted'],
       default: 'active',
+    },
+
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
 
     moderationNote: {
@@ -181,6 +228,7 @@ const userSchema = new mongoose.Schema(
     pickupServiceFee: {
       type: Number,
       min: 0,
+      max: 20000,
       default: 0,
     },
 

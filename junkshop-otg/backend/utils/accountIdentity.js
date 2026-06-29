@@ -20,7 +20,12 @@ async function findUserByNormalizedPhone(normalizedPhone, options = {}) {
   const { roles, excludeUserId } = options;
   const roleFilter = roles ? { role: { $in: roles } } : {};
 
-  let user = await User.findOne({ phone: normalizedPhone, ...roleFilter }).select(AUTH_LOOKUP_EXCLUDE);
+  let user = await User.findOne({
+    phone: normalizedPhone,
+    status: { $ne: 'deleted' },
+    deletedAt: null,
+    ...roleFilter,
+  }).select(AUTH_LOOKUP_EXCLUDE);
   if (user) {
     if (excludeUserId && user._id.toString() === String(excludeUserId)) {
       user = null;
@@ -29,7 +34,12 @@ async function findUserByNormalizedPhone(normalizedPhone, options = {}) {
     }
   }
 
-  const candidates = await User.find({ phone: { $ne: '' }, ...roleFilter }).select('phone');
+  const candidates = await User.find({
+    phone: { $ne: '' },
+    status: { $ne: 'deleted' },
+    deletedAt: null,
+    ...roleFilter,
+  }).select('phone');
   const match = candidates.find((row) => {
     if (excludeUserId && row._id.toString() === String(excludeUserId)) {
       return false;
@@ -60,7 +70,11 @@ async function findUserByGcashNumber(normalizedPhone, options = {}) {
   }
 
   const { excludeUserId } = options;
-  const candidates = await User.find({ gcashNumber: { $ne: '' } }).select('gcashNumber role');
+  const candidates = await User.find({
+    gcashNumber: { $ne: '' },
+    status: { $ne: 'deleted' },
+    deletedAt: null,
+  }).select('gcashNumber role');
   const match = candidates.find((row) => {
     if (excludeUserId && row._id.toString() === String(excludeUserId)) {
       return false;
@@ -90,15 +104,15 @@ async function findUserByPhoneOrGcash(normalizedPhone, options = {}) {
 }
 
 function phoneSignupConflictMessage(existingRole) {
-  return `This mobile number is already registered as a ${roleLabel(existingRole)}. Log in instead.`;
+  return 'This number is already in use.';
 }
 
 function phoneLoginConflictMessage(existingRole) {
-  return `This mobile number is registered as a ${roleLabel(existingRole)}. Log in as ${roleLabel(existingRole)} instead.`;
+  return 'This number is already in use.';
 }
 
 function phoneUpdateConflictMessage(existingRole) {
-  return `This mobile number is already registered as a ${roleLabel(existingRole)}. Use a different number.`;
+  return 'This number is already in use.';
 }
 
 function gcashConflictMessage(existingRole, field) {
@@ -131,9 +145,9 @@ async function assertPhoneAvailable(normalizedPhone, { intendedRole, excludeUser
 
   if (user.role === intendedRole) {
     const sameRoleMessages = {
-      signup: 'This mobile number is already registered.',
+      signup: 'This number is already in use.',
       login: 'Invalid mobile number or password.',
-      update: 'This mobile number is already registered.',
+      update: 'This number is already in use.',
     };
     return {
       status: context === 'login' ? 401 : 409,
@@ -168,7 +182,11 @@ async function assertEmailAvailable(email, { intendedRole, excludeUserId }) {
     return null;
   }
 
-  const existing = await User.findOne({ email: normalizedEmail });
+  const existing = await User.findOne({
+    email: normalizedEmail,
+    status: { $ne: 'deleted' },
+    deletedAt: null,
+  });
   if (!existing) {
     return null;
   }

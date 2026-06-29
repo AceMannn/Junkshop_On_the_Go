@@ -7,6 +7,16 @@ const contactMessageSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    firstName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    lastName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     email: {
       type: String,
       required: true,
@@ -25,8 +35,17 @@ const contactMessageSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['new', 'read', 'resolved'],
+      enum: ['new', 'read', 'resolved', 'deleted'],
       default: 'new',
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
   },
   { timestamps: true }
