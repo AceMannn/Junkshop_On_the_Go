@@ -14,7 +14,7 @@ const HIGHLIGHTS = [
   { id: 'paper', label: 'Paper' },
   { id: 'e-waste', label: 'E-waste' },
   { id: 'glass', label: 'Glass' },
-  { id: 'cardboard', label: 'Cardboard' },
+  { id: 'tires', label: 'Tires' },
 ];
 
 function formatCategoryLabel(value) {

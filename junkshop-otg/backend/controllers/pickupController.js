@@ -358,6 +358,8 @@ exports.createPickupRequest = async (req, res) => {
       materialPhotos,
       estimatedWeightKg,
       address,
+      pickupLocation: clientPickupLocation,
+      landmark,
       scheduledDate,
       timeSlot,
       notes,
@@ -472,11 +474,23 @@ exports.createPickupRequest = async (req, res) => {
       return res.status(400).json({ message: 'Contact phone is required (09XXXXXXXXX).' });
     }
 
-    const pickupLocation = await resolvePickupLocation({
-      requestType,
-      address: pickupAddress,
-      junkshop,
-    });
+    let resolvedPickupLocation = null;
+    const clientCoords =
+      clientPickupLocation &&
+      typeof clientPickupLocation.lat === 'number' &&
+      typeof clientPickupLocation.lng === 'number'
+        ? { lat: clientPickupLocation.lat, lng: clientPickupLocation.lng }
+        : null;
+
+    if (clientCoords) {
+      resolvedPickupLocation = clientCoords;
+    } else {
+      resolvedPickupLocation = await resolvePickupLocation({
+        requestType,
+        address: pickupAddress,
+        junkshop,
+      });
+    }
 
     const request = await PickupRequest.create({
       customer: req.user._id,
@@ -491,7 +505,8 @@ exports.createPickupRequest = async (req, res) => {
       estimatedWeightKg: weight,
       estimatedTotalAmount,
       address: pickupAddress,
-      pickupLocation: pickupLocation || undefined,
+      pickupLocation: resolvedPickupLocation || undefined,
+      landmark: landmark?.trim() || '',
       scheduledDate,
       timeSlot,
       scheduledAt: buildScheduledAt(scheduledDate, timeSlot),
@@ -731,8 +746,8 @@ exports.updatePickupStatus = async (req, res) => {
           return res.status(400).json({ message: 'Enter actual weight (min 0.1 kg).' });
         }
         const totalAmount = Number(req.body.totalAmount);
-        if (!Number.isFinite(totalAmount) || totalAmount < 0) {
-          return res.status(400).json({ message: 'Enter cash paid to the customer.' });
+        if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+          return res.status(400).json({ message: 'Enter cash paid to the customer (must be greater than ₱0).' });
         }
 
         request.actualWeightKg = actualWeight;

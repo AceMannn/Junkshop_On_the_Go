@@ -9,7 +9,7 @@ export const recyclingSteps = [
     title: 'Separate Materials',
     icon: '📦',
     previewImage: tipSeparateImg,
-    description: 'Sort recyclables by type: plastic, paper, metal, glass, and e-waste.',
+    description: 'Sort recyclables by type: plastic, paper, metal, glass, e-waste, and tires.',
     tips: ['Keep different materials in separate bags', 'Label containers for easy identification'],
     preview: true,
   },
@@ -37,7 +37,7 @@ export const recyclingSteps = [
     icon: '♻️',
     previewImage: tipSortImg,
     description: 'Group similar materials together so junkshops can price them faster.',
-    tips: ['Bundle cardboard and flatten boxes', 'Keep metals separated by type'],
+    tips: ['Keep tires dry and free from mud', 'Keep metals separated by type'],
     preview: true,
   },
   {
@@ -51,7 +51,7 @@ export const recyclingSteps = [
 
 export const recyclingDos = [
   'Clean and dry all recyclables before storage',
-  'Flatten cardboard boxes to save space',
+  'Keep tires dry and separated from mixed household waste',
   'Remove food residue from containers',
   'Sort materials by type',
   'Store in a dry, ventilated area',
@@ -80,9 +80,9 @@ export const materialGuides = [
   },
   {
     material: 'Paper',
-    accepted: ['Cardboard', 'Newspapers', 'Office paper', 'Magazines', 'Paper bags'],
+    accepted: ['Newspapers', 'Office paper', 'Magazines', 'Paper bags'],
     notAccepted: ['Wet paper', 'Wax-coated paper', 'Carbon paper', 'Tissue paper'],
-    prep: 'Keep dry, flatten boxes, bundle and tie',
+    prep: 'Keep dry, bundle and tie',
   },
   {
     material: 'Metal',
@@ -95,6 +95,12 @@ export const materialGuides = [
     accepted: ['Clear bottles', 'Colored bottles', 'Glass jars'],
     notAccepted: ['Broken glass', 'Window glass', 'Mirrors', 'Light bulbs'],
     prep: 'Clean, remove caps and labels, keep unbroken',
+  },
+  {
+    material: 'Tires',
+    accepted: ['Car tires', 'Motorcycle tires', 'Bicycle tires'],
+    notAccepted: ['Tires filled with mud', 'Burned tires', 'Tires mixed with hazardous waste'],
+    prep: 'Keep dry, remove loose debris, and confirm oversized tires with the junkshop first',
   },
 ];
 

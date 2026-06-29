@@ -4,9 +4,9 @@ import { domainApi } from "../../services/api";
 import { useProviderMaterials } from "../../hooks/useProviderData";
 import NumberInput from "../ui/NumberInput";
 import Select from "../ui/Select";
-import { formatUpdatedDate } from "../../utils/catalogMappers";
+import { formatMaterialCategoryLabel, formatUpdatedDate } from "../../utils/catalogMappers";
 
-const CATEGORIES = ["plastic", "metal", "paper", "glass", "e-waste", "other"];
+const CATEGORIES = ["plastic", "paper", "metal", "glass", "e-waste", "tires"];
 
 const CATEGORY_COLORS = {
     plastic:   { chip: "bg-blue-100 text-blue-700",    border: "border-t-blue-400"   },
@@ -14,15 +14,16 @@ const CATEGORY_COLORS = {
     paper:     { chip: "bg-emerald-100 text-emerald-700", border: "border-t-emerald-400" },
     glass:     { chip: "bg-teal-100 text-teal-700",    border: "border-t-teal-400"   },
     "e-waste": { chip: "bg-purple-100 text-purple-700", border: "border-t-purple-400" },
+    tires:     { chip: "bg-zinc-200 text-zinc-800",     border: "border-t-zinc-500"   },
     other:     { chip: "bg-zinc-100 text-zinc-600",    border: "border-t-zinc-300"   },
 };
 
 const FILTER_OPTIONS = [
     { value: "all", label: "All categories" },
-    ...CATEGORIES.map((cat) => ({ value: cat, label: cat })),
+    ...CATEGORIES.map((cat) => ({ value: cat, label: formatMaterialCategoryLabel(cat) })),
 ];
 
-const CATEGORY_OPTIONS = CATEGORIES.map((cat) => ({ value: cat, label: cat }));
+const CATEGORY_OPTIONS = CATEGORIES.map((cat) => ({ value: cat, label: formatMaterialCategoryLabel(cat) }));
 const UNIT_OPTIONS = [
     { value: "kg", label: "Per kg" },
     { value: "piece", label: "Per piece" },
@@ -191,7 +192,7 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap mb-0.5">
                                             <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${cat.chip}`}>
-                                                {item.category || "Other"}
+                                                {formatMaterialCategoryLabel(item.category)}
                                             </span>
                                             <span
                                                 className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${item.available
@@ -266,7 +267,13 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                             </label>
                             <Select
                                 value={form.category}
-                                onChange={(category) => setForm({ ...form, category })}
+                                onChange={(category) =>
+                                    setForm({
+                                        ...form,
+                                        category,
+                                        unit: category === "tires" ? "piece" : form.unit,
+                                    })
+                                }
                                 options={CATEGORY_OPTIONS}
                                 ariaLabel="Material category"
                             />

@@ -107,6 +107,7 @@ const pickupRequestSchema = new mongoose.Schema(
     pointsAwarded: { type: Number, min: 0, default: 0 },
     rejectReason: { type: String, trim: true, default: '' },
     rejectMessage: { type: String, trim: true, default: '' },
+    landmark: { type: String, trim: true, default: '' },
     notes: { type: String, trim: true, default: '' },
     providerLocation: {
       lat: Number,

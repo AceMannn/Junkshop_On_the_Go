@@ -180,6 +180,7 @@ function serializePickupForViewer(request, viewerRole, statusMap = {}) {
     estimatedTotalAmount: row.estimatedTotalAmount || 0,
     address: row.address,
     pickupLocation: row.pickupLocation,
+    landmark: row.landmark || '',
     scheduledDate: row.scheduledDate,
     timeSlot: row.timeSlot,
     scheduledAt: row.scheduledAt,

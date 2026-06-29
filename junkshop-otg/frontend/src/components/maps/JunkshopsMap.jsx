@@ -159,7 +159,9 @@ export default function JunkshopsMap({
             center: [JUNKSHOP_MAP_CENTER.lat, JUNKSHOP_MAP_CENTER.lng],
             zoom: JUNKSHOP_MAP_ZOOM,
             scrollWheelZoom: true,
+            zoomControl: false,
         });
+        L.control.zoom({ position: "bottomright" }).addTo(map);
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             attribution:
@@ -379,74 +381,71 @@ export default function JunkshopsMap({
         ? `h-full w-full min-h-0 ${className}`
         : `space-y-3 ${className}`;
     const mapFrameClassName = fillContainer
-        ? "relative z-0 h-full w-full min-h-0 overflow-hidden bg-zinc-100"
-        : "rounded-xl border border-emerald-200 overflow-hidden shadow-sm relative z-0";
+        ? "relative z-0 h-full w-full min-h-0 bg-zinc-100"
+        : "rounded-xl border border-emerald-200 shadow-sm relative z-0";
     const mapContainerClassName = fillContainer
-        ? "fluid-map-min-height h-full w-full min-h-0 z-0 bg-zinc-100 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]"
-        : "fluid-map-height w-full z-0 bg-zinc-100 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]";
+        ? "fluid-map-min-height h-full w-full min-h-0 z-0 bg-zinc-100 overflow-hidden [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]"
+        : "min-h-[18rem] sm:min-h-[22rem] lg:min-h-[26rem] w-full z-0 bg-zinc-100 overflow-hidden rounded-xl [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]";
 
     return (
         <div className={shellClassName}>
-            {routingEnabled && (
-                <div className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 sm:p-4">
-                    <p className="text-xs font-semibold text-[#42493e]">Your starting point</p>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <div className="relative flex-1">
-                            <div className="flex items-center bg-white border border-[#c2c9bb] rounded-xl px-3 py-2.5">
-                                <Search size={16} className="text-[#72796e] shrink-0 mr-2" />
-                                <input
-                                    type="search"
-                                    value={originQuery}
-                                    onChange={(e) => setOriginQuery(e.target.value)}
-                                    placeholder="Search any Metro Manila address..."
-                                    className="w-full bg-transparent outline-none text-sm"
-                                />
+            <div className={mapFrameClassName}>
+
+                {/* Search overlay — floats on top of the map */}
+                {routingEnabled && (
+                    <div className="absolute top-3 left-3 right-3 z-[800] pointer-events-none sm:right-auto sm:max-w-[26rem]">
+                        <div className="pointer-events-auto space-y-1.5">
+                            <div className="flex gap-2">
+                                <div className="relative flex-1 min-w-0">
+                                    <div className="flex items-center bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md rounded-xl px-3 py-2.5">
+                                        <Search size={15} className="text-[#72796e] shrink-0 mr-2" />
+                                        <input
+                                            type="search"
+                                            value={originQuery}
+                                            onChange={(e) => setOriginQuery(e.target.value)}
+                                            placeholder="Search address for directions…"
+                                            className="w-full bg-transparent outline-none text-sm min-w-0"
+                                        />
+                                    </div>
+                                    {originSuggestions.length > 0 && (
+                                        <ul className="scroll-y-clean absolute z-[900] mt-1 w-full max-h-40 rounded-xl border border-zinc-200 bg-white shadow-lg">
+                                            {originSuggestions.map((item) => (
+                                                <li key={`${item.lat}-${item.lng}-${item.label}`}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => applyOriginSuggestion(item)}
+                                                        className="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 border-b border-zinc-50 last:border-0"
+                                                    >
+                                                        {item.label}
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={requestGpsOrigin}
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md px-3 py-2.5 text-xs font-semibold text-[#154212] hover:bg-emerald-50 shrink-0 whitespace-nowrap"
+                                    title="Use my location"
+                                >
+                                    <LocateFixed size={14} />
+                                    <span className="hidden sm:inline">Use my location</span>
+                                </button>
                             </div>
-                            {originSuggestions.length > 0 && (
-                                <ul className="scroll-y-clean absolute z-20 mt-1 w-full max-h-40 rounded-xl border border-zinc-200 bg-white shadow-lg">
-                                    {originSuggestions.map((item) => (
-                                        <li key={`${item.lat}-${item.lng}-${item.label}`}>
-                                            <button
-                                                type="button"
-                                                onClick={() => applyOriginSuggestion(item)}
-                                                className="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 border-b border-zinc-50 last:border-0"
-                                            >
-                                                {item.label}
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
+
+                            {(gpsStatus === "denied" || gpsStatus === "unsupported") && (
+                                <p className="text-xs font-medium text-amber-800 bg-amber-50/90 backdrop-blur-sm border border-amber-200 rounded-lg px-2.5 py-1.5">
+                                    {gpsStatus === "denied"
+                                        ? "Location blocked — search an address."
+                                        : "GPS not available — search your address."}
+                                </p>
                             )}
                         </div>
-                        <button
-                            type="button"
-                            onClick={requestGpsOrigin}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm font-semibold text-[#154212] hover:bg-emerald-50 shrink-0"
-                        >
-                            <LocateFixed size={16} />
-                            Use my location
-                        </button>
                     </div>
-                    {origin && (
-                        <p className="text-xs text-[#72796e] truncate">
-                            From: {origin.label}
-                            {originLoading ? " · Searching…" : ""}
-                        </p>
-                    )}
-                    {gpsStatus === "denied" && (
-                        <p className="text-xs text-amber-800">
-                            Location blocked — search an address above instead.
-                        </p>
-                    )}
-                    {gpsStatus === "unsupported" && (
-                        <p className="text-xs text-amber-800">
-                            GPS not available — search your address above.
-                        </p>
-                    )}
-                </div>
-            )}
+                )}
 
-            <div className={mapFrameClassName}>
                 <div
                     ref={containerRef}
                     className={mapContainerClassName}

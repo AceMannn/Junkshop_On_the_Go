@@ -1,12 +1,6 @@
 const Junkshop = require('../models/Junkshop');
 const Material = require('../models/Material');
-
-function formatCategory(category) {
-  if (!category) return '';
-  const raw = String(category).trim().toLowerCase();
-  if (raw === 'e-waste') return 'E-waste';
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
-}
+const { formatMaterialCategory } = require('./materialCategories');
 
 async function syncJunkshopMaterialTags(providerId) {
   const materials = await Material.find({
@@ -25,7 +19,11 @@ async function syncJunkshopMaterialTags(providerId) {
   }
 
   const categories = [
-    ...new Set(materials.map((item) => formatCategory(item.category)).filter(Boolean)),
+    ...new Set(
+      materials
+        .map((item) => formatMaterialCategory(item.category))
+        .filter(Boolean)
+    ),
   ];
 
   shop.materials = categories;
@@ -42,4 +40,4 @@ async function syncJunkshopMaterialTags(providerId) {
   return shop;
 }
 
-module.exports = { syncJunkshopMaterialTags, formatCategory };
+module.exports = { syncJunkshopMaterialTags, formatCategory: formatMaterialCategory };

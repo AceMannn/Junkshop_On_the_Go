@@ -72,6 +72,9 @@ function PublicShell({
     if (section === 'home') navigate('/');
     else if (section === 'about') navigate('/about');
     else if (section === 'contact') navigate('/contact');
+    else if (section === 'find-shop') navigate('/customer/panel/junkshops');
+    else if (section === 'prices') navigate('/customer/panel/prices');
+    else if (section === 'guide') navigate('/customer/panel/guide');
     else navigate('/');
   };
 

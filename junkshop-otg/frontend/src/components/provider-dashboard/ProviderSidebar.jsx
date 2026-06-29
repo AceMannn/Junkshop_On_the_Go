@@ -4,7 +4,7 @@ import {
     Package,
     Clock,
     Truck,
-    ReceiptText,
+    History,
     MoreHorizontal,
     ShieldCheck,
     Pin,
@@ -13,11 +13,11 @@ import {
 
 export const providerTabs = [
     { id: "dashboard", label: "Overview", icon: LayoutDashboard },
-    { id: "verification", label: "Verification", icon: ShieldCheck },
+    { id: "requests", label: "Pickups", icon: Truck },
     { id: "materials", label: "Materials", icon: Package },
     { id: "availability", label: "Availability", icon: Clock },
-    { id: "requests", label: "Pickups", icon: Truck },
-    { id: "transactions", label: "Transactions", icon: ReceiptText },
+    { id: "verification", label: "Verification", icon: ShieldCheck },
+    { id: "transactions", label: "History", icon: History },
 ];
 
 const mobilePrimaryIds = ["dashboard", "verification", "requests", "materials"];
@@ -26,7 +26,14 @@ const mobileMoreIds = ["availability", "transactions", "settings"];
 const primarySidebarButtonClass =
     "w-full flex items-center rounded-2xl border border-[#154212] bg-[#154212] py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-900 hover:shadow transition-colors";
 
-const sidebarNavTabs = providerTabs.filter((tab) => tab.id !== "requests");
+const sidebarNavItems = [
+    { id: "requests", label: "Pickups", icon: Truck, primary: true },
+    { id: "dashboard", label: "Overview", icon: LayoutDashboard },
+    { id: "materials", label: "Materials", icon: Package },
+    { id: "availability", label: "Availability", icon: Clock },
+    { id: "verification", label: "Verification", icon: ShieldCheck },
+    { id: "transactions", label: "History", icon: History },
+];
 
 export default function ProviderSidebar({ activeTab, onNavigate, pinned, onPinnedChange }) {
     const sidebarWidthClass = pinned ? "w-56" : "w-20 hover:w-56";
@@ -48,26 +55,29 @@ export default function ProviderSidebar({ activeTab, onNavigate, pinned, onPinne
         <aside
             className={`group fixed left-0 top-16 h-[calc(100vh-4rem)] ${sidebarWidthClass} overflow-hidden border-r border-zinc-200 bg-zinc-50 hidden md:flex flex-col z-30 transition-[width] duration-300 ease-out`}
         >
-            <div className="p-3 pb-2">
-                <button
-                    type="button"
-                    onClick={() => onNavigate("requests")}
-                    title="Pickups"
-                    className={`${primarySidebarButtonClass} ${itemLayoutClass} ${primaryPaddingClass} ${gapClass} min-h-10 whitespace-nowrap overflow-hidden transition-[padding,gap] duration-300 ${
-                        activeTab === "requests" ? "ring-2 ring-emerald-400/80" : ""
-                    }`}
-                >
-                    <Truck size={20} className="shrink-0" />
-                    <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
-                        Pickups
-                    </span>
-                </button>
-            </div>
-
-            <nav className="overflow-hidden flex flex-col gap-0.5 px-3 flex-1">
-                {sidebarNavTabs.map((tab) => {
+            <nav className="overflow-hidden flex flex-col gap-0.5 px-3 pt-3 flex-1">
+                {sidebarNavItems.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
+
+                    if (tab.primary) {
+                        return (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => onNavigate(tab.id)}
+                                title={tab.label}
+                                className={`${primarySidebarButtonClass} ${itemLayoutClass} ${primaryPaddingClass} ${gapClass} mb-2 min-h-10 whitespace-nowrap overflow-hidden transition-[padding,gap] duration-300 ${
+                                    isActive ? "ring-2 ring-emerald-400/80" : ""
+                                }`}
+                            >
+                                <Icon size={20} className="shrink-0" />
+                                <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
+                                    {tab.label}
+                                </span>
+                            </button>
+                        );
+                    }
 
                     return (
                         <button

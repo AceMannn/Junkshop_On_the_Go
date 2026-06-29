@@ -14,6 +14,7 @@ export default function StatCard({
   icon: Icon,
   helper,
   helperMode = 'tooltip',
+  showHelperIcon = true,
   accentColor = 'green',
   layout = 'vertical',
   suffix,
@@ -61,7 +62,7 @@ export default function StatCard({
         ) : (
           <div />
         )}
-        {helper && helperMode === 'tooltip' && (
+        {showHelperIcon && helper && helperMode === 'tooltip' && (
           <Info size={15} className="text-zinc-400 cursor-help shrink-0" title={helper} />
         )}
       </div>

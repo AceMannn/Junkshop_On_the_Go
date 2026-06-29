@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ArrowLeft,
     MapPin,
-    Phone,
     Search,
     Map,
     TrendingUp,
@@ -14,13 +13,13 @@ import {
     AlertCircle,
     ReceiptText,
     RefreshCw,
+    SlidersHorizontal,
 } from "lucide-react";
 import { Heart } from "lucide-react";
 import JunkshopsMap from "../maps/JunkshopsMap";
 import EmptyState from "../ui/EmptyState";
 import ShopRating from "../ui/ShopRating";
 import VerifiedPartnerIcon, { isVerified } from "../ui/VerifiedPartnerIcon";
-import ShopCardPreviewDetails from "./ShopCardPreviewDetails";
 import NumberInput from "../ui/NumberInput";
 import { isFavoriteShopId } from "../../utils/favorites";
 import { priceCategories } from "../../data/prices";
@@ -28,7 +27,9 @@ import { useCatalogJunkshops, useFeaturedMaterials } from "../../hooks/useCatalo
 import { domainApi } from "../../services/api";
 import {
     formatUpdatedDate,
+    formatMaterialCategoryLabel,
     getMaterialTrend,
+    normalizeMaterialCategory,
     shopStatusBadgeClass,
 } from "../../utils/catalogMappers";
 import {
@@ -45,18 +46,21 @@ const LOCATION_FILTERS = [
 ];
 
 const HIGHLIGHT_CATEGORIES = [
-    "aluminum",
-    "copper",
-    "plastic",
-    "cardboard",
-    "paper",
-    "glass",
-    "steel",
+    { id: "plastic", label: "Plastic" },
+    { id: "paper", label: "Paper" },
+    { id: "metal", label: "Metal" },
+    { id: "glass", label: "Glass" },
+    { id: "e-waste", label: "E-waste" },
+    { id: "tires", label: "Tires" },
 ];
 
 function parsePriceMid(perKgPrice) {
     const match = perKgPrice.match(/₱(\d+)/);
     return match ? Number(match[1]) : 0;
+}
+
+function materialUnitLabel(item) {
+    return item?.unit === "piece" ? "piece" : "kg";
 }
 
 function PanelStatus({ loading, error, source, onRetry }) {
@@ -124,6 +128,26 @@ export function DashboardPanelShell({ title, onClose, children }) {
     );
 }
 
+const MATERIAL_FILTERS = [
+    { id: "all", label: "All materials" },
+    { id: "plastic", label: "Plastic" },
+    { id: "paper", label: "Paper" },
+    { id: "metal", label: "Metal" },
+    { id: "glass", label: "Glass" },
+    { id: "e-waste", label: "E-waste" },
+    { id: "tires", label: "Tires" },
+];
+
+const SORT_OPTIONS = [
+    { id: "default", label: "Default" },
+    { id: "open_first", label: "Open first" },
+    { id: "nearest", label: "Nearest" },
+    { id: "rating", label: "Highest rated" },
+];
+
+const filterSelectClass =
+    "bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-3 py-2.5 text-sm font-medium text-[#42493e] outline-none focus:ring-2 focus:ring-[#154212]";
+
 export function JunkshopsPanel({
     favoriteIds = [],
     onToggleFavorite,
@@ -135,25 +159,24 @@ export function JunkshopsPanel({
     const { shops, loading, error, source, refresh } = useCatalogJunkshops({ partnersOnly: true });
     const [query, setQuery] = useState("");
     const [locationFilter, setLocationFilter] = useState("all");
-    const [expandedId, setExpandedId] = useState(initialShopId);
+    const [materialFilter, setMaterialFilter] = useState("all");
+    const [sortBy, setSortBy] = useState("default");
+    const [selectedMapId, setSelectedMapId] = useState(initialShopId);
     const [pendingRouteId, setPendingRouteId] = useState(null);
     const effectiveRouteId = autoRouteShopId || pendingRouteId;
 
     useEffect(() => {
-        if (initialShopId) {
-            setExpandedId(initialShopId);
-        }
+        if (initialShopId) setSelectedMapId(initialShopId);
     }, [initialShopId]);
 
     const filteredShops = useMemo(() => {
-        return shops.filter((shop) => {
+        let result = shops.filter((shop) => {
+            const q = query.trim().toLowerCase();
             const matchesQuery =
-                !query.trim() ||
-                shop.name.toLowerCase().includes(query.toLowerCase()) ||
-                shop.address.toLowerCase().includes(query.toLowerCase()) ||
-                shop.materials.some((m) =>
-                    m.toLowerCase().includes(query.toLowerCase())
-                );
+                !q ||
+                shop.name.toLowerCase().includes(q) ||
+                shop.address.toLowerCase().includes(q) ||
+                shop.materials.some((m) => m.toLowerCase().includes(q));
 
             const addressLower = shop.address.toLowerCase();
             const matchesLocation =
@@ -161,218 +184,245 @@ export function JunkshopsPanel({
                 (locationFilter === "teresa" && addressLower.includes("teresa")) ||
                 (locationFilter === "sta-mesa" && addressLower.includes("sta. mesa"));
 
-            // Only show shops within 5 km (shops with no distanceKm are always shown)
-            const withinRange =
-                shop.distanceKm == null || shop.distanceKm <= 5;
+            const matchesMaterial =
+                materialFilter === "all" ||
+                shop.materials.some((m) =>
+                    m.toLowerCase() === materialFilter ||
+                    m.toLowerCase().includes(materialFilter)
+                );
 
-            return matchesQuery && matchesLocation && withinRange;
+            return matchesQuery && matchesLocation && matchesMaterial;
         });
-    }, [shops, query, locationFilter]);
+
+        if (sortBy === "open_first") {
+            result = [...result].sort((a, b) => {
+                const aOpen = a.status === "Open" ? 0 : 1;
+                const bOpen = b.status === "Open" ? 0 : 1;
+                return aOpen - bOpen;
+            });
+        } else if (sortBy === "nearest") {
+            result = [...result].sort((a, b) => {
+                if (a.distanceKm == null && b.distanceKm == null) return 0;
+                if (a.distanceKm == null) return 1;
+                if (b.distanceKm == null) return -1;
+                return a.distanceKm - b.distanceKm;
+            });
+        } else if (sortBy === "rating") {
+            result = [...result].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        }
+
+        return result;
+    }, [shops, query, locationFilter, materialFilter, sortBy]);
+
+    const hasActiveFilters =
+        query.trim() || locationFilter !== "all" || materialFilter !== "all" || sortBy !== "default";
 
     return (
         <div className="space-y-6">
             <PanelStatus loading={loading} error={error} source={source} onRetry={refresh} />
-            <p className="text-sm text-[#72796e] max-w-2xl">
-                Approved junkshops appear here. Verified, trusted, and top badges show when admins assign them.
-            </p>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1 flex items-center bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-2.5">
-                    <Search size={18} className="text-[#72796e] shrink-0 mr-2" />
-                    <input
-                        type="search"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search junkshops or materials..."
-                        className="w-full bg-transparent outline-none text-sm"
-                    />
-                </div>
-
-                <select
-                    value={locationFilter}
-                    onChange={(e) => setLocationFilter(e.target.value)}
-                    className="sm:w-44 bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-4 py-2.5 text-sm font-medium text-[#42493e] outline-none focus:ring-2 focus:ring-[#154212]"
-                    aria-label="Location filter"
-                >
-                    {LOCATION_FILTERS.map((option) => (
-                        <option key={option.id} value={option.id}>
-                            {option.label}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            <div className="flex flex-col gap-6">
-            <div className="order-1 space-y-4 lg:order-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-[#72796e]">
-                    {filteredShops.length} shop{filteredShops.length !== 1 ? "s" : ""} found
-                </p>
-
-                {filteredShops.length === 0 ? (
-                    <EmptyState
-                        compact
-                        title={shops.length === 0 ? "No partner shops yet" : "No junkshops within range"}
-                        description={
-                            shops.length === 0
-                                ? "Approved junkshops appear here after admin review."
-                                : "No junkshops found within 5 km of your location. Try a different filter."
-                        }
-                    />
-                ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {filteredShops.map((shop) => {
-                            const isOpen = shop.status === "Open";
-                            const isExpanded = expandedId === shop.id;
-
-                            return (
-                                <article
-                                    key={shop.id}
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() =>
-                                        setExpandedId(isExpanded ? null : shop.id)
-                                    }
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter" || e.key === " ") {
-                                            e.preventDefault();
-                                            setExpandedId(isExpanded ? null : shop.id);
-                                        }
-                                    }}
-                                    className={`bg-[#f9f9f8] border rounded-xl p-4 sm:p-5 cursor-pointer transition-colors ${isExpanded
-                                        ? "border-emerald-500 ring-2 ring-emerald-200"
-                                        : "border-zinc-200 hover:border-emerald-300"
-                                        }`}
-                                >
-                                    <div className="flex justify-between items-start gap-3 mb-3">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                <h3 className="font-bold text-[#191c1c] truncate">
-                                                    {shop.name}
-                                                </h3>
-                                                {isVerified(shop) && (
-                                                    <VerifiedPartnerIcon size="sm" />
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-[#72796e] flex items-start gap-1 mt-1">
-                                                <MapPin size={14} className="shrink-0 mt-0.5" />
-                                                <span>{shop.address}</span>
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            {onToggleFavorite && (
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onToggleFavorite(shop.id);
-                                                    }}
-                                                    className={`p-1.5 rounded-full ${isFavoriteShopId(shop.id, favoriteIds)
-                                                        ? "text-red-600"
-                                                        : "text-zinc-400 hover:text-red-500"
-                                                        }`}
-                                                    aria-label="Toggle favorite"
-                                                >
-                                                    <Heart
-                                                        size={16}
-                                                        fill={
-                                                            isFavoriteShopId(shop.id, favoriteIds)
-                                                                ? "currentColor"
-                                                                : "none"
-                                                        }
-                                                    />
-                                                </button>
-                                            )}
-                                            <span
-                                                className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${shopStatusBadgeClass(shop.status)}`}
-                                            >
-                                                {shop.status}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-wrap items-center gap-3 text-sm mb-3">
-                                        <span className="font-semibold text-emerald-700">
-                                            {shop.distance}
-                                        </span>
-                                        <span className="text-[#72796e]">•</span>
-                                        <span className="text-[#72796e]">{shop.hours}</span>
-                                        <span className="text-[#72796e]">•</span>
-                                        <ShopRating shop={shop} />
-                                    </div>
-
-                                    <div className="flex flex-wrap gap-1.5 mb-4">
-                                        {shop.materials.length > 0 ? (
-                                            shop.materials.map((material) => (
-                                                <span
-                                                    key={material}
-                                                    className="bg-[#c9e7cc] text-[#4e6953] px-2 py-0.5 rounded-md text-[10px] font-medium"
-                                                >
-                                                    {material}
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <span className="text-[10px] text-[#72796e] italic">
-                                                Materials not listed yet
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {isExpanded && (
-                                        <ShopCardPreviewDetails shop={shop} />
-                                    )}
-
-                                    <div className="flex flex-wrap gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onViewProfile?.(shop);
-                                            }}
-                                            className="flex-1 inline-flex items-center justify-center gap-2 py-2 bg-[#154212] text-white rounded-lg text-sm font-bold hover:bg-emerald-900 transition-colors"
-                                        >
-                                            View Shop Profile
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setExpandedId(shop.id);
-                                                setPendingRouteId(shop.id);
-                                            }}
-                                            className="inline-flex items-center justify-center gap-1.5 py-2 px-3 border border-zinc-300 text-[#42493e] rounded-lg text-sm font-bold hover:bg-zinc-50 transition-colors"
-                                        >
-                                            <Map size={15} />
-                                            Route
-                                        </button>
-                                    </div>
-                                </article>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {!loading && (
-                <div className="order-2 lg:order-1">
-                    <JunkshopsMap
-                        shops={shops}
-                        selectedId={expandedId}
-                        onSelectShop={setExpandedId}
-                        routingEnabled
-                        autoRouteShopId={effectiveRouteId}
-                        onRouteDrawn={() => {
-                            setPendingRouteId(null);
-                            onRouteDrawn?.();
-                        }}
-                        className="fluid-map-min-height w-full"
-                    />
-                </div>
-            )}
-            {loading && (
-                <div className="order-2 lg:order-1 rounded-xl border border-emerald-200 bg-zinc-50 fluid-map-min-height flex items-center justify-center text-sm text-[#72796e]">
+            {/* Map — always shows all approved shops */}
+            {!loading ? (
+                <JunkshopsMap
+                    shops={shops}
+                    selectedId={selectedMapId}
+                    onSelectShop={setSelectedMapId}
+                    routingEnabled
+                    autoRouteShopId={effectiveRouteId}
+                    onRouteDrawn={() => {
+                        setPendingRouteId(null);
+                        onRouteDrawn?.();
+                    }}
+                    className="fluid-map-min-height w-full"
+                />
+            ) : (
+                <div className="rounded-xl border border-emerald-200 bg-zinc-50 fluid-map-min-height flex items-center justify-center text-sm text-[#72796e]">
                     Loading map…
                 </div>
             )}
+
+            {/* Available Junkshops section */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <h3 className="font-bold text-[#191c1c]">Available Junkshops</h3>
+                        <p className="text-xs text-[#72796e] mt-0.5">
+                            {loading
+                                ? "Loading shops…"
+                                : `${filteredShops.length} shop${filteredShops.length !== 1 ? "s" : ""}${hasActiveFilters ? " matching filters" : ""}`}
+                        </p>
+                    </div>
+                    <SlidersHorizontal size={16} className="text-[#72796e] shrink-0" />
+                </div>
+
+                {/* Filters row */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex-1 flex items-center bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-3 py-2.5 gap-2 min-w-0">
+                        <Search size={16} className="text-[#72796e] shrink-0" />
+                        <input
+                            type="search"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search junkshop, material, or address…"
+                            className="w-full bg-transparent outline-none text-sm min-w-0"
+                        />
+                    </div>
+                    <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                        <select
+                            value={locationFilter}
+                            onChange={(e) => setLocationFilter(e.target.value)}
+                            className={filterSelectClass}
+                            aria-label="Area filter"
+                        >
+                            {LOCATION_FILTERS.map((opt) => (
+                                <option key={opt.id} value={opt.id}>{opt.label}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={materialFilter}
+                            onChange={(e) => setMaterialFilter(e.target.value)}
+                            className={filterSelectClass}
+                            aria-label="Material filter"
+                        >
+                            {MATERIAL_FILTERS.map((opt) => (
+                                <option key={opt.id} value={opt.id}>{opt.label}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className={filterSelectClass}
+                            aria-label="Sort order"
+                        >
+                            {SORT_OPTIONS.map((opt) => (
+                                <option key={opt.id} value={opt.id}>{opt.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* Grid */}
+                {filteredShops.length === 0 ? (
+                    <EmptyState
+                        compact
+                        title={shops.length === 0 ? "No partner shops yet" : "No shops match your filters"}
+                        description={
+                            shops.length === 0
+                                ? "Approved junkshops appear here after admin review."
+                                : "Try adjusting your search or clearing the filters."
+                        }
+                    />
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredShops.map((shop) => (
+                            <article
+                                key={shop.id}
+                                className={`bg-[#f9f9f8] border rounded-xl p-4 flex flex-col gap-3 transition-colors ${
+                                    selectedMapId === shop.id
+                                        ? "border-emerald-500 ring-2 ring-emerald-200"
+                                        : "border-zinc-200 hover:border-emerald-300"
+                                }`}
+                            >
+                                {/* Header */}
+                                <div className="flex justify-between items-start gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <h3 className="font-bold text-[#191c1c] text-sm truncate leading-snug">
+                                                {shop.name}
+                                            </h3>
+                                            {isVerified(shop) && (
+                                                <VerifiedPartnerIcon size="sm" />
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-[#72796e] flex items-start gap-1 mt-1 leading-snug">
+                                            <MapPin size={12} className="shrink-0 mt-0.5" />
+                                            <span className="line-clamp-2">{shop.address}</span>
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        {onToggleFavorite && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onToggleFavorite(shop.id)}
+                                                className={`p-1.5 rounded-full ${
+                                                    isFavoriteShopId(shop.id, favoriteIds)
+                                                        ? "text-red-600"
+                                                        : "text-zinc-400 hover:text-red-500"
+                                                }`}
+                                                aria-label="Toggle favorite"
+                                            >
+                                                <Heart
+                                                    size={14}
+                                                    fill={isFavoriteShopId(shop.id, favoriteIds) ? "currentColor" : "none"}
+                                                />
+                                            </button>
+                                        )}
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase shrink-0 ${shopStatusBadgeClass(shop.status)}`}>
+                                            {shop.status}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Meta row */}
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                                    {shop.distance && (
+                                        <span className="font-semibold text-emerald-700">{shop.distance}</span>
+                                    )}
+                                    {shop.distance && <span className="text-zinc-300">•</span>}
+                                    <span className="text-[#72796e]">{shop.hours}</span>
+                                    <span className="text-zinc-300">•</span>
+                                    <ShopRating shop={shop} />
+                                </div>
+
+                                {/* Material chips */}
+                                <div className="flex flex-wrap gap-1.5">
+                                    {shop.materials.length > 0 ? (
+                                        shop.materials.slice(0, 4).map((material) => (
+                                            <span
+                                                key={material}
+                                                className="bg-[#c9e7cc] text-[#4e6953] px-2 py-0.5 rounded-md text-[10px] font-medium"
+                                            >
+                                                {material}
+                                            </span>
+                                        ))
+                                    ) : (
+                                        <span className="text-[10px] text-[#72796e] italic">
+                                            Materials not listed yet
+                                        </span>
+                                    )}
+                                    {shop.materials.length > 4 && (
+                                        <span className="text-[10px] text-[#72796e]">
+                                            +{shop.materials.length - 4} more
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Actions — pushed to bottom */}
+                                <div className="mt-auto flex gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => onViewProfile?.(shop)}
+                                        className="flex-1 inline-flex items-center justify-center py-2 bg-[#154212] text-white rounded-lg text-xs font-bold hover:bg-emerald-900 transition-colors"
+                                    >
+                                        View Shop Profile
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedMapId(shop.id);
+                                            setPendingRouteId(shop.id);
+                                            window.scrollTo({ top: 0, behavior: "smooth" });
+                                        }}
+                                        className="inline-flex items-center justify-center gap-1 py-2 px-3 border border-zinc-300 text-[#42493e] rounded-lg text-xs font-bold hover:bg-zinc-50 transition-colors"
+                                    >
+                                        <Map size={13} />
+                                        Route
+                                    </button>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -409,24 +459,17 @@ export function MaterialPricesPanel() {
 
     const filteredPrices = useMemo(() => {
         if (activeCategory === "all") return materials;
-        return materials.filter((item) => item.category === activeCategory);
+        return materials.filter(
+            (item) => normalizeMaterialCategory(item.category, item.material) === activeCategory
+        );
     }, [materials, activeCategory]);
 
     const highlightRows = useMemo(() => {
-        const keywords = {
-            aluminum: "aluminum",
-            copper: "copper",
-            plastic: "plastic",
-            cardboard: "cardboard",
-            paper: "paper",
-            glass: "glass",
-            steel: "scrap metal|steel|iron",
-        };
-
-        return HIGHLIGHT_CATEGORIES.map((key) => {
-            const pattern = new RegExp(keywords[key], "i");
-            const match = materials.find((p) => pattern.test(p.material));
-            return { key, label: key.charAt(0).toUpperCase() + key.slice(1), item: match };
+        return HIGHLIGHT_CATEGORIES.map((category) => {
+            const match = materials.find(
+                (item) => normalizeMaterialCategory(item.category, item.material) === category.id
+            );
+            return { ...category, item: match };
         });
     }, [materials]);
 
@@ -450,9 +493,9 @@ export function MaterialPricesPanel() {
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {highlightRows.map(({ key, label, item }) => (
+                {highlightRows.map(({ id, label, item }) => (
                     <div
-                        key={key}
+                        key={id}
                         className="min-w-0 bg-emerald-50 border border-emerald-100 rounded-xl p-3 sm:p-4"
                     >
                         <p className="text-[10px] uppercase tracking-wider font-bold text-[#72796e]">
@@ -461,7 +504,9 @@ export function MaterialPricesPanel() {
                         <p className="text-sm font-bold text-emerald-900 mt-1">
                             {item ? item.perKgPrice : "—"}
                         </p>
-                        <p className="text-[10px] text-[#72796e] mt-1">per kg (est.)</p>
+                        <p className="text-[10px] text-[#72796e] mt-1">
+                            per {materialUnitLabel(item)} (est.)
+                        </p>
                     </div>
                 ))}
             </div>
@@ -490,6 +535,7 @@ export function MaterialPricesPanel() {
                             : ["up", "down", "stable"][
                             (item.id?.length || 0) % 3
                             ];
+                    const unitLabel = materialUnitLabel(item);
                     const mid = parsePriceMid(item.perKgPrice);
                     const updatedLabel = formatUpdatedDate(item.updatedAt);
 
@@ -501,7 +547,7 @@ export function MaterialPricesPanel() {
                             <div className="flex justify-between items-start gap-2 mb-2">
                                 <div>
                                     <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">
-                                        {item.category}
+                                        {formatMaterialCategoryLabel(item.category)}
                                     </span>
                                     <h3 className="font-bold text-[#191c1c] mt-0.5">
                                         {item.material}
@@ -513,12 +559,12 @@ export function MaterialPricesPanel() {
                             <p className="text-2xl font-bold text-emerald-900">
                                 {item.perKgPrice}
                                 <span className="text-sm font-semibold text-[#72796e] ml-1">
-                                    / kg
+                                    / {unitLabel === "piece" ? "pc" : "kg"}
                                 </span>
                             </p>
 
                             <p className="text-xs text-[#72796e] mt-2">
-                                Est. midpoint: ₱{mid}/kg • Updated {updatedLabel}
+                                Est. midpoint: ₱{mid}/{unitLabel === "piece" ? "pc" : "kg"} • Updated {updatedLabel}
                             </p>
 
                             <p className="text-sm text-[#42493e] mt-3">{item.examples}</p>
@@ -674,7 +720,7 @@ export function RecyclingGuidePanel() {
 const LOG_MATERIALS = [
     { label: "PET Bottles (Clear)", rate: 17.5 },
     { label: "Aluminum Cans", rate: 52.5 },
-    { label: "Cardboard", rate: 10 },
+    { label: "Used Tires", rate: 12 },
     { label: "Mixed Paper", rate: 6.5 },
     { label: "Scrap Metal (Iron)", rate: 42.5 },
     { label: "Glass Bottles", rate: 10 },
@@ -830,7 +876,7 @@ export function LogTripPanel({ shops = [], onSubmit }) {
 
 export const OVERVIEW_PANELS = {
     junkshops: {
-        title: "Find Nearby Junkshops",
+        title: "",
         Component: JunkshopsPanel,
     },
     prices: {

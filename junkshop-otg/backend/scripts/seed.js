@@ -6,6 +6,7 @@ const connectDB = require('../config/db');
 const User = require('../models/User');
 const Junkshop = require('../models/Junkshop');
 const Material = require('../models/Material');
+const { normalizeMaterialCategory } = require('../utils/materialCategories');
 const {
   junkshopSeed,
   materialSeed,
@@ -54,21 +55,22 @@ const seed = async () => {
 
   let materialCount = 0;
   for (const item of materialSeed) {
-    const mid = parsePriceMid(item.perKgPrice);
+    const priceLabel = item.priceLabel || item.perKgPrice;
+    const mid = parsePriceMid(priceLabel);
     await Material.findOneAndUpdate(
       { slug: item.slug },
       {
         provider: catalogProvider._id,
         name: item.name,
-        category: item.category,
+        category: normalizeMaterialCategory(item.category, item.name),
         price: mid,
         previousPrice: mid,
-        priceLabel: item.perKgPrice,
+        priceLabel,
         examples: item.examples,
         notes: item.notes,
         slug: item.slug,
         isCatalog: true,
-        unit: 'kg',
+        unit: item.unit || 'kg',
         available: true,
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }

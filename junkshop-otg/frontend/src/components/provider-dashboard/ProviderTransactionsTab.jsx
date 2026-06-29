@@ -57,7 +57,7 @@ export default function ProviderTransactionsTab({ onNotify }) {
 
     const totalEarnings = useMemo(() => {
         return filtered.reduce((sum, row) => {
-            const num = Number(String(row.amount).replace(/[₱,]/g, ""));
+            const num = Number(row.amountValue);
             return sum + (Number.isFinite(num) ? num : 0);
         }, 0);
     }, [filtered]);
@@ -166,7 +166,7 @@ export default function ProviderTransactionsTab({ onNotify }) {
                         inputClassName="w-full border border-zinc-200 rounded-xl px-4 py-2.5 pr-11 text-sm outline-none focus:ring-2 focus:ring-[#154212]/20"
                     />
                     <NumberInput
-                        min={0}
+                        min={0.01}
                         step={0.01}
                         required
                         placeholder="Price per kg (₱)"

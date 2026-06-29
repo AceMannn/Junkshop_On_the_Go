@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Truck, CheckCircle, Clock3, DollarSign, Layers, AlertCircle } from "lucide-react";
+import { Truck, CheckCircle, Clock3, Layers, AlertCircle } from "lucide-react";
 import { pickupApi, domainApi } from "../../services/api";
 import { useProviderMaterials } from "../../hooks/useProviderData";
 import { STATUS_STYLES, STATUS_LABELS } from "../../utils/pickupHelpers";
-import { normalizeTransaction } from "../../utils/catalogMappers";
+import { formatMaterialCategoryLabel, normalizeTransaction } from "../../utils/catalogMappers";
 import StatCard from "../ui/StatCard";
 
 function getTimeGreeting() {
@@ -19,8 +19,21 @@ const CATEGORY_CHIP_COLORS = {
     paper:     "bg-emerald-100 text-emerald-700",
     glass:     "bg-teal-100 text-teal-700",
     "e-waste": "bg-purple-100 text-purple-700",
+    tires:     "bg-zinc-200 text-zinc-800",
     other:     "bg-zinc-100 text-zinc-600",
 };
+
+function PesoIcon({ size = 18 }) {
+    return (
+        <span
+            className="font-bold leading-none select-none"
+            style={{ fontSize: Math.round(size * 0.95) }}
+            aria-hidden
+        >
+            ₱
+        </span>
+    );
+}
 
 export default function ProviderOverviewTab({ user, onNavigate }) {
     const { materials } = useProviderMaterials();
@@ -162,7 +175,7 @@ export default function ProviderOverviewTab({ user, onNavigate }) {
                     label="Avg Price"
                     value={stats.avgPrice === "—" ? "—" : `₱${stats.avgPrice}`}
                     unit={stats.avgPrice === "—" ? "" : "/kg"}
-                    icon={DollarSign}
+                    icon={PesoIcon}
                     accentColor="teal"
                     helper="Across your material list"
                     helperMode="inline"
@@ -229,7 +242,7 @@ export default function ProviderOverviewTab({ user, onNavigate }) {
                                     >
                                         <div className="flex items-center gap-2 min-w-0">
                                             <span className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${chipClass}`}>
-                                                {item.category || "Other"}
+                                                {formatMaterialCategoryLabel(item.category)}
                                             </span>
                                             <span className="text-sm text-[#191c1c] truncate">{item.name}</span>
                                         </div>

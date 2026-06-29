@@ -18,7 +18,7 @@ import {
     formatPickupSchedule,
     formatPeso,
     getShopName,
-    materialsSummary,
+    materialNamesSummary,
     pickupEstimatedPayout,
     canCustomerCancel,
     isActivePickupStatus,
@@ -269,7 +269,7 @@ export default function CustomerPickupsTab({
                                     </span>
                                 </div>
                                 <p className="text-sm text-[#42493e] mt-2 line-clamp-1">
-                                    {materialsSummary(req.materials)} · {req.estimatedWeightKg} kg
+                                    {materialNamesSummary(req.materials)} · {req.estimatedWeightKg} kg
                                 </p>
                                 {estimate > 0 && (
                                     <p className="mt-1 text-xs font-bold text-[#154212]">
@@ -426,11 +426,14 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate
 
                     <div className="space-y-1 text-sm">
                         <p className="text-[#72796e]">{formatPickupSchedule(live)}</p>
-                        <p>{materialsSummary(live.materials)} · {live.estimatedWeightKg} kg</p>
+                        <p>{materialNamesSummary(live.materials)} · {live.estimatedWeightKg} kg</p>
                         <p className="flex items-start gap-1 text-[#42493e]">
                             <MapPin size={14} className="shrink-0 mt-0.5" />
                             {live.address}
                         </p>
+                        {live.landmark && (
+                            <p className="text-xs text-[#72796e] pl-5">Landmark: {live.landmark}</p>
+                        )}
                     </div>
 
                     {estimatedTotal > 0 && (

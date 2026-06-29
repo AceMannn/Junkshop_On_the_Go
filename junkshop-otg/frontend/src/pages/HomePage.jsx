@@ -136,9 +136,9 @@ export default function HomePage({ onSignInToSell }) {
             />
           )}
           <div className={`${siteCardClass} shadow-md overflow-hidden min-w-0`}>
-            <div className="grid lg:grid-cols-2 min-w-0">
-              <div className="min-w-0 p-4 sm:p-6 lg:p-8 bg-white">
-                <div className="space-y-6 sm:space-y-8">
+            <div className="grid min-w-0 lg:h-[22rem] lg:grid-cols-2">
+              <div className="min-w-0 self-start p-4 sm:p-6 lg:p-8 bg-white">
+                <div>
                   {shopsLoading ? (
                     <p className="text-gray-500">Loading shops...</p>
                   ) : previewShops.length === 0 ? (
@@ -150,42 +150,40 @@ export default function HomePage({ onSignInToSell }) {
                     />
                   ) : (
                     previewShops.map((shop, index) => (
-                      <article key={shop.id} className="flex min-w-0 gap-3 sm:gap-4 items-start">
-                        <div className="flex flex-col items-center shrink-0">
-                          <div className="w-10 h-10 rounded-xl bg-[#154212] flex items-center justify-center shadow-sm">
+                      <article
+                        key={shop.id}
+                        className="flex min-w-0 items-stretch gap-3 pb-6 last:pb-0 sm:gap-4 sm:pb-8"
+                      >
+                        <div className="relative flex w-10 shrink-0 justify-center">
+                          {index !== previewShops.length - 1 && (
+                            <div className="absolute left-1/2 top-10 h-[calc(100%+2rem)] w-[2px] -translate-x-1/2 rounded-full bg-gray-200" />
+                          )}
+                          <div className="relative z-10 w-10 h-10 rounded-xl bg-[#154212] flex items-center justify-center shadow-sm">
                             <MapPin className="text-white" size={18} />
                           </div>
-                          {index !== previewShops.length - 1 && <div className="w-[2px] h-12 sm:h-16 bg-gray-200 mt-2 rounded-full" />}
                         </div>
                         <div className="min-w-0 flex-1 pt-1">
                           <h4 className="mb-2 text-charcoal break-words">{shop.name}</h4>
-                          <p className="text-gray-600 text-sm sm:text-base mb-2 break-words">
-                            {shop.address}, <span className="text-gray-700">{shop.distance}</span>
-                          </p>
                           <div className="flex flex-wrap items-center gap-2 text-sm">
                             <ShopRating shop={shop} />
                             <span className={(shop.status === 'Open' || shop.status === 'Open now') ? 'text-eco-green' : shop.status === 'Suspended' ? 'text-amber-700' : 'text-gray-500'}>{shop.status}</span>
-                            <span className="text-gray-600">{shop.topPrice}</span>
                             {shop.isPartner && (
                               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Partner</span>
                             )}
                           </div>
-                          {shop.latestReview && (
-                            <ReviewSnippet review={shop.latestReview} className="mt-2" />
-                          )}
                         </div>
                       </article>
                     ))
                   )}
                 </div>
               </div>
-              <div className="relative fluid-map-min-height min-h-0 overflow-hidden bg-[#154212]">
+              <div className="relative h-[22rem] min-h-0 overflow-hidden bg-[#154212] lg:h-full">
                 {shopsLoading ? (
-                  <div className="flex fluid-map-min-height h-full items-center justify-center p-4 sm:p-8">
+                  <div className="flex h-full items-center justify-center p-4 sm:p-8">
                     <p className="text-sm text-white/80 animate-pulse">Loading map…</p>
                   </div>
                 ) : previewShops.length === 0 ? (
-                  <div className="flex fluid-map-min-height h-full items-center justify-center p-4 sm:p-8">
+                  <div className="flex h-full items-center justify-center p-4 sm:p-8">
                     <EmptyState
                       compact
                       inverted
@@ -202,7 +200,12 @@ export default function HomePage({ onSignInToSell }) {
             </div>
           </div>
           <div className="mt-10 text-center">
-            <SiteButton variant="outline" onClick={() => setActiveModal('map')}>
+            <SiteButton
+              variant="outline"
+              className="!min-h-0 !py-0 !text-sm"
+              style={{ height: '34px', paddingInline: '18px', borderRadius: '12px' }}
+              onClick={() => setActiveModal('map')}
+            >
               Open full map
             </SiteButton>
           </div>
@@ -238,7 +241,12 @@ export default function HomePage({ onSignInToSell }) {
             ))}
           </div>
           <div className="mt-10 text-center">
-            <SiteButton variant="dark" onClick={() => setActiveModal('guide')}>
+            <SiteButton
+              variant="dark"
+              className="!min-h-0 !py-0 !text-sm"
+              style={{ height: '34px', paddingInline: '18px', borderRadius: '12px' }}
+              onClick={() => setActiveModal('guide')}
+            >
               View full guide
             </SiteButton>
           </div>

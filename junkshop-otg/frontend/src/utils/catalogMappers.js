@@ -50,11 +50,55 @@ export function normalizeJunkshop(shop) {
   return normalized;
 }
 
+export function normalizeMaterialCategory(category, material = '') {
+  const raw = String(category || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
+  const materialName = String(material || '').trim().toLowerCase();
+
+  if (raw === 'ewaste' || raw === 'e-waste' || raw === 'electronic-waste') {
+    return 'e-waste';
+  }
+
+  if (
+    raw === 'aluminum' ||
+    raw === 'aluminium' ||
+    raw === 'copper' ||
+    raw === 'steel' ||
+    raw === 'iron' ||
+    raw === 'scrap-metal'
+  ) {
+    return 'metal';
+  }
+
+  if (
+    raw === 'tires' ||
+    raw === 'tire' ||
+    raw === 'tyres' ||
+    raw === 'tyre' ||
+    raw === 'rubber-tires' ||
+    raw === 'cardboard' ||
+    materialName.includes('tire') ||
+    materialName.includes('tyre') ||
+    materialName.includes('cardboard')
+  ) {
+    return 'tires';
+  }
+
+  return raw || 'other';
+}
+
+export function formatMaterialCategoryLabel(category) {
+  const normalized = normalizeMaterialCategory(category);
+  if (normalized === 'e-waste') return 'E-waste';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
 export function normalizeMaterial(item) {
+  const category = normalizeMaterialCategory(item.category, item.name);
+
   return {
     id: item.slug || item._id,
     _id: item._id,
-    category: item.category,
+    category,
     material: item.name,
     perKgPrice: item.priceLabel || (item.price != null ? `₱${item.price}` : '—'),
     examples: item.examples || '',
@@ -101,11 +145,13 @@ export function shopStatusBadgeClass(status) {
 }
 
 export function normalizeProviderMaterial(item) {
+  const category = normalizeMaterialCategory(item.category, item.name);
+
   return {
     id: item._id,
     _id: item._id,
     name: item.name,
-    category: item.category,
+    category,
     price: item.price,
     previousPrice: item.previousPrice,
     unit: item.unit || 'kg',
@@ -137,6 +183,8 @@ export function normalizeProviderJunkshop(shop) {
 export function normalizeTransaction(row) {
   const provider = row.provider;
   const customer = row.customer;
+  const amountValue = Number(row.totalAmount) || 0;
+  const amount = `₱${amountValue.toFixed(2)}`;
 
   if (provider?.accountStatus === 'suspended') {
     return {
@@ -150,7 +198,9 @@ export function normalizeTransaction(row) {
       weightKg: Number(row.weight) || 0,
       weightUnit: row.unit || 'kg',
       weight: `${row.weight} ${row.unit || 'kg'}`,
-      amount: `₱${Number(row.totalAmount).toFixed(2)}`,
+      amount,
+      amountValue,
+      isPaidTransaction: amountValue > 0,
       shop: 'Suspended Junkshop Owner',
       status:
         row.status === 'completed'
@@ -174,7 +224,9 @@ export function normalizeTransaction(row) {
       weightKg: Number(row.weight) || 0,
       weightUnit: row.unit || 'kg',
       weight: `${row.weight} ${row.unit || 'kg'}`,
-      amount: `₱${Number(row.totalAmount).toFixed(2)}`,
+      amount,
+      amountValue,
+      isPaidTransaction: amountValue > 0,
       shop: 'Suspended Customer',
       status:
         row.status === 'completed'
@@ -202,7 +254,9 @@ export function normalizeTransaction(row) {
     weightKg: Number(row.weight) || 0,
     weightUnit: row.unit || 'kg',
     weight: `${row.weight} ${row.unit || 'kg'}`,
-    amount: `₱${Number(row.totalAmount).toFixed(2)}`,
+    amount,
+    amountValue,
+    isPaidTransaction: amountValue > 0,
     shop: shopLabel,
     status:
       row.status === 'completed'

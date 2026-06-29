@@ -1,67 +1,56 @@
-import { Facebook, Mail, Instagram, MapPin } from 'lucide-react';
+import { Clock, Mail, MapPin, Phone } from 'lucide-react';
 import logoImage from '../assets/junkshop-logo.png';
 import { siteContainerClass, siteFooterShellClass } from './ui/siteUi';
 
 export default function Footer({ onNavigate }) {
-  const handleSocialClick = (platform) => {
-    switch (platform) {
-      case 'facebook':
-        window.open('https://www.facebook.com/junkshop.otg', '_blank', 'noopener,noreferrer');
-        break;
-      case 'instagram':
-        window.open('https://www.instagram.com/junkshop.otg', '_blank', 'noopener,noreferrer');
-        break;
-      case 'email':
-        window.location.href = 'mailto:hello@junkshop-otg.ph';
-        break;
-      default:
-        break;
-    }
-  };
-
   const linkClass =
     'text-zinc-400 hover:text-emerald-400 transition-colors text-sm text-left';
+  const contactIconClass = 'shrink-0 mt-0.5 text-emerald-500';
 
   return (
     <footer className={`${siteFooterShellClass} py-14 sm:py-16`}>
       <div className={siteContainerClass}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 lg:gap-8">
-          <div className="lg:col-span-5">
-            <img src={logoImage} alt="JunkShop On-The-Go" className="h-12 w-auto mb-4 brightness-0 invert" />
-            <p className="text-zinc-400 text-sm leading-relaxed max-w-md mb-6">
-              Community-driven recycling for Teresa, Sta. Mesa, Manila. Empowering residents to
-              recycle smarter, earn more, and keep our neighborhood clean.
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-10 lg:gap-8">
+          <div className="lg:col-span-4">
+            <img src={logoImage} alt="JunkShop On-The-Go" className="h-16 w-auto mb-4" />
+            <p className="max-w-sm text-sm leading-relaxed text-zinc-400">
+              JunkShop On-The-Go connects customers with verified junkshops for pickups,
+              drop-offs, price checking, and recycling guidance.
             </p>
-            <div className="flex gap-3">
-              {[
-                { id: 'facebook', icon: Facebook, label: 'Facebook' },
-                { id: 'email', icon: Mail, label: 'Email' },
-                { id: 'instagram', icon: Instagram, label: 'Instagram' },
-              ].map(({ id, icon: Icon, label }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => handleSocialClick(id)}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-800 text-zinc-300 hover:bg-[#154212] hover:text-white transition-colors"
-                  aria-label={label}
-                >
-                  <Icon size={18} />
-                </button>
-              ))}
-            </div>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2">
             <h4 className="text-sm font-bold uppercase tracking-wider text-zinc-300 mb-4">
-              Quick Links
+              Platform
             </h4>
             <ul className="space-y-2.5">
               {[
                 { id: 'home', label: 'Home' },
                 { id: 'about', label: 'About' },
-                { id: 'contact', label: 'Contact' },
+                { id: 'find-shop', label: 'Find a Shop' },
+                { id: 'prices', label: 'Prices' },
+                { id: 'guide', label: 'Guide' },
               ].map((section) => (
                 <li key={section.id}>
+                  <button type="button" onClick={() => onNavigate(section.id)} className={linkClass}>
+                    {section.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="lg:col-span-2">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-zinc-300 mb-4">
+              Support
+            </h4>
+            <ul className="space-y-2.5">
+              {[
+                { id: 'contact', label: 'Contact Support' },
+                { id: 'contact', label: 'Report a Problem' },
+                { id: 'contact', label: 'Help Center' },
+              ].map((section, index) => (
+                <li key={`${section.label}-${index}`}>
                   <button type="button" onClick={() => onNavigate(section.id)} className={linkClass}>
                     {section.label}
                   </button>
@@ -76,22 +65,29 @@ export default function Footer({ onNavigate }) {
             </h4>
             <ul className="space-y-3 text-sm text-zinc-400">
               <li className="flex items-start gap-2">
-                <MapPin size={16} className="shrink-0 mt-0.5 text-emerald-500" />
-                <span>Teresa, Sta. Mesa, Manila, Philippines</span>
-              </li>
-              <li>
+                <Mail size={16} className={contactIconClass} />
                 <a href="mailto:hello@junkshop-otg.ph" className={linkClass}>
                   hello@junkshop-otg.ph
                 </a>
+              </li>
+              <li className="flex items-start gap-2">
+                <Phone size={16} className={contactIconClass} />
+                <a href="tel:09123456789" className={linkClass}>
+                  0912 345 6789
+                </a>
+              </li>
+              <li className="flex items-start gap-2">
+                <MapPin size={16} className={contactIconClass} />
+                <span>Teresa, Sta. Mesa, Manila, Philippines</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Clock size={16} className={contactIconClass} />
+                <span>Mon-Sat, 8:00 AM - 6:00 PM</span>
               </li>
             </ul>
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-zinc-500">
-          <p>© {new Date().getFullYear()} JunkShop On-The-Go. All rights reserved.</p>
-          <p className="text-emerald-600/80 font-medium">Recycle smarter. Earn more.</p>
-        </div>
       </div>
     </footer>
   );

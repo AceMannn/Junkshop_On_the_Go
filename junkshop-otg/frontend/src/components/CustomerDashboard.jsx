@@ -54,16 +54,37 @@ import {
 } from "../utils/dashboardRoutes";
 import { getCustomerNotificationTarget } from "../utils/notificationNavigation";
 
+function SidebarPesoIcon({ size = 20 }) {
+    return (
+        <span
+            className="inline-flex shrink-0 items-center justify-center font-semibold leading-none select-none"
+            style={{
+                width: size,
+                height: size,
+                fontSize: Math.round(size * 0.8),
+            }}
+            aria-hidden
+        >
+            ₱
+        </span>
+    );
+}
+
 const navTabs = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "pickups", label: "Pickups", icon: Truck },
-    { id: "history", label: "History", icon: History },
     { id: "favorites", label: "Favorites", icon: Heart },
+    { id: "history", label: "History", icon: History },
 ];
 
-const sidebarToolItems = [
-    { id: "prices", label: "Material Prices", icon: DollarSign },
-    { id: "guide", label: "Recycling Guide", icon: BookOpen },
+const sidebarNavItems = [
+    { kind: "panel", id: "junkshops", label: "Find a Shop", icon: MapPin, primary: true },
+    { kind: "tab", id: "overview", label: "Overview", icon: LayoutDashboard },
+    { kind: "tab", id: "pickups", label: "Pickups", icon: Truck },
+    { kind: "panel", id: "prices", label: "Prices", icon: SidebarPesoIcon },
+    { kind: "panel", id: "guide", label: "Guide", icon: BookOpen },
+    { kind: "tab", id: "favorites", label: "Favorites", icon: Heart },
+    { kind: "tab", id: "history", label: "History", icon: History },
 ];
 
 const primarySidebarButtonClass =
@@ -427,7 +448,24 @@ export default function CustomerDashboard({
                             onToggleFavorite={handleToggleFavorite}
                             onBack={closeShopProfile}
                             backLabel={shopProfileBackLabel}
-                            onBookPickup={() => openPickupsTab(true)}
+                            onBookPickup={(shop, item) => {
+                                if (!user?.profileComplete) {
+                                    showNotification("Add your mobile number in Profile Settings before booking a pickup.");
+                                    navigate(buildCustomerPath({ accountView: "profile" }));
+                                    return;
+                                }
+                                handleTabChange("pickups");
+                                onBookMaterial?.({
+                                    junkshopId: shop._id || shop.id,
+                                    ...(item ? {
+                                        name: item.name,
+                                        category: item.category,
+                                        unit: item.unit,
+                                        price: item.price,
+                                        catalogId: `shop-${item.name}`,
+                                    } : {}),
+                                });
+                            }}
                         />
                     )}
 
@@ -570,57 +608,46 @@ function Sidebar({ activeTab, setActiveTab, overviewPanel, onOpenPanel, pinned, 
         <aside
             className={`group fixed left-0 top-16 h-[calc(100vh-4rem)] ${sidebarWidthClass} overflow-hidden border-r border-zinc-200 bg-zinc-50 hidden md:flex flex-col z-30 transition-[width] duration-300 ease-out`}
         >
-            <div className="p-3 pb-2">
-                <button
-                    type="button"
-                    onClick={() => onOpenPanel("junkshops")}
-                    className={`${primarySidebarButtonClass} ${itemLayoutClass} ${primaryPaddingClass} ${gapClass} min-h-10 whitespace-nowrap overflow-hidden transition-[padding,gap] duration-300`}
-                    title="Find a Shop"
-                >
-                    <MapPin size={20} className="shrink-0" />
-                    <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
-                        Find a Shop
-                    </span>
-                </button>
-            </div>
-
-            <nav className="overflow-hidden flex flex-col gap-0.5 px-3 flex-1">
-                {navTabs.map((tab) => {
-                    const Icon = tab.icon;
-                    const isActive = activeTab === tab.id && !overviewPanel;
-
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            title={tab.label}
-                            className={`flex min-h-11 items-center ${itemLayoutClass} ${gapClass} ${itemPaddingClass} py-2.5 text-sm font-medium transition-[padding,gap,colors] duration-300 text-left rounded-lg whitespace-nowrap overflow-hidden ${isActive
-                                ? "text-emerald-800 bg-emerald-100/80"
-                                : "text-zinc-600 hover:bg-zinc-100"
-                                }`}
-                        >
-                            <Icon size={20} className="shrink-0" />
-                            <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
-                                {tab.label}
-                            </span>
-                        </button>
-                    );
-                })}
-
-                <div className="my-2 border-t border-zinc-200/80" />
-
-                <p className={`overflow-hidden px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#72796e] transition-all duration-200 ${labelClass}`}>
-                    Resources
-                </p>
-                {sidebarToolItems.map((item) => {
+            <nav className="overflow-hidden flex flex-col gap-0.5 px-3 pt-3 flex-1">
+                {sidebarNavItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = overviewPanel === item.id;
+                    const isActive =
+                        item.kind === "tab"
+                            ? activeTab === item.id && !overviewPanel
+                            : overviewPanel === item.id;
+
+                    const handleClick = () => {
+                        if (item.kind === "tab") {
+                            setActiveTab(item.id);
+                            return;
+                        }
+                        onOpenPanel(item.id);
+                    };
+
+                    if (item.primary) {
+                        return (
+                            <button
+                                key={item.id}
+                                type="button"
+                                onClick={handleClick}
+                                title={item.label}
+                                className={`${primarySidebarButtonClass} ${itemLayoutClass} ${primaryPaddingClass} ${gapClass} mb-2 min-h-10 whitespace-nowrap overflow-hidden transition-[padding,gap] duration-300 ${
+                                    isActive ? "ring-2 ring-emerald-400/80" : ""
+                                }`}
+                            >
+                                <Icon size={20} className="shrink-0" />
+                                <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
+                                    {item.label}
+                                </span>
+                            </button>
+                        );
+                    }
 
                     return (
                         <button
                             key={item.id}
                             type="button"
-                            onClick={() => onOpenPanel(item.id)}
+                            onClick={handleClick}
                             title={item.label}
                             className={`flex min-h-11 items-center ${itemLayoutClass} ${gapClass} ${itemPaddingClass} py-2.5 text-sm font-medium transition-[padding,gap,colors] duration-300 text-left rounded-lg whitespace-nowrap overflow-hidden ${isActive
                                 ? "text-emerald-800 bg-emerald-100/80"
@@ -772,6 +799,18 @@ function CustomerSidePanel({
     return null;
 }
 
+function PesoIcon({ size = 18 }) {
+    return (
+        <span
+            className="font-bold leading-none select-none"
+            style={{ fontSize: Math.round(size * 0.95) }}
+            aria-hidden
+        >
+            ₱
+        </span>
+    );
+}
+
 function OverviewTab({
     user,
     shops,
@@ -794,13 +833,14 @@ function OverviewTab({
             return sum + (match ? Number(match[0]) : 0);
         }, 0);
         const totalEarnings = historyRows.reduce((sum, row) => {
-            const num = Number(String(row.amount).replace(/[₱,]/g, ""));
+            const num = Number(row.amountValue);
             return sum + (Number.isFinite(num) ? num : 0);
         }, 0);
+        const paidTransactions = historyRows.filter((row) => row.isPaidTransaction).length;
         return {
             totalKg: totalKg.toFixed(1),
             totalEarnings: totalEarnings.toFixed(2),
-            transactions: historyRows.length,
+            transactions: paidTransactions,
             trees: Math.max(1, Math.floor(totalKg / 10)),
         };
     }, [historyRows]);
@@ -861,28 +901,28 @@ function OverviewTab({
                         value={overviewStats.totalKg}
                         unit="kg"
                         icon={Recycle}
-                        helper="From your logged trips and transactions"
+                        showHelperIcon={false}
                         accentColor="green"
                     />
                     <StatCard
                         label="Total Earnings"
                         value={`₱${overviewStats.totalEarnings}`}
-                        icon={DollarSign}
-                        helper="Total from your recycling history"
+                        icon={PesoIcon}
+                        showHelperIcon={false}
                         accentColor="amber"
                     />
                     <StatCard
                         label="Transactions"
                         value={String(overviewStats.transactions)}
                         icon={ReceiptText}
-                        helper="Trips recorded in your account"
+                        showHelperIcon={false}
                         accentColor="blue"
                     />
                     <StatCard
                         label="Trees Saved"
                         value={String(overviewStats.trees)}
                         icon={TreePine}
-                        helper="Estimated environmental impact"
+                        showHelperIcon={false}
                         accentColor="teal"
                     />
                 </div>
@@ -1038,7 +1078,7 @@ function HistoryTab({
 
     const totalEarnings = useMemo(() => {
         return filteredRows.reduce((sum, row) => {
-            const num = Number(String(row.amount).replace(/[₱,]/g, ""));
+            const num = Number(row.amountValue);
             return sum + (Number.isFinite(num) ? num : 0);
         }, 0);
     }, [filteredRows]);
@@ -1046,6 +1086,15 @@ function HistoryTab({
     const totalWeightKg = useMemo(() => {
         return filteredRows.reduce((sum, row) => sum + (row.weightKg || 0), 0);
     }, [filteredRows]);
+
+    const paidTransactionCount = useMemo(
+        () => filteredRows.filter((row) => row.isPaidTransaction).length,
+        [filteredRows]
+    );
+    const totalPaidTransactionCount = useMemo(
+        () => historyRows.filter((row) => row.isPaidTransaction).length,
+        [historyRows]
+    );
 
     const handleExport = () => {
         const header = ["Date", "Material", "Weight", "Amount", "Shop", "Status"];
@@ -1095,7 +1144,7 @@ function HistoryTab({
                     Recycling History
                 </h1>
                 <p className="text-[#72796e] mt-2">
-                    Track all your recycling transactions and earnings.
+                    Track your recycling records, paid transactions, and earnings.
                 </p>
             </div>
 
@@ -1109,7 +1158,7 @@ function HistoryTab({
                             onChange={(e) => setSearch(e.target.value)}
                             className="outline-none text-sm w-full bg-transparent"
                             placeholder="Search materials or shops..."
-                            aria-label="Search transaction history"
+                            aria-label="Search recycling history"
                         />
                     </div>
 
@@ -1191,11 +1240,11 @@ function HistoryTab({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <StatCard
                     layout="horizontal"
-                    label="Trips"
-                    value={filteredRows.length}
+                    label="Transactions"
+                    value={paidTransactionCount}
                     suffix={
                         <span className="text-xs font-medium text-[#72796e] ml-1">
-                            / {historyRows.length}
+                            / {totalPaidTransactionCount}
                         </span>
                     }
                     icon={ReceiptText}
@@ -1226,7 +1275,7 @@ function HistoryTab({
                 <EmptyState
                     compact
                     icon={ReceiptText}
-                    title="No transactions yet"
+                    title="No recycling records yet"
                     description="Log a trip from the + menu, or adjust your search and date filters."
                     action={
                         onRefresh ? (

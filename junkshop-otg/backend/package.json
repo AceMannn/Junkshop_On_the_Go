@@ -11,7 +11,8 @@
     "ratings:backfill": "node scripts/backfillRatings.js",
     "dedupe:phones": "node scripts/dedupePhones.js",
     "migrate:internal-emails": "node scripts/migrateInternalEmails.js",
-    "migrate:cloudinary-images": "node scripts/migrateCloudinaryImages.js"
+    "migrate:cloudinary-images": "node scripts/migrateCloudinaryImages.js",
+    "normalize:material-categories": "node scripts/normalizeMaterialCategories.js"
   },
   "keywords": [],
   "author": "",

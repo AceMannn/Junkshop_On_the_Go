@@ -54,6 +54,11 @@ export function materialsSummary(materials = []) {
     .join(', ');
 }
 
+export function materialNamesSummary(materials = []) {
+  if (!materials.length) return '—';
+  return materials.map((m) => m.name).filter(Boolean).join(', ') || '—';
+}
+
 export function formatPeso(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return '—';

@@ -54,7 +54,7 @@ const junkshopSeed = [
     hours: '8:30 AM - 6:30 PM',
     status: 'open',
     rating: 4.7,
-    materials: ['Metal', 'Paper', 'Cardboard'],
+    materials: ['Metal', 'Paper', 'Tires'],
     topPrice: 'Metal: ₱48/kg',
   },
   {
@@ -68,7 +68,7 @@ const junkshopSeed = [
     hours: '8:00 AM - 5:00 PM',
     status: 'open',
     rating: 4.9,
-    materials: ['Plastic', 'Metal', 'Paper', 'Glass', 'E-waste', 'Cardboard'],
+    materials: ['Plastic', 'Metal', 'Paper', 'Glass', 'E-waste', 'Tires'],
     topPrice: 'Best prices in Teresa',
   },
 ];
@@ -78,7 +78,7 @@ const materialSeed = [
   { slug: 'pet-colored', category: 'plastic', name: 'PET Bottles (Colored)', examples: 'Juice bottles, colored containers', perKgPrice: '₱12-18', notes: 'Remove labels if possible' },
   { slug: 'hard-plastic', category: 'plastic', name: 'Hard Plastic', examples: 'Containers, buckets, chairs', perKgPrice: '₱10-15', notes: 'Clean and dry' },
   { slug: 'plastic-bags', category: 'plastic', name: 'Plastic Bags (Soft)', examples: 'Shopping bags, sachets', perKgPrice: '₱5-8', notes: 'Bundle together' },
-  { slug: 'cardboard', category: 'paper', name: 'Cardboard', examples: 'Boxes, packaging materials', perKgPrice: '₱8-12', notes: 'Flatten and bundle' },
+  { slug: 'used-tires', category: 'tires', name: 'Used Tires', examples: 'Car tires, motorcycle tires, bicycle tires', priceLabel: '₱5-20', unit: 'piece', notes: 'Keep dry and free from mud; confirm oversized tires before pickup' },
   { slug: 'white-paper', category: 'paper', name: 'White Paper', examples: 'Office paper, notebook paper', perKgPrice: '₱12-15', notes: 'No plastic coating' },
   { slug: 'newspaper', category: 'paper', name: 'Newspaper', examples: 'Old newspapers, magazines', perKgPrice: '₱6-10', notes: 'Bundle and tie' },
   { slug: 'mixed-paper', category: 'paper', name: 'Mixed Paper', examples: 'Various paper types', perKgPrice: '₱5-8', notes: 'Remove plastic or metal parts' },
@@ -88,10 +88,10 @@ const materialSeed = [
   { slug: 'brass', category: 'metal', name: 'Brass', examples: 'Faucets, fittings', perKgPrice: '₱180-220', notes: 'Clean items preferred' },
   { slug: 'glass-clear', category: 'glass', name: 'Glass Bottles (Clear)', examples: 'Beer bottles, wine bottles', perKgPrice: '₱8-12', notes: 'Unbroken, clean bottles' },
   { slug: 'glass-colored', category: 'glass', name: 'Glass Bottles (Colored)', examples: 'Brown, green bottles', perKgPrice: '₱6-10', notes: 'Remove caps and labels' },
-  { slug: 'computer-parts', category: 'ewaste', name: 'Computer Parts', examples: 'Motherboards, hard drives', perKgPrice: '₱50-150', notes: 'Working or non-working' },
-  { slug: 'mobile-phones', category: 'ewaste', name: 'Mobile Phones', examples: 'Old phones, smartphones', perKgPrice: '₱300-800', notes: 'Price varies by model' },
-  { slug: 'cables-wires', category: 'ewaste', name: 'Cables & Wires', examples: 'Chargers, USB cables', perKgPrice: '₱20-40', notes: 'Mixed electronic cables' },
-  { slug: 'batteries', category: 'ewaste', name: 'Batteries', examples: 'Phone batteries, power banks', perKgPrice: '₱15-30', notes: 'Handle with care' },
+  { slug: 'computer-parts', category: 'e-waste', name: 'Computer Parts', examples: 'Motherboards, hard drives', perKgPrice: '₱50-150', notes: 'Working or non-working' },
+  { slug: 'mobile-phones', category: 'e-waste', name: 'Mobile Phones', examples: 'Old phones, smartphones', perKgPrice: '₱300-800', notes: 'Price varies by model' },
+  { slug: 'cables-wires', category: 'e-waste', name: 'Cables & Wires', examples: 'Chargers, USB cables', perKgPrice: '₱20-40', notes: 'Mixed electronic cables' },
+  { slug: 'batteries', category: 'e-waste', name: 'Batteries', examples: 'Phone batteries, power banks', perKgPrice: '₱15-30', notes: 'Handle with care' },
 ];
 
 function parsePriceMid(perKgPrice) {

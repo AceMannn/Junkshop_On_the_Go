@@ -806,6 +806,9 @@ function ProviderPickupDetailDrawer({
                             <MapPin size={14} className="shrink-0 mt-0.5" />
                             {request.address}
                         </p>
+                        {request.landmark && (
+                            <p className="text-xs text-[#72796e] pl-5">Landmark: {request.landmark}</p>
+                        )}
                         {request.contactPhone && (
                             <p className="text-[#72796e]">Phone: {request.contactPhone}</p>
                         )}

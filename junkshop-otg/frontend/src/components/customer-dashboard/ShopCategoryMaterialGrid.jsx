@@ -1,10 +1,10 @@
-import { Box, Cog, FileText, Archive, Cpu, GlassWater, ChevronDown, ChevronUp } from 'lucide-react';
+import { Box, Cog, FileText, Circle, Cpu, GlassWater, ChevronDown, ChevronUp } from 'lucide-react';
 
 export const SELL_CATEGORIES = [
   { id: 'plastic',   label: 'Plastic',   Icon: Box        },
   { id: 'metal',     label: 'Metal',     Icon: Cog        },
   { id: 'paper',     label: 'Paper',     Icon: FileText   },
-  { id: 'cardboard', label: 'Cardboard', Icon: Archive    },
+  { id: 'tires',     label: 'Tires',     Icon: Circle     },
   { id: 'e-waste',   label: 'E-waste',   Icon: Cpu        },
   { id: 'glass',     label: 'Glass',     Icon: GlassWater },
 ];

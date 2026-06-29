@@ -55,7 +55,7 @@ export const junkshops = [
     hours: '8:30 AM - 6:30 PM',
     status: 'Open',
     rating: 4.7,
-    materials: ['Metal', 'Paper', 'Cardboard'],
+    materials: ['Metal', 'Paper', 'Tires'],
     topPrice: 'Metal: ₱48/kg',
   },
   {
@@ -69,7 +69,7 @@ export const junkshops = [
     hours: '8:00 AM - 5:00 PM',
     status: 'Open',
     rating: 4.9,
-    materials: ['Plastic', 'Metal', 'Paper', 'Glass', 'E-waste', 'Cardboard'],
+    materials: ['Plastic', 'Metal', 'Paper', 'Glass', 'E-waste', 'Tires'],
     topPrice: 'Best prices in Teresa',
   },
 ];

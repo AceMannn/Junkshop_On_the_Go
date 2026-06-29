@@ -4,7 +4,8 @@ export const priceCategories = [
   { id: 'paper', label: 'Paper' },
   { id: 'metal', label: 'Metal' },
   { id: 'glass', label: 'Glass' },
-  { id: 'ewaste', label: 'E-waste' },
+  { id: 'e-waste', label: 'E-waste' },
+  { id: 'tires', label: 'Tires' },
 ];
 
 export const prices = [
@@ -51,13 +52,14 @@ export const prices = [
       'https://images.unsplash.com/photo-1637308101453-2055fda23a65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwbGFzdGljJTIwYmFncyUyMHdhc3RlfGVufDF8fHx8MTc2NTI4ODkzNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
   },
   {
-    id: 'cardboard',
-    category: 'paper',
-    material: 'Cardboard',
-    examples: 'Boxes, packaging materials',
-    perKgPrice: '₱8-12',
-    perPiecePrice: '₱0.25-0.50',
-    notes: 'Flatten and bundle',
+    id: 'used-tires',
+    category: 'tires',
+    material: 'Used Tires',
+    examples: 'Car tires, motorcycle tires, bicycle tires',
+    perKgPrice: '₱5-20',
+    perPiecePrice: '₱5-20',
+    unit: 'piece',
+    notes: 'Keep dry and free from mud; confirm oversized tires before pickup',
     preview: true,
     image:
       'https://images.unsplash.com/photo-1719600804011-3bff3909b183?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjYXJkYm9hcmQlMjBib3hlcyUyMHJlY3ljbGluZ3xlbnwxfHx8fDE3NjUzNjg0MjF8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
@@ -151,7 +153,7 @@ export const prices = [
   },
   {
     id: 'computer-parts',
-    category: 'ewaste',
+    category: 'e-waste',
     material: 'Computer Parts',
     examples: 'Motherboards, hard drives',
     perKgPrice: '₱50-150',
@@ -163,7 +165,7 @@ export const prices = [
   },
   {
     id: 'mobile-phones',
-    category: 'ewaste',
+    category: 'e-waste',
     material: 'Mobile Phones',
     examples: 'Old phones, smartphones',
     perKgPrice: '₱300-800',
@@ -172,7 +174,7 @@ export const prices = [
   },
   {
     id: 'cables-wires',
-    category: 'ewaste',
+    category: 'e-waste',
     material: 'Cables & Wires',
     examples: 'Chargers, USB cables',
     perKgPrice: '₱20-40',
@@ -181,7 +183,7 @@ export const prices = [
   },
   {
     id: 'batteries',
-    category: 'ewaste',
+    category: 'e-waste',
     material: 'Batteries',
     examples: 'Phone batteries, power banks',
     perKgPrice: '₱15-30',

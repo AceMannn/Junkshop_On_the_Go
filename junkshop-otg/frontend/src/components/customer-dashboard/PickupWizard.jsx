@@ -27,6 +27,7 @@ import {
   materialsSummary,
 } from '../../utils/pickupHelpers';
 import { getUserFullName } from '../../utils/userDisplay';
+import PickupAddressPicker from './PickupAddressPicker';
 
 const PICKUP_STEPS = ['Type', 'Shop', 'Materials', 'Photos', 'Schedule', 'Contact', 'Review'];
 const DROP_OFF_STEPS = ['Type', 'Shop', 'Materials', 'Photos', 'Schedule', 'Review'];
@@ -134,8 +135,12 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
   const [contactEmail, setContactEmail] = useState(
     user?.email || ''
   );
-  const [address, setAddress] = useState(user?.address || '');
+  const [pickupLocation, setPickupLocation] = useState(null); // { lat, lng, label }
+  const [addressConfirmed, setAddressConfirmed] = useState(false);
+  const [landmark, setLandmark] = useState('');
   const [notes, setNotes] = useState('');
+
+  const address = pickupLocation?.label || '';
 
   const isDropOff = requestType === 'drop_off';
   const steps = isDropOff ? DROP_OFF_STEPS : PICKUP_STEPS;
@@ -218,8 +223,12 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
     }
     if (currentLabel === 'Contact') {
       const phone = contactPhone.replace(/\D/g, '').slice(0, 11);
-      if (!contactName.trim() || !address.trim()) {
-        setError('Name and pickup address are required.');
+      if (!contactName.trim()) {
+        setError('Full name is required.');
+        return false;
+      }
+      if (!addressConfirmed || !address.trim()) {
+        setError('Confirm your pickup location on the map before continuing.');
         return false;
       }
       if (!/^09\d{9}$/.test(phone)) {
@@ -266,6 +275,10 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
         scheduledDate,
         timeSlot,
         address: isDropOff ? selectedShop?.address || address.trim() : address.trim(),
+        ...(pickupLocation && !isDropOff
+          ? { pickupLocation: { lat: pickupLocation.lat, lng: pickupLocation.lng } }
+          : {}),
+        landmark: landmark.trim(),
         notes: notes.trim(),
       });
       onSuccess('Pickup request submitted! Wait for shop acceptance.');
@@ -571,13 +584,31 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                 value={contactEmail}
                 onChange={(event) => setContactEmail(event.target.value)}
               />
-              <textarea
-                rows={3}
-                className={`${inputClass} resize-none`}
-                placeholder="Pickup address *"
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
-              />
+              <div className="space-y-1.5">
+                <FieldLabel>Pickup location *</FieldLabel>
+                <PickupAddressPicker
+                  confirmed={addressConfirmed}
+                  confirmedLabel={address}
+                  onConfirm={(loc) => {
+                    setPickupLocation(loc);
+                    setAddressConfirmed(true);
+                    setError('');
+                  }}
+                  onReset={() => {
+                    setPickupLocation(null);
+                    setAddressConfirmed(false);
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <FieldLabel>Landmark (optional)</FieldLabel>
+                <input
+                  className={inputClass}
+                  placeholder="e.g. Near 7-Eleven, Blue gate house"
+                  value={landmark}
+                  onChange={(event) => setLandmark(event.target.value)}
+                />
+              </div>
               <textarea
                 rows={2}
                 className={`${inputClass} resize-none`}
@@ -626,6 +657,12 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                       <span className="text-[#72796e]">Address · </span>
                       <strong>{address}</strong>
                     </p>
+                    {landmark && (
+                      <p>
+                        <span className="text-[#72796e]">Landmark · </span>
+                        <strong>{landmark}</strong>
+                      </p>
+                    )}
                     <p>
                       <span className="text-[#72796e]">Phone · </span>
                       <strong>{contactPhone}</strong>

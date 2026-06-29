@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { domainApi } from "../../services/api";
 import { useProviderMaterials } from "../../hooks/useProviderData";
+import { formatMaterialCategoryLabel } from "../../utils/catalogMappers";
 import NumberInput from "../ui/NumberInput";
 
 export default function ProviderPricesTab({ onNotify }) {
@@ -76,7 +77,9 @@ export default function ProviderPricesTab({ onNotify }) {
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
                                         <p className="font-semibold text-[#191c1c]">{item.name}</p>
-                                        <p className="text-xs capitalize text-[#72796e]">{item.category}</p>
+                                        <p className="text-xs text-[#72796e]">
+                                            {formatMaterialCategoryLabel(item.category)}
+                                        </p>
                                     </div>
                                     {editingId !== item.id && (
                                         <button
@@ -138,8 +141,8 @@ export default function ProviderPricesTab({ onNotify }) {
                                 {filtered.map((item) => (
                                     <tr key={item.id} className="hover:bg-zinc-50">
                                         <td className="p-3 sm:p-4 font-medium">{item.name}</td>
-                                        <td className="p-3 sm:p-4 capitalize text-[#72796e]">
-                                            {item.category}
+                                        <td className="p-3 sm:p-4 text-[#72796e]">
+                                            {formatMaterialCategoryLabel(item.category)}
                                         </td>
                                         <td className="p-3 sm:p-4">
                                             {editingId === item.id ? (

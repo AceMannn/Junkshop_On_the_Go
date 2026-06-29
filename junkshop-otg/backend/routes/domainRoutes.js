@@ -12,6 +12,10 @@ const contactController = require('../controllers/contactController');
 const { haversineKm, formatDistanceKm } = require('../utils/geo');
 const { syncProfileComplete } = require('../utils/profileCompletion');
 const { syncJunkshopMaterialTags } = require('../utils/syncJunkshopTags');
+const {
+  formatMaterialCategory,
+  normalizeMaterialCategory,
+} = require('../utils/materialCategories');
 const { TRANSACTION_LIST_LIMIT } = require('../utils/listLimits');
 const {
   pickAllowed,
@@ -145,7 +149,7 @@ router.get('/junkshops', async (req, res) => {
       if (!acc[key]) acc[key] = [];
       acc[key].push({
         name: item.name,
-        category: item.category,
+        category: normalizeMaterialCategory(item.category, item.name),
         price: item.price,
         unit: item.unit || 'kg',
         postedAt: item.createdAt,
@@ -174,10 +178,8 @@ router.get('/junkshops', async (req, res) => {
       materials:
         shop.materials?.length > 0
           ? shop.materials
-          : [...new Set(listingPrices.map((item) => item.category).filter(Boolean))].map((c) => {
-              const raw = String(c).toLowerCase();
-              return raw === 'e-waste' ? 'E-waste' : raw.charAt(0).toUpperCase() + raw.slice(1);
-            }),
+          : [...new Set(listingPrices.map((item) => item.category).filter(Boolean))]
+              .map(formatMaterialCategory),
     };
   });
 
@@ -453,6 +455,7 @@ router.get('/materials', async (req, res) => {
       const visibleShop = shop ? applyJunkshopVisibility(shop, providerStatus) : null;
       return {
         ...item,
+        category: normalizeMaterialCategory(item.category, item.name),
         junkshop: visibleShop
           ? {
               id: String(visibleShop._id),
@@ -476,16 +479,26 @@ router.get('/materials', async (req, res) => {
     query.provider = req.query.provider;
   }
 
-  const materials = await Material.find(query).sort({ category: 1, name: 1 });
-  res.json({ materials });
+  const materials = await Material.find(query).sort({ category: 1, name: 1 }).lean();
+  res.json({
+    materials: materials.map((item) => ({
+      ...item,
+      category: normalizeMaterialCategory(item.category, item.name),
+    })),
+  });
 });
 
 router.get('/materials/mine', protect, requireProvider, async (req, res) => {
   const materials = await Material.find({
     provider: req.user._id,
     isCatalog: { $ne: true },
-  }).sort({ category: 1, name: 1 });
-  res.json({ materials });
+  }).sort({ category: 1, name: 1 }).lean();
+  res.json({
+    materials: materials.map((item) => ({
+      ...item,
+      category: normalizeMaterialCategory(item.category, item.name),
+    })),
+  });
 });
 
 router.post('/materials', protect, requireProvider, async (req, res) => {
@@ -497,6 +510,7 @@ router.post('/materials', protect, requireProvider, async (req, res) => {
   if (data.unit && !['kg', 'piece'].includes(String(data.unit))) {
     data.unit = 'kg';
   }
+  data.category = normalizeMaterialCategory(data.category, data.name);
   const material = await Material.create({
     ...data,
     provider: req.user._id,
@@ -523,6 +537,9 @@ router.patch('/materials/:id', protect, requireProvider, async (req, res) => {
   }
   if (data.unit && !['kg', 'piece'].includes(String(data.unit))) {
     data.unit = existing.unit || 'kg';
+  }
+  if (data.category !== undefined || data.name !== undefined) {
+    data.category = normalizeMaterialCategory(data.category ?? existing.category, data.name ?? existing.name);
   }
   existing.set({
     ...data,
@@ -573,7 +590,7 @@ router.delete('/notifications', protect, pickupController.clearNotifications);
 
 router.get('/transactions', protect, async (req, res) => {
   const key = req.user.role === 'provider' ? 'provider' : 'customer';
-  const query = { [key]: req.user._id };
+  const query = { [key]: req.user._id, totalAmount: { $gt: 0 } };
 
   if (req.query.from || req.query.to) {
     query.createdAt = {};
@@ -628,6 +645,10 @@ router.post('/transactions', protect, requireProvider, async (req, res) => {
 
   const weightNum = Number(weight);
   const price = Number(pricePerUnit);
+  if (!weightNum || weightNum <= 0 || !price || price <= 0) {
+    return res.status(400).json({ message: 'Enter valid weight and price values greater than zero.' });
+  }
+
   const totalAmount = Math.round(weightNum * price * 100) / 100;
 
   const transaction = await Transaction.create({

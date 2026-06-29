@@ -24,7 +24,7 @@ const transactionSchema = new mongoose.Schema(
     weight: {
       type: Number,
       required: true,
-      min: 0,
+      min: 0.01,
     },
     unit: {
       type: String,
@@ -33,12 +33,12 @@ const transactionSchema = new mongoose.Schema(
     pricePerUnit: {
       type: Number,
       required: true,
-      min: 0,
+      min: 0.01,
     },
     totalAmount: {
       type: Number,
       required: true,
-      min: 0,
+      min: 0.01,
     },
     status: {
       type: String,
