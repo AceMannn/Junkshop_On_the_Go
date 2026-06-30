@@ -22,7 +22,7 @@ export default function ProfileCompletionBanner({
     const subtitle =
         role === "provider"
             ? "Your shop stays hidden from the customer map until verification is done (like GCash full verification)."
-            : "Browse shops and prices freely. Add your mobile number and street address before booking a pickup.";
+            : "Browse shops and prices freely. Add your street address before booking a pickup.";
 
     return (
         <div

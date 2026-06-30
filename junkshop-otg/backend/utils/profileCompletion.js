@@ -29,15 +29,9 @@ function buildChecklist(items) {
 }
 
 async function evaluateCustomerProfile(user) {
-  const phone = normalizePhone(user.phone);
   const address = String(user.address || '').trim();
 
   return buildChecklist([
-    {
-      id: 'phone',
-      label: 'Mobile number (for pickups & recovery)',
-      done: hasValidPhone(phone),
-    },
     {
       id: 'address',
       label: 'Street address (for home pickups)',

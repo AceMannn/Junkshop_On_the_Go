@@ -1,16 +1,26 @@
 const { normalizePhone } = require('./profileCompletion');
+const logger = require('./fileLogger');
 
 const APP_NAME = 'JunkShop On-The-Go';
 const BREVO_EMAIL_API_URL = 'https://api.brevo.com/v3/smtp/email';
 const BREVO_SMS_API_URL = 'https://api.brevo.com/v3/transactionalSMS/send';
 const DEFAULT_SMS_SENDER = 'JunkShopOTG';
 
+function cleanEnv(value) {
+  return String(value || '').trim();
+}
+
+function hasUsableBrevoApiKey() {
+  const apiKey = cleanEnv(process.env.BREVO_API_KEY);
+  return Boolean(apiKey && apiKey !== 'PASTE_YOUR_BREVO_API_KEY_HERE');
+}
+
 function isEmailConfigured() {
-  return Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL);
+  return Boolean(hasUsableBrevoApiKey() && cleanEnv(process.env.BREVO_FROM_EMAIL));
 }
 
 function isSmsConfigured() {
-  return Boolean(process.env.BREVO_API_KEY);
+  return hasUsableBrevoApiKey();
 }
 
 function toBrevoSmsRecipient(phone) {
@@ -30,6 +40,12 @@ function toBrevoSmsRecipient(phone) {
 async function sendEmail({ to, subject, text, html }) {
   if (!isEmailConfigured()) {
     console.log(`[email:stub] to=${to} subject=${subject}\n${text}`);
+    logger.warn('email.stub_delivery', {
+      to,
+      subject,
+      reason: 'Brevo email is not configured or API key is placeholder.',
+      body: process.env.NODE_ENV === 'production' ? '[hidden in production]' : text,
+    });
     return { ok: true, stub: true };
   }
 
@@ -37,7 +53,7 @@ async function sendEmail({ to, subject, text, html }) {
     method: 'POST',
     headers: {
       accept: 'application/json',
-      'api-key': process.env.BREVO_API_KEY,
+      'api-key': cleanEnv(process.env.BREVO_API_KEY),
       'content-type': 'application/json',
     },
     body: JSON.stringify({
@@ -54,9 +70,25 @@ async function sendEmail({ to, subject, text, html }) {
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Brevo email send failed (${response.status}): ${detail}`);
+    const error = new Error(`Brevo email send failed (${response.status}): ${detail}`);
+    error.code = 'BREVO_EMAIL_SEND_FAILED';
+    error.status = response.status;
+    logger.error('email.brevo_send_failed', error, {
+      to,
+      subject,
+      brevoStatus: response.status,
+      brevoResponse: detail,
+      fromEmail: process.env.BREVO_FROM_EMAIL,
+    });
+    throw error;
   }
 
+  logger.info('email.sent', {
+    to,
+    subject,
+    provider: 'brevo',
+    fromEmail: process.env.BREVO_FROM_EMAIL,
+  });
   return { ok: true, stub: false };
 }
 
@@ -74,7 +106,7 @@ async function sendSms({ to, body }) {
     method: 'POST',
     headers: {
       accept: 'application/json',
-      'api-key': process.env.BREVO_API_KEY,
+      'api-key': cleanEnv(process.env.BREVO_API_KEY),
       'content-type': 'application/json',
     },
     body: JSON.stringify({

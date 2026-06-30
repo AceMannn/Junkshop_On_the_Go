@@ -152,36 +152,21 @@ export default function LoginScreen({
     setInfo('');
 
     if (!email || !password) {
-      setError(
-        selectedRole === 'provider' || selectedRole === 'customer'
-          ? 'Please enter your mobile number and password.'
-          : 'Please enter your login details and password.'
-      );
+      setError('Please enter your email address and password.');
       return;
     }
 
-    if (selectedRole === 'provider' || selectedRole === 'customer') {
-      const normalizedPhone = email.replace(/\D/g, '').slice(0, 11);
-      if (!/^09\d{9}$/.test(normalizedPhone)) {
-        setError('Enter a valid mobile number (09XXXXXXXXX).');
-        return;
-      }
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        setError('Please enter a valid email address.');
-        return;
-      }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
     }
 
     setIsLoading(true);
     try {
       const session = await authApi.login({
-        identifier:
-          selectedRole === 'provider' || selectedRole === 'customer'
-            ? email.replace(/\D/g, '').slice(0, 11)
-            : email,
-        email: selectedRole === 'provider' || selectedRole === 'customer' ? undefined : email,
+        identifier: email.trim(),
+        email: email.trim(),
         password,
         role: selectedRole,
       });
@@ -194,11 +179,11 @@ export default function LoginScreen({
         loginError.requiresPhoneVerification
       ) {
         setVerificationData({
-          email: loginError.email || '',
-          phone: loginError.phone || email.replace(/\D/g, '').slice(0, 11),
+          email: loginError.email || email.trim(),
+          phone: loginError.phone || '',
           role: selectedRole,
           requiresEmail: Boolean(loginError.requiresEmailVerification),
-          requiresPhone: Boolean(loginError.requiresPhoneVerification),
+          requiresPhone: false,
           message: loginError.message,
         });
         setView('verifyAccount');
@@ -441,34 +426,20 @@ export default function LoginScreen({
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div>
                     <label htmlFor="email" className={authLabelClass}>
-                      {selectedRole === 'provider' || selectedRole === 'customer'
-                        ? 'Mobile number'
-                        : 'Email address'}
+                      Email address
                     </label>
                     <input
-                      type={
-                        selectedRole === 'provider' || selectedRole === 'customer' ? 'tel' : 'email'
-                      }
+                      type="email"
                       id="email"
                       value={email}
                       onChange={(e) => {
-                        const nextValue =
-                          selectedRole === 'provider' || selectedRole === 'customer'
-                            ? e.target.value.replace(/\D/g, '').slice(0, 11)
-                            : e.target.value;
-                        setEmail(nextValue);
+                        setEmail(e.target.value);
                         setError('');
                       }}
-                      placeholder={
-                        selectedRole === 'provider' || selectedRole === 'customer'
-                          ? '09XXXXXXXXX'
-                          : 'your@email.com'
-                      }
+                      placeholder="your@email.com"
                       className={authInputClass}
                       disabled={isLoading}
-                      autoComplete={
-                        selectedRole === 'provider' || selectedRole === 'customer' ? 'tel' : 'email'
-                      }
+                      autoComplete="email"
                     />
                   </div>
 
@@ -747,7 +718,6 @@ export default function LoginScreen({
                   phone={verificationData?.phone || ''}
                   role={verificationData?.role || selectedRole}
                   requiresEmail={verificationData?.requiresEmail}
-                  requiresPhone={verificationData?.requiresPhone}
                   initialMessage={verificationData?.message || ''}
                   onVerified={(session) => {
                     onLoginSuccess({ ...session, rememberMe });

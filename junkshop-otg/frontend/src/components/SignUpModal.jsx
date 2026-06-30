@@ -92,23 +92,22 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
     e.preventDefault();
     setError('');
 
-    if (!formData.firstName || !formData.lastName || !formData.phone || !formData.password) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
       setError('Please fill in all required fields.');
       return;
     }
 
+    // Phone is optional — validate only when entered
     const normalizedPhone = formData.phone.replace(/\D/g, '').slice(0, 11);
-    if (!/^09\d{9}$/.test(normalizedPhone)) {
+    if (formData.phone.trim() && !/^09\d{9}$/.test(normalizedPhone)) {
       setError('Enter a valid mobile number (09XXXXXXXXX).');
       return;
     }
 
-    if (formData.email.trim()) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email.trim())) {
-        setError('Please enter a valid email address.');
-        return;
-      }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
     }
 
     const passwordValidation = validatePasswordStrength(formData.password);
@@ -134,8 +133,8 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
         firstName: formData.firstName,
         middleName: formData.middleName,
         lastName: formData.lastName,
-        phone: normalizedPhone,
-        email: formData.email.trim() || undefined,
+        phone: normalizedPhone || undefined,
+        email: formData.email.trim(),
         password: formData.password,
         termsAccepted: true,
         termsVersion: TERMS_VERSION,
@@ -146,11 +145,9 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
           email: result.email || formData.email.trim().toLowerCase(),
           phone: result.phone || normalizedPhone,
           role: 'customer',
-          requiresEmail: Boolean(result.requiresEmailVerification),
-          requiresPhone: Boolean(result.requiresPhoneVerification),
-          message: result.message || 'Check your codes.',
-          devEmailCode: result.devEmailVerificationCode || result.devVerificationCode || '',
-          devPhoneCode: result.devPhoneVerificationCode || '',
+          requiresEmail: true,
+          requiresPhone: false,
+          message: result.message || 'Check your email for the verification code.',
         });
         setStep('verify');
         setError('');
@@ -203,9 +200,6 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
               phone={verificationData?.phone || ''}
               role={verificationData?.role || 'customer'}
               requiresEmail={verificationData?.requiresEmail}
-              requiresPhone={verificationData?.requiresPhone}
-              initialDevEmailCode={verificationData?.devEmailCode || ''}
-              initialDevPhoneCode={verificationData?.devPhoneCode || ''}
               initialMessage={verificationData?.message || ''}
               onVerified={(session) => {
                 setFormData(EMPTY_CUSTOMER_FORM);
@@ -291,7 +285,8 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
 
             <div>
               <label htmlFor="signup-phone" className={authLabelClass}>
-                Mobile number <span className="text-red-500">*</span>
+                Mobile number{' '}
+                <span className="text-charcoal/40 font-normal text-xs">(optional)</span>
               </label>
               <input
                 type="tel"
@@ -310,8 +305,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
 
             <div>
               <label htmlFor="signup-email" className={authLabelClass}>
-                Email address{' '}
-                <span className="text-charcoal/40 font-normal text-xs">(optional)</span>
+                Email address <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"

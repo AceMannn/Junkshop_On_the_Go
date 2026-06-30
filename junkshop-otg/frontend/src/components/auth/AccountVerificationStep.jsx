@@ -13,16 +13,14 @@ export default function AccountVerificationStep({
   phone = '',
   role = 'customer',
   requiresEmail = false,
-  requiresPhone = true,
-  initialDevEmailCode = '',
-  initialDevPhoneCode = '',
   initialMessage = '',
   onVerified,
   onBack,
   verifyLabel = 'Verify account',
 }) {
-  const [emailCode, setEmailCode] = useState(normalizeOtp(initialDevEmailCode));
-  const [phoneCode, setPhoneCode] = useState(normalizeOtp(initialDevPhoneCode));
+  const [emailCode, setEmailCode] = useState('');
+  // SMS OTP support kept for future use:
+  // const [phoneCode, setPhoneCode] = useState(normalizeOtp(initialDevPhoneCode));
   const [info, setInfo] = useState(initialMessage);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -38,10 +36,11 @@ export default function AccountVerificationStep({
     setError('');
     setInfo('');
 
-    if (requiresPhone && phoneCode.length !== OTP_LENGTH) {
-      setError(`Enter the ${OTP_LENGTH}-digit code from your SMS.`);
-      return;
-    }
+    // SMS OTP support kept for future use:
+    // if (requiresPhone && phoneCode.length !== OTP_LENGTH) {
+    //   setError(`Enter the ${OTP_LENGTH}-digit code from your SMS.`);
+    //   return;
+    // }
     if (requiresEmail && emailCode.length !== OTP_LENGTH) {
       setError(`Enter the ${OTP_LENGTH}-digit code from your email.`);
       return;
@@ -54,7 +53,8 @@ export default function AccountVerificationStep({
         phone,
         role,
         emailCode,
-        phoneCode,
+        // SMS OTP support kept for future use:
+        // phoneCode,
       });
       onVerified?.(session);
     } catch (verifyError) {
@@ -73,9 +73,10 @@ export default function AccountVerificationStep({
       if (data.devEmailVerificationCode) {
         setEmailCode(normalizeOtp(data.devEmailVerificationCode));
       }
-      if (data.devPhoneVerificationCode) {
-        setPhoneCode(normalizeOtp(data.devPhoneVerificationCode));
-      }
+      // SMS OTP support kept for future use:
+      // if (data.devPhoneVerificationCode) {
+      //   setPhoneCode(normalizeOtp(data.devPhoneVerificationCode));
+      // }
       setInfo(data.message || 'A new verification code was sent.');
     } catch (resendError) {
       setError(resendError.message);
@@ -85,12 +86,13 @@ export default function AccountVerificationStep({
   };
 
   const descriptionText = (() => {
-    if (requiresPhone && requiresEmail) {
-      return 'Enter the 6-digit codes we sent to your mobile number and email to activate your account.';
-    }
-    if (requiresPhone) {
-      return 'Enter the 6-digit code we sent to your mobile number to activate your account.';
-    }
+    // SMS OTP support kept for future use:
+    // if (requiresPhone && requiresEmail) {
+    //   return 'Enter the 6-digit codes we sent to your mobile number and email to activate your account.';
+    // }
+    // if (requiresPhone) {
+    //   return 'Enter the 6-digit code we sent to your mobile number to activate your account.';
+    // }
     if (requiresEmail) {
       return 'Enter the 6-digit code we sent to your email to activate your account.';
     }
@@ -113,6 +115,7 @@ export default function AccountVerificationStep({
         </div>
       )}
 
+      {/* SMS OTP support kept for future use:
       {requiresPhone && (
         <div>
           <label htmlFor="phone-verification-code" className={authLabelClass}>
@@ -135,6 +138,7 @@ export default function AccountVerificationStep({
           />
         </div>
       )}
+      */}
 
       {requiresEmail && (
         <div>
@@ -142,7 +146,7 @@ export default function AccountVerificationStep({
             Email code sent to {email}
           </label>
           <input
-            ref={requiresPhone ? undefined : firstInputRef}
+            ref={firstInputRef}
             id="email-verification-code"
             type="text"
             inputMode="numeric"

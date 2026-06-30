@@ -162,9 +162,7 @@ export default function CustomerPickupsTab({
     }, [focusPickupId, requests, loading, onFocusHandled]);
 
     const profileCompletionMessage = () =>
-        user?.profileStatus?.missing?.includes("address")
-            ? "Add your street address in Profile Settings before booking a pickup."
-            : "Add your mobile number in Profile Settings before booking a pickup.";
+        "Add your street address in Profile Settings before booking a pickup.";
 
     const startWizard = () => {
         if (!user?.profileComplete) {

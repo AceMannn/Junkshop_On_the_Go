@@ -162,14 +162,14 @@ export default function ProviderSignUpWizard({
       if (!form.firstName.trim() || !form.lastName.trim()) {
         return 'First and last name are required.';
       }
-      if (!/^09\d{9}$/.test(form.phone.replace(/\D/g, '').slice(0, 11))) {
+      // Phone is optional — validate only when entered
+      const trimmedPhone = form.phone.replace(/\D/g, '').slice(0, 11);
+      if (form.phone.trim() && !/^09\d{9}$/.test(trimmedPhone)) {
         return 'Enter a valid mobile number (09XXXXXXXXX).';
       }
-      if (form.email.trim()) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(form.email.trim())) {
-          return 'Please enter a valid email address.';
-        }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email.trim())) {
+        return 'Please enter a valid email address.';
       }
       const passwordValidation = validatePasswordStrength(form.password);
       if (!passwordValidation.ok) {
@@ -224,8 +224,8 @@ export default function ProviderSignUpWizard({
         firstName: form.firstName.trim(),
         middleName: form.middleName.trim(),
         lastName: form.lastName.trim(),
-        phone: form.phone.replace(/\D/g, '').slice(0, 11),
-        email: form.email.trim() || undefined,
+        phone: form.phone.replace(/\D/g, '').slice(0, 11) || undefined,
+        email: form.email.trim(),
         password: form.password,
         location: form.location,
         operatingHours: sanitizeOperatingHours(form.operatingHours),
@@ -238,11 +238,9 @@ export default function ProviderSignUpWizard({
           email: session.email || form.email.trim().toLowerCase(),
           phone: session.phone || form.phone.replace(/\D/g, '').slice(0, 11),
           role: 'provider',
-          requiresEmail: Boolean(session.requiresEmailVerification),
-          requiresPhone: Boolean(session.requiresPhoneVerification),
-          message: session.message || 'Check your email/SMS for verification codes.',
-          devEmailCode: session.devEmailVerificationCode || session.devVerificationCode || '',
-          devPhoneCode: session.devPhoneVerificationCode || '',
+          requiresEmail: true,
+          requiresPhone: false,
+          message: session.message || 'Check your email for the verification code.',
         });
         return;
       }
@@ -291,9 +289,6 @@ export default function ProviderSignUpWizard({
               phone={verificationData.phone}
               role={verificationData.role}
               requiresEmail={verificationData.requiresEmail}
-              requiresPhone={verificationData.requiresPhone}
-              initialDevEmailCode={verificationData.devEmailCode}
-              initialDevPhoneCode={verificationData.devPhoneCode}
               initialMessage={verificationData.message}
               onVerified={(session) => {
                 setForm(initialForm);
@@ -487,7 +482,8 @@ export default function ProviderSignUpWizard({
 
                 <div>
                   <label htmlFor="ownerPhone" className={authLabelClass}>
-                    Mobile number <span className="text-red-500">*</span>
+                    Mobile number{' '}
+                    <span className="text-charcoal/40 font-normal text-xs">(optional)</span>
                   </label>
                   <input
                     id="ownerPhone"
@@ -501,14 +497,13 @@ export default function ProviderSignUpWizard({
                     disabled={isLoading}
                   />
                   <p className="mt-1 text-xs text-charcoal/50">
-                    You will log in using this mobile number.
+                    Used for pickup coordination and contact, not for login.
                   </p>
                 </div>
 
                 <div>
                   <label htmlFor="ownerEmail" className={authLabelClass}>
-                    Email address{' '}
-                    <span className="text-charcoal/40 font-normal text-xs">(optional)</span>
+                    Email address <span className="text-red-500">*</span>
                   </label>
                   <input
                     id="ownerEmail"
@@ -763,11 +758,12 @@ export default function ProviderSignUpWizard({
                     {[form.firstName, form.middleName, form.lastName].filter(Boolean).join(' ')}
                   </p>
                   <p>
-                    <span className="font-semibold text-charcoal">Mobile:</span> {form.phone}
+                    <span className="font-semibold text-charcoal">Mobile:</span>{' '}
+                    {form.phone.trim() || <span className="text-charcoal/40">Not provided</span>}
                   </p>
                   <p>
                     <span className="font-semibold text-charcoal">Email:</span>{' '}
-                    {form.email.trim() || 'Not provided'}
+                    {form.email.trim()}
                   </p>
                   <p>
                     <span className="font-semibold text-charcoal">Address:</span> {form.address}

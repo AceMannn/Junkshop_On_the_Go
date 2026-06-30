@@ -54,6 +54,7 @@ const {
 } = require('../utils/accountIdentity');
 const { AUTH_LOOKUP_EXCLUDE, SESSION_USER_EXCLUDE } = require('../utils/userQueries');
 const { isBanned } = require('../utils/accountModeration');
+const logger = require('../utils/fileLogger');
 
 const DEFAULT_SHOP_LOCATION = { lat: 14.5995, lng: 121.0055 };
 const MAX_AMOUNT = 20000;
@@ -102,8 +103,8 @@ const userPayload = (user) => ({
   badges: user.badges || [],
   emailVerified: isCustomerEmailVerified(user),
   phoneVerified: isPhoneVerified(user),
-  requiresPhoneSetup:
-    user.role === 'customer' && !hasValidPhone(user.phone),
+  // Phone is optional; requiresPhoneSetup is no longer triggered automatically.
+  requiresPhoneSetup: false,
 });
 
 async function buildUserResponse(user) {
@@ -203,37 +204,79 @@ const registerUser = async (req, res) => {
     }
 
     if (cleanedRole === 'customer') {
-      if (!cleanedPhone || !phoneRegex.test(cleanedPhone)) {
-        return res.status(400).json({
-          message: 'A valid mobile number (09XXXXXXXXX) is required.',
-        });
-      }
-
-      const normalizedPhone = normalizePhone(cleanedPhone);
-
-      if (cleanedEmail && !emailRegex.test(cleanedEmail)) {
+      // Email is required for new accounts
+      if (!cleanedEmail || !emailRegex.test(cleanedEmail)) {
         return res.status(400).json({ message: 'Please enter a valid email address.' });
       }
 
-      const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
-        intendedRole: 'customer',
-        context: 'signup',
+      // Reuse an abandoned unverified account with the same email instead of
+      // blocking the user or creating a duplicate record.
+      const existingUnverified = await User.findOne({
+        email: cleanedEmail,
+        role: 'customer',
+        emailVerified: false,
+        status: { $ne: 'deleted' },
+        deletedAt: null,
       });
-      if (phoneConflict) {
-        return res.status(phoneConflict.status).json({ message: phoneConflict.message });
-      }
 
-      if (cleanedEmail) {
-        const emailConflict = await assertEmailAvailable(cleanedEmail, {
+      // Phone is optional — validate and check uniqueness only when provided.
+      // When retrying the same unverified email, exclude that pending account
+      // so its own phone number does not block the resend flow.
+      let normalizedPhone = '';
+      if (cleanedPhone) {
+        if (!phoneRegex.test(cleanedPhone)) {
+          return res.status(400).json({ message: 'Enter a valid mobile number (09XXXXXXXXX).' });
+        }
+        normalizedPhone = normalizePhone(cleanedPhone);
+        const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
           intendedRole: 'customer',
+          excludeUserId: existingUnverified?._id,
+          context: 'signup',
         });
-        if (emailConflict) {
-          return res.status(emailConflict.status).json({ message: emailConflict.message });
+        if (phoneConflict) {
+          return res.status(phoneConflict.status).json({ message: phoneConflict.message });
         }
       }
 
+      if (existingUnverified) {
+        existingUnverified.firstName = cleanedFirstName;
+        existingUnverified.middleName = cleanedMiddleName;
+        existingUnverified.lastName = cleanedLastName;
+        existingUnverified.phone = normalizedPhone;
+        existingUnverified.password = await bcrypt.hash(password, 10);
+        existingUnverified.acceptedTermsAt = new Date();
+        existingUnverified.termsVersion = String(termsVersion || '').trim();
+        existingUnverified.phoneVerified = true; // phone not used for OTP
+
+        const emailCode = assignEmailVerificationCode(existingUnverified);
+        await existingUnverified.save();
+        await syncProfileComplete(existingUnverified._id);
+        const emailDelivery = await sendEmailVerificationEmail(
+          cleanedEmail,
+          emailCode,
+          cleanedFirstName
+        );
+        return res.status(200).json(
+          verificationPayload({
+            user: existingUnverified,
+            message: 'Account created. Verify your email to continue.',
+            emailCode,
+            emailDelivery,
+            phoneCode: null,
+            phoneDelivery: null,
+          })
+        );
+      }
+
+      // Block if a different (verified or other-role) account already owns this email
+      const emailConflict = await assertEmailAvailable(cleanedEmail, {
+        intendedRole: 'customer',
+      });
+      if (emailConflict) {
+        return res.status(emailConflict.status).json({ message: emailConflict.message });
+      }
+
       const hashedPassword = await bcrypt.hash(password, 10);
-      const hasRealEmail = Boolean(cleanedEmail);
 
       const user = new User({
         role: cleanedRole,
@@ -242,49 +285,39 @@ const registerUser = async (req, res) => {
         lastName: cleanedLastName,
         phone: normalizedPhone,
         password: hashedPassword,
-        emailVerified: !hasRealEmail,
-        phoneVerified: false,
+        email: cleanedEmail,
+        emailVerified: false,
+        phoneVerified: true, // phone not used for OTP
         acceptedTermsAt: new Date(),
         termsVersion: String(termsVersion || '').trim(),
       });
 
-      if (hasRealEmail) {
-        user.email = cleanedEmail;
-      }
-
-      let emailCode = null;
-      let emailDelivery = null;
-
-      if (hasRealEmail) {
-        emailCode = assignEmailVerificationCode(user);
-      }
-
-      const phoneCode = ACCOUNT_PHONE_VERIFICATION_ENABLED
-        ? assignPhoneVerificationCode(user)
-        : null;
+      const emailCode = assignEmailVerificationCode(user);
+      // SMS OTP support kept for future use:
+      // const phoneCode = ACCOUNT_PHONE_VERIFICATION_ENABLED
+      //   ? assignPhoneVerificationCode(user)
+      //   : null;
+      const phoneCode = null;
 
       await user.save();
       await syncProfileComplete(user._id);
 
-      if (hasRealEmail) {
-        emailDelivery = await sendEmailVerificationEmail(
-          cleanedEmail,
-          emailCode,
-          cleanedFirstName
-        );
-      }
-
-      const phoneDelivery =
-        ACCOUNT_PHONE_VERIFICATION_ENABLED && phoneCode
-          ? await sendPhoneVerificationSms(normalizedPhone, phoneCode)
-          : null;
+      const emailDelivery = await sendEmailVerificationEmail(
+        cleanedEmail,
+        emailCode,
+        cleanedFirstName
+      );
+      // SMS OTP support kept for future use:
+      // const phoneDelivery =
+      //   ACCOUNT_PHONE_VERIFICATION_ENABLED && phoneCode
+      //     ? await sendPhoneVerificationSms(normalizedPhone, phoneCode)
+      //     : null;
+      const phoneDelivery = null;
 
       return res.status(201).json(
         verificationPayload({
           user,
-          message: hasRealEmail
-            ? 'Account created. Verify your mobile number and email to continue.'
-            : 'Account created. Verify your mobile number to continue.',
+          message: 'Account created. Verify your email to continue.',
           emailCode,
           emailDelivery,
           phoneCode,
@@ -302,32 +335,36 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Business address is required.' });
     }
 
-    if (!cleanedPhone || !phoneRegex.test(cleanedPhone)) {
-      return res.status(400).json({
-        message: 'A valid mobile number (09XXXXXXXXX) is required.',
-      });
-    }
-
-    const normalizedPhone = normalizePhone(cleanedPhone);
-
-    if (cleanedEmail && !emailRegex.test(cleanedEmail)) {
+    // Email is required for new accounts
+    if (!cleanedEmail || !emailRegex.test(cleanedEmail)) {
       return res.status(400).json({ message: 'Please enter a valid email address.' });
     }
 
-    const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
-      intendedRole: 'provider',
-      context: 'signup',
+    // Reuse an abandoned unverified provider account with the same email
+    const existingUnverifiedProvider = await User.findOne({
+      email: cleanedEmail,
+      role: 'provider',
+      emailVerified: false,
+      status: { $ne: 'deleted' },
+      deletedAt: null,
     });
-    if (phoneConflict) {
-      return res.status(phoneConflict.status).json({ message: phoneConflict.message });
-    }
 
-    if (cleanedEmail) {
-      const emailConflict = await assertEmailAvailable(cleanedEmail, {
+    // Phone is optional — validate and check uniqueness only when provided.
+    // When retrying the same unverified email, exclude that pending account
+    // so its own phone number does not block the resend flow.
+    let normalizedPhone = '';
+    if (cleanedPhone) {
+      if (!phoneRegex.test(cleanedPhone)) {
+        return res.status(400).json({ message: 'Enter a valid mobile number (09XXXXXXXXX).' });
+      }
+      normalizedPhone = normalizePhone(cleanedPhone);
+      const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
         intendedRole: 'provider',
+        excludeUserId: existingUnverifiedProvider?._id,
+        context: 'signup',
       });
-      if (emailConflict) {
-        return res.status(emailConflict.status).json({ message: emailConflict.message });
+      if (phoneConflict) {
+        return res.status(phoneConflict.status).json({ message: phoneConflict.message });
       }
     }
 
@@ -346,34 +383,86 @@ const registerUser = async (req, res) => {
       };
     }
 
+    if (existingUnverifiedProvider) {
+      existingUnverifiedProvider.firstName = cleanedFirstName;
+      existingUnverifiedProvider.middleName = cleanedMiddleName;
+      existingUnverifiedProvider.lastName = cleanedLastName;
+      existingUnverifiedProvider.phone = normalizedPhone;
+      existingUnverifiedProvider.password = await bcrypt.hash(password, 10);
+      existingUnverifiedProvider.junkshopName = cleanedJunkshopName;
+      existingUnverifiedProvider.address = cleanedAddress;
+      existingUnverifiedProvider.acceptedTermsAt = new Date();
+      existingUnverifiedProvider.termsVersion = String(termsVersion || '').trim();
+      existingUnverifiedProvider.phoneVerified = true; // phone not used for OTP
+
+      const emailCode = assignEmailVerificationCode(existingUnverifiedProvider);
+      await existingUnverifiedProvider.save();
+
+      // Update existing Junkshop record for this provider
+      await Junkshop.findOneAndUpdate(
+        { provider: existingUnverifiedProvider._id },
+        {
+          name: cleanedJunkshopName,
+          address: cleanedAddress,
+          phone: normalizedPhone,
+          hours: hoursSummary,
+          operatingHours: schedule,
+          location: shopLocation || DEFAULT_SHOP_LOCATION,
+        },
+        { upsert: true }
+      );
+
+      await syncProfileComplete(existingUnverifiedProvider._id);
+      const emailDelivery = await sendEmailVerificationEmail(
+        cleanedEmail,
+        emailCode,
+        cleanedFirstName
+      );
+      return res.status(200).json(
+        verificationPayload({
+          user: existingUnverifiedProvider,
+          message: 'Junkshop account created. Verify your email to continue.',
+          emailCode,
+          emailDelivery,
+          phoneCode: null,
+          phoneDelivery: null,
+        })
+      );
+    }
+
+    // Block if a different (verified or other-role) account already owns this email
+    const emailConflict = await assertEmailAvailable(cleanedEmail, {
+      intendedRole: 'provider',
+    });
+    if (emailConflict) {
+      return res.status(emailConflict.status).json({ message: emailConflict.message });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const hasProviderEmail = Boolean(cleanedEmail);
     const user = new User({
       role: 'provider',
       firstName: cleanedFirstName,
       middleName: cleanedMiddleName,
       lastName: cleanedLastName,
-      ...(cleanedEmail ? { email: cleanedEmail } : {}),
+      email: cleanedEmail,
       phone: normalizedPhone,
       password: hashedPassword,
       junkshopName: cleanedJunkshopName,
       address: cleanedAddress,
       verificationStatus: 'draft',
-      emailVerified: !hasProviderEmail,
-      phoneVerified: false,
+      emailVerified: false,
+      phoneVerified: true, // phone not used for OTP
       acceptedTermsAt: new Date(),
       termsVersion: String(termsVersion || '').trim(),
     });
 
-    let emailCode = null;
-    let emailDelivery = null;
-    if (hasProviderEmail) {
-      emailCode = assignEmailVerificationCode(user);
-    }
-    const phoneCode = ACCOUNT_PHONE_VERIFICATION_ENABLED
-      ? assignPhoneVerificationCode(user)
-      : null;
+    const emailCode = assignEmailVerificationCode(user);
+    // SMS OTP support kept for future use:
+    // const phoneCode = ACCOUNT_PHONE_VERIFICATION_ENABLED
+    //   ? assignPhoneVerificationCode(user)
+    //   : null;
+    const phoneCode = null;
     await user.save();
 
     await Junkshop.create({
@@ -390,24 +479,22 @@ const registerUser = async (req, res) => {
     });
 
     await syncProfileComplete(user._id);
-    if (hasProviderEmail) {
-      emailDelivery = await sendEmailVerificationEmail(
-        cleanedEmail,
-        emailCode,
-        cleanedFirstName
-      );
-    }
-    const phoneDelivery =
-      ACCOUNT_PHONE_VERIFICATION_ENABLED && phoneCode
-        ? await sendPhoneVerificationSms(normalizedPhone, phoneCode)
-        : null;
+    const emailDelivery = await sendEmailVerificationEmail(
+      cleanedEmail,
+      emailCode,
+      cleanedFirstName
+    );
+    // SMS OTP support kept for future use:
+    // const phoneDelivery =
+    //   ACCOUNT_PHONE_VERIFICATION_ENABLED && phoneCode
+    //     ? await sendPhoneVerificationSms(normalizedPhone, phoneCode)
+    //     : null;
+    const phoneDelivery = null;
 
     res.status(201).json(
       verificationPayload({
         user,
-        message: hasProviderEmail
-          ? 'Junkshop account created. Verify your mobile number and email to continue.'
-          : 'Junkshop account created. Verify your mobile number to continue.',
+        message: 'Junkshop account created. Verify your email to continue.',
         emailCode,
         emailDelivery,
         phoneCode,
@@ -416,6 +503,17 @@ const registerUser = async (req, res) => {
     );
   } catch (error) {
     console.error('registerUser', error);
+    logger.error('auth.register_failed', error, {
+      role: req.body?.role,
+      email: req.body?.email,
+      phoneProvided: Boolean(req.body?.phone),
+    });
+    if (error.code === 'BREVO_EMAIL_SEND_FAILED') {
+      return res.status(502).json({
+        message:
+          'Email verification could not be sent. Check your Brevo API key and verified sender email.',
+      });
+    }
     res.status(500).json({ message: 'Server error during registration.' });
   }
 };
@@ -434,63 +532,35 @@ const loginUser = async (req, res) => {
 
     let user = null;
 
-    if (cleanedRole === 'provider') {
-      user = await findProviderByPhone(loginId);
+    if (cleanedRole === 'provider' || cleanedRole === 'customer') {
+      // Email-first login for customers and providers
+      const normalizedEmail = loginId.toLowerCase();
+      if (!emailRegex.test(normalizedEmail)) {
+        return res.status(400).json({ message: 'Please enter a valid email address.' });
+      }
+      user = await User.findOne({ email: normalizedEmail, role: cleanedRole }).select(AUTH_LOOKUP_EXCLUDE);
       if (!user) {
-        const normalizedPhone = normalizePhone(loginId.replace(/\D/g, '').slice(0, 11));
-        const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
-          intendedRole: 'provider',
-          context: 'login',
-        });
-        if (phoneConflict && phoneConflict.status !== 401) {
-          return res.status(phoneConflict.status).json({ message: phoneConflict.message });
+        // Check if the email belongs to a different role
+        const crossRoleUser = await User.findOne({
+          email: normalizedEmail,
+          role: cleanedRole === 'customer' ? 'provider' : 'customer',
+          status: { $ne: 'deleted' },
+          deletedAt: null,
+        }).select(AUTH_LOOKUP_EXCLUDE);
+        if (crossRoleUser) {
+          return res.status(403).json({ message: emailConflictMessage(crossRoleUser.role) });
         }
-        return res.status(401).json({ message: 'Invalid mobile number or password.' });
+        return res.status(401).json({ message: 'Invalid email or password.' });
       }
     } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const looksLikeEmail = loginId.includes('@');
-
-      if (looksLikeEmail) {
-        const normalizedEmail = loginId.toLowerCase();
-        if (!emailRegex.test(normalizedEmail)) {
-          return res.status(400).json({ message: 'Please enter a valid email address.' });
-        }
-        const emailRole = cleanedRole || 'admin';
-        user = await User.findOne({ email: normalizedEmail, role: emailRole }).select(AUTH_LOOKUP_EXCLUDE);
-        if (!user && cleanedRole === 'customer') {
-          user = await User.findOne({ email: normalizedEmail, role: 'admin' }).select(AUTH_LOOKUP_EXCLUDE);
-        }
-        if (!user && (cleanedRole === 'customer' || cleanedRole === 'provider')) {
-          const crossRoleUser = await User.findOne({
-            email: normalizedEmail,
-            role: cleanedRole === 'customer' ? 'provider' : 'customer',
-          }).select(AUTH_LOOKUP_EXCLUDE);
-          if (crossRoleUser) {
-            return res.status(403).json({
-              message: emailConflictMessage(crossRoleUser.role),
-            });
-          }
-        }
-        if (!user) {
-          return res.status(401).json({ message: 'Invalid login details or password.' });
-        }
-      } else {
-        const normalizedPhone = normalizePhone(loginId.replace(/\D/g, '').slice(0, 11));
-        if (!hasValidPhone(normalizedPhone)) {
-          return res.status(400).json({ message: 'Enter a valid mobile number (09XXXXXXXXX).' });
-        }
-        user = await findCustomerByPhone(normalizedPhone);
-        if (!user) {
-          const phoneConflict = await assertPhoneAvailable(normalizedPhone, {
-            intendedRole: 'customer',
-            context: 'login',
-          });
-          if (phoneConflict && phoneConflict.status !== 401) {
-            return res.status(phoneConflict.status).json({ message: phoneConflict.message });
-          }
-          return res.status(401).json({ message: 'Invalid mobile number or password.' });
-        }
+      // Admin login by email
+      const normalizedEmail = loginId.toLowerCase();
+      if (!emailRegex.test(normalizedEmail)) {
+        return res.status(400).json({ message: 'Please enter a valid email address.' });
+      }
+      user = await User.findOne({ email: normalizedEmail, role: 'admin' }).select(AUTH_LOOKUP_EXCLUDE);
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid login details or password.' });
       }
     }
 
@@ -522,8 +592,8 @@ const loginUser = async (req, res) => {
 
     if (!isPasswordCorrect) {
       const message =
-        cleanedRole === 'provider' || !loginId.includes('@')
-          ? 'Invalid mobile number or password.'
+        cleanedRole === 'provider' || cleanedRole === 'customer'
+          ? 'Invalid email or password.'
           : 'Invalid login details or password.';
       return res.status(401).json({ message });
     }
@@ -1289,6 +1359,17 @@ const resendAccountVerification = async (req, res) => {
     );
   } catch (error) {
     console.error('resendAccountVerification', error);
+    logger.error('auth.resend_account_verification_failed', error, {
+      role: req.body?.role,
+      email: req.body?.email,
+      phoneProvided: Boolean(req.body?.phone),
+    });
+    if (error.code === 'BREVO_EMAIL_SEND_FAILED') {
+      return res.status(502).json({
+        message:
+          'Email verification could not be sent. Check your Brevo API key and verified sender email.',
+      });
+    }
     res.status(500).json({ message: 'Could not resend verification code.' });
   }
 };
@@ -1332,6 +1413,15 @@ const resendEmailVerification = async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error('resendEmailVerification', error);
+    logger.error('auth.resend_email_verification_failed', error, {
+      email: req.body?.email,
+    });
+    if (error.code === 'BREVO_EMAIL_SEND_FAILED') {
+      return res.status(502).json({
+        message:
+          'Email verification could not be sent. Check your Brevo API key and verified sender email.',
+      });
+    }
     res.status(500).json({ message: 'Could not resend verification code.' });
   }
 };

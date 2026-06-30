@@ -259,9 +259,7 @@ export default function CustomerDashboard({
     };
 
     const profileCompletionMessage = () =>
-        user?.profileStatus?.missing?.includes("address")
-            ? "Add your street address in Profile Settings before booking a pickup."
-            : "Add your mobile number in Profile Settings before booking a pickup.";
+        "Add your street address in Profile Settings before booking a pickup.";
 
     useEffect(() => {
         if (!user?.passwordNeedsUpdate || passwordNoticeShown) return;

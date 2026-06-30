@@ -335,8 +335,8 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                             )}
                         </div>
                         <InputField
-                            label={isProvider ? "Mobile number (login)" : "Mobile number"}
-                            required={!isProvider}
+                            label="Mobile number"
+                            required={false}
                             type="tel"
                             value={form.phone}
                             onChange={(v) =>
@@ -347,9 +347,7 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                             }
                         />
                         <p className="text-xs text-[#72796e] md:col-span-2 -mt-2">
-                            {isProvider
-                                ? "Used to sign in and for customer pickup contact. Format "
-                                : "Required for pickup requests and account recovery. Use format "}
+                            Used for pickup coordination and contact. Format{' '}
                             <strong>09XXXXXXXXX</strong>.
                         </p>
                     </div>

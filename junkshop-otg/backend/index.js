@@ -16,6 +16,7 @@ const verificationRoutes = require('./routes/verificationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const { mapsLimiter } = require('./middlewares/rateLimiters');
 const { MAX_JSON_BODY } = require('./utils/verificationConstants');
+const logger = require('./utils/fileLogger');
 
 // =====================
 // Required environment
@@ -102,6 +103,19 @@ app.use(
   })
 );
 app.use(express.json({ limit: MAX_JSON_BODY }));
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    logger.info('http.request', {
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      durationMs: Date.now() - startedAt,
+      ip: req.ip,
+    });
+  });
+  next();
+});
 
 // =====================
 // Routes
@@ -142,6 +156,11 @@ app.use((err, req, res, next) => {
   }
 
   console.error(err);
+  logger.error('http.unhandled_error', err, {
+    method: req.method,
+    url: req.originalUrl,
+    ip: req.ip,
+  });
 
   res.status(err.status || 500).json({
     message: isProduction ? 'Something went wrong.' : err.message || 'Something went wrong.',
@@ -166,5 +185,6 @@ const startServer = async () => {
 
 startServer().catch((err) => {
   console.error('Failed to start server:', err.message);
+  logger.error('server.start_failed', err);
   process.exit(1);
 });
