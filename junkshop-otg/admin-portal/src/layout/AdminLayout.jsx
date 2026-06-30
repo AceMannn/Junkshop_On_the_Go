@@ -17,11 +17,16 @@ const navItems = [
 export default function AdminLayout({ user, onLogout }) {
   const navigate = useNavigate();
   const [unreadContactCount, setUnreadContactCount] = useState(0);
+  const [contactNotifications, setContactNotifications] = useState([]);
 
   const refreshUnreadContactCount = useCallback(async () => {
     try {
-      const data = await adminApi.getOverview();
-      setUnreadContactCount(data.stats?.unreadContactMessages || 0);
+      const [overview, contactData] = await Promise.all([
+        adminApi.getOverview(),
+        adminApi.listContactMessages(),
+      ]);
+      setUnreadContactCount(overview.stats?.unreadContactMessages || 0);
+      setContactNotifications((contactData.messages || []).filter((row) => row.status === 'new').slice(0, 5));
     } catch {
       // Keep navigation usable even if the badge count cannot load.
     }
@@ -37,8 +42,8 @@ export default function AdminLayout({ user, onLogout }) {
     };
   }, [refreshUnreadContactCount]);
 
-  const openContactInbox = () => {
-    navigate('/contact');
+  const openContactInbox = (messageId) => {
+    navigate(messageId ? `/contact?message=${messageId}` : '/contact');
   };
 
   return (
@@ -47,6 +52,7 @@ export default function AdminLayout({ user, onLogout }) {
         user={user}
         onLogout={onLogout}
         unreadContactCount={unreadContactCount}
+        contactNotifications={contactNotifications}
         onOpenContact={openContactInbox}
       />
 

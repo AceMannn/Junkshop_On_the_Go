@@ -20,6 +20,18 @@ const pickupRequestSchema = new mongoose.Schema(
       enum: ['specific', 'nearest'],
       default: 'specific',
     },
+    nearbyRadiusKm: {
+      type: Number,
+      min: 1,
+      max: 50,
+      default: 5,
+    },
+    candidateProviders: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     requestType: {
       type: String,
       enum: ['home_pickup', 'drop_off'],

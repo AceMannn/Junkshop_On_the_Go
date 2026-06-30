@@ -10,6 +10,7 @@ const {
   getFavorites,
   toggleFavorite,
   forgotPassword,
+  verifyResetCode,
   resetPassword,
   verifyAccount,
   resendAccountVerification,
@@ -26,6 +27,7 @@ router.post('/login', authLimiter, loginUser);
 router.post('/verify-email', authLimiter, verifyEmail);
 router.post('/resend-verification', authLimiter, resendEmailVerification);
 router.post('/forgot-password', authLimiter, forgotPassword);
+router.post('/verify-reset-code', authLimiter, verifyResetCode);
 router.post('/reset-password', authLimiter, resetPassword);
 router.post('/verify-account', authLimiter, verifyAccount);
 router.post('/resend-account-verification', authLimiter, resendAccountVerification);

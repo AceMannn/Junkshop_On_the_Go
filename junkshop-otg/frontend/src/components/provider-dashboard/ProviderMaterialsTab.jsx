@@ -1,5 +1,21 @@
-import { useMemo, useState } from "react";
-import { Plus, Search, Trash2, Pencil, Eye, EyeOff, Layers, LayoutGrid, Table2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+    AlertTriangle,
+    Clock3,
+    History,
+    Layers,
+    LayoutGrid,
+    Loader2,
+    Pencil,
+    Plus,
+    RotateCcw,
+    Search,
+    Table2,
+    Trash2,
+    X,
+    Eye,
+    EyeOff,
+} from "lucide-react";
 import { domainApi } from "../../services/api";
 import { useProviderMaterials } from "../../hooks/useProviderData";
 import NumberInput from "../ui/NumberInput";
@@ -94,14 +110,52 @@ function isKnownSubcategory(category, name) {
     );
 }
 
+function getMaterialId(item) {
+    return item?._id || item?.id;
+}
+
+function daysLeftMeta(days) {
+    if (days <= 3) {
+        return {
+            text: `${days} day${days === 1 ? "" : "s"} left`,
+            chip: "bg-red-50 text-red-700 border-red-200",
+            bar: "bg-red-500",
+        };
+    }
+    if (days <= 7) {
+        return {
+            text: `${days} days left`,
+            chip: "bg-amber-50 text-amber-700 border-amber-200",
+            bar: "bg-amber-500",
+        };
+    }
+    return {
+        text: `${days} days left`,
+        chip: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        bar: "bg-emerald-500",
+    };
+}
+
+function historyLabel(row) {
+    return row?.label || String(row?.action || "Updated").replace(/_/g, " ");
+}
+
 export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
     const { materials, loading, refresh } = useProviderMaterials({ autoRefresh: true });
+    const deleteTimerRef = useRef(null);
+    const [activeTab, setActiveTab] = useState("active");
+    const [deletedMaterials, setDeletedMaterials] = useState([]);
+    const [trashLoading, setTrashLoading] = useState(false);
     const [search, setSearch] = useState("");
     const [categoryFilter, setCategoryFilter] = useState("all");
     const [viewMode, setViewMode] = useState("cards");
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [pendingDelete, setPendingDelete] = useState(null);
+    const [historyMaterial, setHistoryMaterial] = useState(null);
+    const [historyItems, setHistoryItems] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [form, setForm] = useState({
         category: "plastic",
         name: getDefaultSubcategory("plastic"),
@@ -111,9 +165,14 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
         available: true,
     });
 
+    const activeCount = materials.length;
+    const trashCount = deletedMaterials.length;
+
+    const currentMaterials = activeTab === "trash" ? deletedMaterials : materials;
+
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return materials.filter((item) => {
+        return currentMaterials.filter((item) => {
             const matchesCategory =
                 categoryFilter === "all" ||
                 item.category.toLowerCase() === categoryFilter.toLowerCase();
@@ -123,7 +182,37 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                 item.category.toLowerCase().includes(q);
             return matchesCategory && matchesSearch;
         });
-    }, [materials, search, categoryFilter]);
+    }, [currentMaterials, search, categoryFilter]);
+
+    const loadTrash = async ({ silent = false } = {}) => {
+        if (!silent) setTrashLoading(true);
+        try {
+            const data = await domainApi.getDeletedMaterials();
+            setDeletedMaterials(data.materials || []);
+            if (data.purgedCount > 0) {
+                onNotify?.(`${data.purgedCount} expired material${data.purgedCount === 1 ? "" : "s"} permanently deleted.`);
+            }
+        } catch (err) {
+            onNotify?.(err.message);
+        } finally {
+            if (!silent) setTrashLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadTrash({ silent: true });
+        return () => {
+            if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === "trash") {
+            loadTrash();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab]);
 
     const openAdd = () => {
         setEditing(null);
@@ -187,14 +276,59 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!confirm("Delete this material?")) return;
+    const commitDelete = async (item) => {
         try {
-            await domainApi.deleteMaterial(id);
-            onNotify?.("Material deleted.");
+            await domainApi.deleteMaterial(getMaterialId(item));
+            onNotify?.("Material moved to trash. You can restore it within 30 days.");
             refresh();
+            loadTrash({ silent: true });
+            await onRefreshProfile?.();
         } catch (err) {
             onNotify?.(err.message);
+        } finally {
+            setPendingDelete(null);
+            deleteTimerRef.current = null;
+        }
+    };
+
+    const handleDelete = (item) => {
+        if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+        setPendingDelete(item);
+        deleteTimerRef.current = setTimeout(() => {
+            commitDelete(item);
+        }, 5000);
+    };
+
+    const undoDelete = () => {
+        if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+        deleteTimerRef.current = null;
+        setPendingDelete(null);
+    };
+
+    const restoreMaterial = async (item) => {
+        try {
+            await domainApi.restoreMaterial(getMaterialId(item));
+            onNotify?.("Material restored as hidden. Turn it on when ready.");
+            await loadTrash();
+            refresh();
+            await onRefreshProfile?.();
+        } catch (err) {
+            onNotify?.(err.message);
+        }
+    };
+
+    const openHistory = async (item) => {
+        setHistoryMaterial(item);
+        setHistoryItems([]);
+        setHistoryLoading(true);
+        try {
+            const data = await domainApi.getMaterialHistory(getMaterialId(item));
+            setHistoryMaterial(data.material || item);
+            setHistoryItems(data.history || []);
+        } catch (err) {
+            onNotify?.(err.message);
+        } finally {
+            setHistoryLoading(false);
         }
     };
 
@@ -218,14 +352,45 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                         Manage what your shop accepts. Shown to customers in your catalog.
                     </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={openAdd}
-                    className="inline-flex items-center justify-center gap-2 bg-[#154212] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-900 transition-colors"
-                >
-                    <Plus size={18} />
-                    Add Material
-                </button>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab("active")}
+                        className={`inline-flex h-10 items-center justify-center rounded-xl border px-5 text-sm font-semibold shadow-sm transition-colors ${
+                            activeTab === "active"
+                                ? "border-[#154212] bg-[#154212] text-white hover:bg-emerald-900"
+                                : "border-emerald-200 bg-white text-[#154212] hover:bg-emerald-50"
+                        }`}
+                    >
+                        Active ({activeCount})
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab("trash")}
+                        className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-5 text-sm font-semibold shadow-sm transition-colors ${
+                            activeTab === "trash"
+                                ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+                                : "border-red-200 bg-white text-red-600 hover:bg-red-50"
+                        }`}
+                    >
+                        <Trash2 size={15} />
+                        Trash ({trashCount})
+                    </button>
+                    <button
+                        type="button"
+                        onClick={openAdd}
+                        disabled={activeTab === "trash"}
+                        className={`inline-flex h-10 items-center justify-center gap-2 px-5 rounded-xl text-sm font-semibold transition-colors shadow-sm ${
+                            activeTab === "trash"
+                                ? "cursor-not-allowed border border-zinc-200 bg-zinc-100 text-zinc-400"
+                                : "bg-[#154212] text-white hover:bg-emerald-900"
+                        }`}
+                        title={activeTab === "trash" ? "Switch to Active to add materials" : "Add material"}
+                    >
+                        <Plus size={18} />
+                        Add Material
+                    </button>
+                </div>
             </div>
 
             <div className="flex min-w-0 flex-col sm:flex-row gap-3">
@@ -249,12 +414,16 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                     <button
                         type="button"
                         onClick={() => setViewMode("cards")}
+                        disabled={activeTab === "trash"}
                         className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
-                            viewMode === "cards"
+                            activeTab === "trash"
+                                ? "cursor-not-allowed text-zinc-400"
+                                : viewMode === "cards"
                                 ? "bg-[#154212] text-white"
                                 : "text-[#42493e] hover:bg-emerald-50"
                         }`}
                         aria-pressed={viewMode === "cards"}
+                        title={activeTab === "trash" ? "Table view is disabled in trash" : "Show cards"}
                     >
                         <LayoutGrid size={14} />
                         Cards
@@ -262,12 +431,16 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                     <button
                         type="button"
                         onClick={() => setViewMode("table")}
+                        disabled={activeTab === "trash"}
                         className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
-                            viewMode === "table"
+                            activeTab === "trash"
+                                ? "cursor-not-allowed text-zinc-400"
+                                : viewMode === "table"
                                 ? "bg-[#154212] text-white"
                                 : "text-[#42493e] hover:bg-emerald-50"
                         }`}
                         aria-pressed={viewMode === "table"}
+                        title={activeTab === "trash" ? "Table view is disabled in trash" : "Show table"}
                     >
                         <Table2 size={14} />
                         Table
@@ -275,17 +448,26 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                 </div>
             </div>
 
-            {loading ? (
-                <p className="text-sm text-[#72796e]">Loading materials...</p>
+            {(activeTab === "trash" ? trashLoading : loading) ? (
+                <p className="inline-flex items-center gap-2 text-sm text-[#72796e]">
+                    <Loader2 size={16} className="animate-spin" />
+                    Loading {activeTab === "trash" ? "trash" : "materials"}...
+                </p>
             ) : filtered.length === 0 ? (
                 <div className="text-center py-16 bg-white rounded-xl border border-zinc-200 flex flex-col items-center gap-3">
                     <div className="w-14 h-14 rounded-2xl bg-zinc-100 flex items-center justify-center">
                         <Layers size={26} className="text-zinc-400" />
                     </div>
-                    <p className="text-[#191c1c] font-semibold">No materials found</p>
-                    <p className="text-sm text-[#72796e]">Add your first listing to start accepting pickups.</p>
+                    <p className="text-[#191c1c] font-semibold">
+                        {activeTab === "trash" ? "No deleted materials" : "No materials found"}
+                    </p>
+                    <p className="text-sm text-[#72796e]">
+                        {activeTab === "trash"
+                            ? "Items moved to trash appear here for 30 days before permanent deletion."
+                            : "Add your first listing to start accepting pickups."}
+                    </p>
                 </div>
-            ) : viewMode === "table" ? (
+            ) : activeTab === "active" && viewMode === "table" ? (
                 <div className="scroll-x-clean overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
                     <table className="w-full min-w-[760px] text-sm">
                         <thead className="bg-[#f3f4f3] text-[#42493e]">
@@ -304,7 +486,7 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                                 const cat = CATEGORY_COLORS[catKey] || CATEGORY_COLORS.other;
 
                                 return (
-                                    <tr key={item.id} className="hover:bg-zinc-50">
+                                    <tr key={getMaterialId(item)} className="hover:bg-zinc-50">
                                         <td className="px-4 py-4">
                                             <p className="font-bold text-[#191c1c]">{item.name}</p>
                                             <p className="text-xs text-[#72796e]">per {item.unit}</p>
@@ -350,11 +532,19 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleDelete(item._id)}
+                                                    onClick={() => openHistory(item)}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-semibold border border-zinc-300 text-[#42493e] px-3 py-1.5 rounded-lg"
+                                                >
+                                                    <History size={13} />
+                                                    History
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDelete(item)}
                                                     className="inline-flex items-center gap-1.5 text-xs font-semibold border border-red-200 text-red-600 px-3 py-1.5 rounded-lg"
                                                 >
                                                     <Trash2 size={13} />
-                                                    Delete
+                                                    Trash
                                                 </button>
                                             </div>
                                         </td>
@@ -369,10 +559,16 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                     {filtered.map((item) => {
                         const catKey = item.category?.toLowerCase() || "other";
                         const cat = CATEGORY_COLORS[catKey] || CATEGORY_COLORS.other;
+                        const isTrash = activeTab === "trash";
+                        const daysLeft = item.daysUntilPermanentDelete ?? 30;
+                        const expiry = daysLeftMeta(daysLeft);
+                        const progressWidth = `${Math.max(0, Math.min(100, (daysLeft / 30) * 100))}%`;
                         return (
                             <article
-                                key={item.id}
-                                className={`bg-white rounded-xl border border-zinc-200 border-t-2 ${cat.border} p-4 sm:p-5 shadow-sm`}
+                                key={getMaterialId(item)}
+                                className={`bg-white rounded-xl border border-zinc-200 border-t-2 ${cat.border} p-4 sm:p-5 shadow-sm ${
+                                    isTrash ? "opacity-90 bg-zinc-50/80" : ""
+                                }`}
                             >
                                 <div className="flex justify-between items-start gap-3">
                                     <div className="min-w-0">
@@ -388,10 +584,20 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                                             >
                                                 {item.available ? "Available" : "Hidden"}
                                             </span>
+                                            {isTrash && (
+                                                <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase ${expiry.chip}`}>
+                                                    <Clock3 size={11} />
+                                                    {expiry.text}
+                                                </span>
+                                            )}
                                         </div>
-                                        <h3 className="font-bold text-[#191c1c] mt-1">{item.name}</h3>
+                                        <h3 className={`font-bold text-[#191c1c] mt-1 ${isTrash ? "line-through decoration-red-300" : ""}`}>
+                                            {item.name}
+                                        </h3>
                                         <p className="text-xs text-[#72796e] mt-0.5">
-                                            Posted {formatUpdatedDate(item.createdAt || item.updatedAt)}
+                                            {isTrash
+                                                ? `Moved to trash ${formatUpdatedDate(item.deletedAt)}`
+                                                : `Posted ${formatUpdatedDate(item.createdAt || item.updatedAt)}`}
                                         </p>
                                     </div>
                                     <div className="shrink-0 text-right">
@@ -399,35 +605,162 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                                         <p className="text-xs text-[#72796e]">per {item.unit}</p>
                                     </div>
                                 </div>
+                                {isTrash && (
+                                    <div className="mt-4">
+                                        <div className="h-2 rounded-full bg-zinc-200 overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${expiry.bar}`}
+                                                style={{ width: progressWidth }}
+                                            />
+                                        </div>
+                                        <p className="mt-2 flex items-center gap-1 text-xs text-[#72796e]">
+                                            <AlertTriangle size={13} />
+                                            Permanently deletes after 30 days in trash.
+                                        </p>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-100">
+                                    {!isTrash && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => openEdit(item)}
+                                                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#154212] text-white px-3 py-1.5 rounded-lg"
+                                            >
+                                                <Pencil size={13} />
+                                                Edit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleAvailability(item)}
+                                                className="inline-flex items-center gap-1.5 text-xs font-semibold border border-zinc-300 text-[#42493e] px-3 py-1.5 rounded-lg"
+                                            >
+                                                {item.available ? <EyeOff size={13} /> : <Eye size={13} />}
+                                                {item.available ? "Hide" : "Show"}
+                                            </button>
+                                        </>
+                                    )}
                                     <button
                                         type="button"
-                                        onClick={() => openEdit(item)}
-                                        className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#154212] text-white px-3 py-1.5 rounded-lg"
-                                    >
-                                        <Pencil size={13} />
-                                        Edit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleAvailability(item)}
+                                        onClick={() => openHistory(item)}
                                         className="inline-flex items-center gap-1.5 text-xs font-semibold border border-zinc-300 text-[#42493e] px-3 py-1.5 rounded-lg"
                                     >
-                                        {item.available ? <EyeOff size={13} /> : <Eye size={13} />}
-                                        {item.available ? "Hide" : "Show"}
+                                        <History size={13} />
+                                        History
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleDelete(item._id)}
-                                        className="inline-flex items-center gap-1.5 text-xs font-semibold border border-red-200 text-red-600 px-3 py-1.5 rounded-lg ml-auto"
-                                    >
-                                        <Trash2 size={13} />
-                                        Delete
-                                    </button>
+                                    {isTrash ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => restoreMaterial(item)}
+                                            className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#154212] text-white px-3 py-1.5 rounded-lg ml-auto"
+                                        >
+                                            <RotateCcw size={13} />
+                                            Restore hidden
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDelete(item)}
+                                            className="inline-flex items-center gap-1.5 text-xs font-semibold border border-red-200 text-red-600 px-3 py-1.5 rounded-lg ml-auto"
+                                        >
+                                            <Trash2 size={13} />
+                                            Trash
+                                        </button>
+                                    )}
                                 </div>
                             </article>
                         );
                     })}
+                </div>
+            )}
+
+            {pendingDelete && (
+                <div className="fixed bottom-5 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl">
+                    <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                            <Trash2 size={18} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-[#191c1c]">Move material to trash?</p>
+                            <p className="text-sm text-[#72796e]">
+                                {pendingDelete.name} will stay recoverable for 30 days.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={undoDelete}
+                            className="rounded-lg px-3 py-1.5 text-sm font-bold text-[#154212] hover:bg-emerald-50"
+                        >
+                            Undo
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {historyMaterial && (
+                <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={() => setHistoryMaterial(null)}>
+                    <aside
+                        className="scroll-y-clean h-full w-full max-w-md bg-white shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white p-5">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-wide text-[#72796e]">
+                                        Material history
+                                    </p>
+                                    <h2 className="mt-1 text-xl font-bold text-[#191c1c]">
+                                        {historyMaterial.name}
+                                    </h2>
+                                    <span className="mt-2 inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-bold uppercase text-zinc-600">
+                                        {formatMaterialCategoryLabel(historyMaterial.category)}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setHistoryMaterial(null)}
+                                    className="rounded-xl border border-zinc-200 p-2 text-[#42493e] hover:bg-zinc-50"
+                                    aria-label="Close history"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-5">
+                            {historyLoading ? (
+                                <p className="inline-flex items-center gap-2 text-sm text-[#72796e]">
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Loading history...
+                                </p>
+                            ) : historyItems.length === 0 ? (
+                                <div className="rounded-2xl border border-dashed border-zinc-200 p-8 text-center">
+                                    <Clock3 className="mx-auto mb-3 text-zinc-400" />
+                                    <p className="font-semibold text-[#191c1c]">No history yet</p>
+                                    <p className="mt-1 text-sm text-[#72796e]">
+                                        Future material updates will appear here.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-0">
+                                    {historyItems.map((row, index) => (
+                                        <div key={row._id || `${row.action}-${index}`} className="relative flex gap-3 pb-5">
+                                            {index < historyItems.length - 1 && (
+                                                <div className="absolute left-[0.57rem] top-5 h-full w-px bg-zinc-200" />
+                                            )}
+                                            <div className="relative z-10 mt-1 h-5 w-5 rounded-full border-4 border-white bg-[#154212] shadow" />
+                                            <div className="min-w-0 flex-1 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+                                                <p className="font-semibold text-[#191c1c]">{historyLabel(row)}</p>
+                                                <p className="mt-1 text-xs text-[#72796e]">
+                                                    {formatUpdatedDate(row.createdAt)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </aside>
                 </div>
             )}
 

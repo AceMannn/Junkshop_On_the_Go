@@ -202,9 +202,9 @@ export default function CustomerPickupsTab({
                 <button
                     type="button"
                     onClick={startWizard}
-                    className="inline-flex items-center justify-center gap-2 bg-[#154212] text-white px-5 py-3 rounded-xl text-sm font-semibold hover:bg-emerald-900 transition-colors"
+                    className="inline-flex h-10 items-center justify-center gap-2 bg-[#154212] text-white px-4 rounded-xl text-sm font-semibold hover:bg-emerald-900 transition-colors"
                 >
-                    <Plus size={18} />
+                    <Plus size={16} />
                     New pickup
                 </button>
             </div>
@@ -215,7 +215,7 @@ export default function CustomerPickupsTab({
                         key={key}
                         type="button"
                         onClick={() => setFilter(key)}
-                        className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${filter === key
+                        className={`h-9 px-3.5 rounded-xl text-sm font-semibold transition ${filter === key
                             ? "bg-[#154212] text-white"
                             : "bg-white border border-zinc-200 text-[#72796e] hover:bg-zinc-50"
                             }`}

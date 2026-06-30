@@ -6,6 +6,7 @@ const Transaction = require('../models/Transaction');
 const { evaluateProfile, normalizePhone, hasValidPhone } = require('../utils/profileCompletion');
 const { syncJunkshopRating } = require('../utils/shopRatings');
 const { geocodeFirst } = require('../utils/mapService');
+const { haversineKm } = require('../utils/geo');
 const {
   isHomePickup,
   isZeroServiceFee,
@@ -25,15 +26,14 @@ const {
   serializePickupForViewer,
 } = require('../utils/accountModeration');
 const { PICKUP_LIST_LIMIT } = require('../utils/listLimits');
-const {
-  sendTransactionalEmail,
-  sendTransactionalSms,
-} = require('../utils/deliveryService');
+const { sendTransactionalEmail } = require('../utils/deliveryService');
 const { writeAuditLog } = require('../utils/auditLogger');
 
 const POPULATE_FIELDS =
   'firstName lastName email phone junkshopName name address pickupServiceFee gcashNumber gcashQrUrl pickupEnabled status role';
 const MAX_AMOUNT = 20000;
+const DEFAULT_NEARBY_RADIUS_KM = 5;
+const ALLOWED_NEARBY_RADIUS_KM = [5, 10, 20];
 
 const REJECT_PRESETS = [
   'We cannot accept this pickup right now.',
@@ -57,17 +57,12 @@ const notifyUser = async (userId, { title, message, pickupRequestId }) => {
     title,
     message,
     pickupRequest: pickupRequestId,
-    channels: { inApp: true, email: Boolean(user.email), sms: Boolean(user.phone) },
+    channels: { inApp: true, email: Boolean(user.email), sms: false },
   });
 
   if (user.email) {
     sendTransactionalEmail(user.email, title, message).catch((err) => {
       console.warn('[notify:email]', err.message);
-    });
-  }
-  if (user.phone) {
-    sendTransactionalSms(user.phone, `${title}: ${message}`).catch((err) => {
-      console.warn('[notify:sms]', err.message);
     });
   }
 };
@@ -94,6 +89,11 @@ const resolvePickupLocation = async ({ requestType, address, junkshop }) => {
 
   return null;
 };
+
+function normalizeNearbyRadiusKm(value) {
+  const parsed = Number(value);
+  return ALLOWED_NEARBY_RADIUS_KM.includes(parsed) ? parsed : DEFAULT_NEARBY_RADIUS_KM;
+}
 
 const serializeRequest = (doc, viewerRole, statusMap = {}) =>
   serializePickupForViewer(doc, viewerRole, statusMap);
@@ -247,7 +247,16 @@ exports.listPickupRequests = async (req, res) => {
         deletedAt: null,
         $or: [
           { provider: req.user._id },
-          { status: 'pending', assignmentMode: 'nearest', provider: null },
+          {
+            status: 'pending',
+            assignmentMode: 'nearest',
+            provider: null,
+            $or: [
+              { candidateProviders: req.user._id },
+              { candidateProviders: { $exists: false } },
+              { candidateProviders: { $size: 0 } },
+            ],
+          },
           { status: 'pending', junkshop: { $in: shopIds }, provider: null },
         ],
       };
@@ -361,6 +370,7 @@ exports.createPickupRequest = async (req, res) => {
       assignmentMode = 'specific',
       requestType = 'home_pickup',
       junkshopId,
+      nearbyRadiusKm,
       contactName,
       contactPhone,
       contactEmail,
@@ -520,10 +530,66 @@ exports.createPickupRequest = async (req, res) => {
       });
     }
 
+    const normalizedNearbyRadiusKm = normalizeNearbyRadiusKm(nearbyRadiusKm);
+    let candidateProviderIds = [];
+
+    if (assignmentMode === 'nearest') {
+      if (!resolvedPickupLocation) {
+        return res.status(400).json({
+          message: 'Confirm a pickup location before using nearest shop.',
+        });
+      }
+
+      const providers = await User.find({
+        role: 'provider',
+        status: 'active',
+        deletedAt: null,
+        pickupEnabled: true,
+        profileComplete: true,
+      }).select('_id');
+      const providerIds = providers.map((provider) => provider._id);
+
+      const nearbyShops = await Junkshop.find({
+        provider: { $in: providerIds },
+        isCatalog: { $ne: true },
+        deletedAt: null,
+        isPublished: true,
+        pickupEnabled: { $ne: false },
+      }).select('provider location status pickupEnabled');
+
+      const candidateSet = new Set();
+      nearbyShops.forEach((shop) => {
+        if (requestType === 'home_pickup' && shop.status === 'closed') return;
+        const shopLat = Number(shop.location?.lat);
+        const shopLng = Number(shop.location?.lng);
+        if (!Number.isFinite(shopLat) || !Number.isFinite(shopLng)) return;
+
+        const km = haversineKm(
+          Number(resolvedPickupLocation.lat),
+          Number(resolvedPickupLocation.lng),
+          shopLat,
+          shopLng
+        );
+        if (km <= normalizedNearbyRadiusKm) {
+          candidateSet.add(String(shop.provider));
+        }
+      });
+
+      candidateProviderIds = [...candidateSet];
+
+      if (candidateProviderIds.length === 0) {
+        return res.status(400).json({
+          message: `No available shops within ${normalizedNearbyRadiusKm} km. Expand the range or choose a shop manually.`,
+        });
+      }
+    }
+
     const request = await PickupRequest.create({
       customer: req.user._id,
       junkshop: junkshop?._id,
       assignmentMode,
+      nearbyRadiusKm: normalizedNearbyRadiusKm,
+      candidateProviders: candidateProviderIds,
       requestType,
       contactName: contactName.trim(),
       contactPhone: normalizedPhone || contactPhone?.trim() || '',
@@ -552,18 +618,11 @@ exports.createPickupRequest = async (req, res) => {
         pickupRequestId: request._id,
       });
     } else if (assignmentMode === 'nearest') {
-      const providers = await User.find({
-        role: 'provider',
-        status: 'active',
-        deletedAt: null,
-        pickupEnabled: true,
-        profileComplete: true,
-      }).select('_id');
       await Promise.all(
-        providers.map((p) =>
-          notifyUser(p._id, {
+        candidateProviderIds.map((providerId) =>
+          notifyUser(providerId, {
             title: 'New nearby pickup request',
-            message: `${contactName} is looking for the nearest available shop.`,
+            message: `${contactName} is looking for a shop within ${normalizedNearbyRadiusKm} km.`,
             pickupRequestId: request._id,
           })
         )
@@ -603,6 +662,16 @@ exports.acceptPickupRequest = async (req, res) => {
     const provider = await User.findById(req.user._id);
     if (!provider.pickupEnabled) {
       return res.status(400).json({ message: 'Enable pickups in your shop settings first.' });
+    }
+
+    const hasCandidateScope =
+      Array.isArray(request.candidateProviders) && request.candidateProviders.length > 0;
+    if (
+      request.assignmentMode === 'nearest' &&
+      hasCandidateScope &&
+      !request.candidateProviders.some((id) => id.toString() === req.user._id.toString())
+    ) {
+      return res.status(403).json({ message: 'This pickup is outside your nearby request range.' });
     }
 
     let junkshop = null;
@@ -1106,6 +1175,16 @@ exports.ratePickupRequest = async (req, res) => {
 
     if (request.junkshop) {
       await syncJunkshopRating(request.junkshop);
+    }
+
+    if (request.provider) {
+      await Notification.create({
+        user: request.provider,
+        type: 'review',
+        title: 'New customer review',
+        message: `A customer rated your completed pickup ${rating}/5 stars.`,
+        pickupRequest: request._id,
+      });
     }
 
     res.json({ request: serializeRequest(request) });

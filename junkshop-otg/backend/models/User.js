@@ -264,6 +264,16 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    passwordResetSessionToken: {
+      type: String,
+      default: null,
+    },
+
+    passwordResetSessionExpires: {
+      type: Date,
+      default: null,
+    },
+
     profileComplete: {
       type: Boolean,
       default: false,

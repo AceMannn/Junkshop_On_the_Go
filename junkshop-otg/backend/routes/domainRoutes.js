@@ -34,9 +34,36 @@ const {
   applyJunkshopVisibility,
   filterTransactionsForViewer,
 } = require('../utils/accountModeration');
+const { sendMaterialExpiryWarningEmail } = require('../utils/deliveryService');
 
 const router = express.Router();
 const MAX_AMOUNT = 20000;
+const MATERIAL_TRASH_RETENTION_DAYS = 30;
+const MATERIAL_TRASH_WARNING_DAYS_LEFT = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function materialChangelogEntry(action, label, actor, details = {}) {
+  return {
+    action,
+    label,
+    details,
+    actor: actor?._id || actor || null,
+    createdAt: new Date(),
+  };
+}
+
+function normalizeMaterialForResponse(item) {
+  return {
+    ...item,
+    category: normalizeMaterialCategory(item.category, item.name),
+  };
+}
+
+function daysUntilPermanentDelete(deletedAt) {
+  if (!deletedAt) return MATERIAL_TRASH_RETENTION_DAYS;
+  const elapsed = Date.now() - new Date(deletedAt).getTime();
+  return Math.max(0, Math.ceil(MATERIAL_TRASH_RETENTION_DAYS - elapsed / DAY_MS));
+}
 
 const requireProvider = (req, res, next) => {
   if (req.user.role !== 'provider') {
@@ -45,6 +72,17 @@ const requireProvider = (req, res, next) => {
 
   next();
 };
+
+function normalizeJunkshopLocation(location) {
+  const lat = Number(location?.lat);
+  const lng = Number(location?.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return { lat, lng };
+}
 
 router.get('/junkshops', async (req, res) => {
   const lat = Number(req.query.lat);
@@ -327,6 +365,13 @@ router.get('/junkshops/:id/reviews', async (req, res) => {
 
 router.post('/junkshops', protect, requireProvider, async (req, res) => {
   const data = pickAllowed(req.body, JUNKSHOP_WRITE_KEYS);
+  const location = normalizeJunkshopLocation(data.location);
+
+  if (!String(data.address || '').trim() || !location) {
+    return res.status(400).json({ message: 'Shop address and confirmed map pin are required.' });
+  }
+
+  data.location = location;
   const junkshop = await Junkshop.create({
     ...data,
     provider: req.user._id,
@@ -339,6 +384,20 @@ router.post('/junkshops', protect, requireProvider, async (req, res) => {
 
 router.patch('/junkshops/:id', protect, requireProvider, async (req, res) => {
   const data = pickAllowed(req.body, JUNKSHOP_WRITE_KEYS);
+
+  if (Object.prototype.hasOwnProperty.call(data, 'address')) {
+    const location = normalizeJunkshopLocation(data.location);
+    if (!String(data.address || '').trim() || !location) {
+      return res.status(400).json({ message: 'Shop address and confirmed map pin are required.' });
+    }
+    data.location = location;
+  } else if (Object.prototype.hasOwnProperty.call(data, 'location')) {
+    const location = normalizeJunkshopLocation(data.location);
+    if (!location) {
+      return res.status(400).json({ message: 'Confirmed map pin is required.' });
+    }
+    data.location = location;
+  }
 
   if (Array.isArray(data.operatingHours)) {
     const schedule = sanitizeOperatingHours(data.operatingHours);
@@ -510,11 +569,151 @@ router.get('/materials/mine', protect, requireProvider, async (req, res) => {
     deletedAt: null,
   }).sort({ category: 1, name: 1 }).lean();
   res.json({
-    materials: materials.map((item) => ({
-      ...item,
-      category: normalizeMaterialCategory(item.category, item.name),
-    })),
+    materials: materials.map(normalizeMaterialForResponse),
   });
+});
+
+router.get('/materials/deleted', protect, requireProvider, async (req, res) => {
+  const now = new Date();
+  const hardDeleteCutoff = new Date(now.getTime() - MATERIAL_TRASH_RETENTION_DAYS * DAY_MS);
+  const warningCutoff = new Date(
+    now.getTime() - (MATERIAL_TRASH_RETENTION_DAYS - MATERIAL_TRASH_WARNING_DAYS_LEFT) * DAY_MS
+  );
+
+  const expired = await Material.find({
+    provider: req.user._id,
+    isCatalog: { $ne: true },
+    deletedAt: { $lte: hardDeleteCutoff },
+  }).select('_id name category');
+
+  if (expired.length > 0) {
+    await Material.deleteMany({ _id: { $in: expired.map((item) => item._id) } });
+
+    await writeAuditLog({
+      actor: req.user,
+      action: 'hard_delete',
+      targetType: 'material',
+      targetId: req.user._id,
+      details: {
+        reason: 'material trash retention expired',
+        count: expired.length,
+        materials: expired.map((item) => ({
+          id: String(item._id),
+          name: item.name,
+          category: item.category,
+        })),
+      },
+    });
+  }
+
+  const warningCandidates = await Material.find({
+    provider: req.user._id,
+    isCatalog: { $ne: true },
+    deletedAt: { $ne: null, $lte: warningCutoff, $gt: hardDeleteCutoff },
+    expiryNotifiedAt: null,
+  });
+
+  for (const material of warningCandidates) {
+    try {
+      await sendMaterialExpiryWarningEmail(req.user.email, req.user.firstName, material.name);
+      material.expiryNotifiedAt = now;
+      material.changelog.push(
+        materialChangelogEntry(
+          'expiry_warning_sent',
+          '3-day deletion warning email sent',
+          req.user,
+          { deletedAt: material.deletedAt }
+        )
+      );
+      await material.save();
+    } catch (error) {
+      console.error('[materials] expiry warning failed:', error.message);
+    }
+  }
+
+  const deletedMaterials = await Material.find({
+    provider: req.user._id,
+    isCatalog: { $ne: true },
+    deletedAt: { $ne: null },
+  })
+    .sort({ deletedAt: -1 })
+    .lean();
+
+  res.json({
+    materials: deletedMaterials.map((item) => ({
+      ...normalizeMaterialForResponse(item),
+      daysUntilPermanentDelete: daysUntilPermanentDelete(item.deletedAt),
+    })),
+    purgedCount: expired.length,
+  });
+});
+
+router.get('/materials/:id/history', protect, requireProvider, async (req, res) => {
+  const material = await Material.findOne({
+    _id: req.params.id,
+    provider: req.user._id,
+    isCatalog: { $ne: true },
+  })
+    .select('name category price unit changelog createdAt updatedAt deletedAt')
+    .lean();
+
+  if (!material) {
+    return res.status(404).json({ message: 'Material not found.' });
+  }
+
+  const history =
+    material.changelog?.length > 0
+      ? [...material.changelog].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      : [
+          materialChangelogEntry(
+            'created',
+            `Material created at ₱${material.price || 0}`,
+            null,
+            {}
+          ),
+        ];
+
+  res.json({
+    material: normalizeMaterialForResponse(material),
+    history,
+  });
+});
+
+router.patch('/materials/:id/restore', protect, requireProvider, async (req, res) => {
+  const material = await Material.findOne({
+    _id: req.params.id,
+    provider: req.user._id,
+    isCatalog: { $ne: true },
+    deletedAt: { $ne: null },
+  });
+
+  if (!material) {
+    return res.status(404).json({ message: 'Deleted material not found.' });
+  }
+
+  material.deletedAt = null;
+  material.deletedBy = null;
+  material.expiryNotifiedAt = null;
+  material.available = false;
+  material.changelog.push(
+    materialChangelogEntry('restored', 'Restored from trash as hidden', req.user, {
+      available: false,
+    })
+  );
+  await material.save();
+
+  await syncJunkshopMaterialTags(req.user._id);
+  await syncProfileComplete(req.user._id);
+
+  await writeAuditLog({
+    actor: req.user,
+    action: 'restore',
+    targetType: 'material',
+    targetId: material._id,
+    details: { name: material.name, category: material.category, restoredAs: 'hidden' },
+  });
+
+  res.json({ message: 'Material restored as hidden.', material });
 });
 
 router.post('/materials', protect, requireProvider, async (req, res) => {
@@ -534,6 +733,20 @@ router.post('/materials', protect, requireProvider, async (req, res) => {
     ...data,
     provider: req.user._id,
     previousPrice: data.price,
+    changelog: [
+      materialChangelogEntry(
+        'created',
+        `Added at ₱${price}/${data.unit || 'kg'}`,
+        req.user,
+        {
+          name: data.name,
+          category: data.category,
+          price,
+          unit: data.unit || 'kg',
+          available: data.available !== false,
+        }
+      ),
+    ],
   });
 
   await syncJunkshopMaterialTags(req.user._id);
@@ -567,11 +780,57 @@ router.patch('/materials/:id', protect, requireProvider, async (req, res) => {
   if (data.category !== undefined || data.name !== undefined) {
     data.category = normalizeMaterialCategory(data.category ?? existing.category, data.name ?? existing.name);
   }
+  const changelog = [];
+  if (data.name !== undefined && data.name !== existing.name) {
+    changelog.push(
+      materialChangelogEntry('name_changed', `Renamed from ${existing.name} to ${data.name}`, req.user, {
+        from: existing.name,
+        to: data.name,
+      })
+    );
+  }
+  if (data.category !== undefined && data.category !== existing.category) {
+    changelog.push(
+      materialChangelogEntry(
+        'category_changed',
+        `Category changed from ${formatMaterialCategory(existing.category)} to ${formatMaterialCategory(data.category)}`,
+        req.user,
+        { from: existing.category, to: data.category }
+      )
+    );
+  }
+  if (nextPrice !== existing.price) {
+    changelog.push(
+      materialChangelogEntry('price_changed', `Price changed ₱${existing.price} → ₱${nextPrice}`, req.user, {
+        from: existing.price,
+        to: nextPrice,
+      })
+    );
+  }
+  if (data.unit !== undefined && data.unit !== existing.unit) {
+    changelog.push(
+      materialChangelogEntry('unit_changed', `Unit changed from ${existing.unit} to ${data.unit}`, req.user, {
+        from: existing.unit,
+        to: data.unit,
+      })
+    );
+  }
+  if (data.available !== undefined && data.available !== existing.available) {
+    changelog.push(
+      materialChangelogEntry(
+        'availability_changed',
+        data.available ? 'Set to available' : 'Set to hidden',
+        req.user,
+        { from: existing.available, to: data.available }
+      )
+    );
+  }
   existing.set({
     ...data,
     previousPrice: nextPrice !== existing.price ? existing.price : existing.previousPrice,
     price: nextPrice,
   });
+  existing.changelog.push(...changelog);
 
   await existing.save();
   await syncJunkshopMaterialTags(req.user._id);
@@ -580,15 +839,26 @@ router.patch('/materials/:id', protect, requireProvider, async (req, res) => {
 });
 
 router.delete('/materials/:id', protect, requireProvider, async (req, res) => {
-  const material = await Material.findOneAndUpdate(
-    { _id: req.params.id, provider: req.user._id, deletedAt: null },
-    { deletedAt: new Date(), deletedBy: req.user._id, available: false },
-    { new: true }
-  );
+  const material = await Material.findOne({
+    _id: req.params.id,
+    provider: req.user._id,
+    deletedAt: null,
+  });
 
   if (!material) {
     return res.status(404).json({ message: 'Material not found.' });
   }
+
+  material.deletedAt = new Date();
+  material.deletedBy = req.user._id;
+  material.available = false;
+  material.expiryNotifiedAt = null;
+  material.changelog.push(
+    materialChangelogEntry('deleted', 'Moved to trash', req.user, {
+      permanentDeleteAfterDays: MATERIAL_TRASH_RETENTION_DAYS,
+    })
+  );
+  await material.save();
 
   await syncJunkshopMaterialTags(req.user._id);
   await syncProfileComplete(req.user._id);

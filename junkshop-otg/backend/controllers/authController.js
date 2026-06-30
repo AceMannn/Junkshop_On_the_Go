@@ -24,6 +24,7 @@ const {
 const {
   sendPasswordResetEmail,
   sendPasswordResetSms,
+  sendPasswordChangedEmail,
   sendEmailVerificationEmail,
   sendPhoneVerificationSms,
 } = require('../utils/deliveryService');
@@ -59,8 +60,8 @@ const MAX_AMOUNT = 20000;
 const nameRegex = /^[A-Za-zÀ-ÿÑñ\s.'-]+$/;
 const phoneRegex = /^(\+63|0)9\d{9}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// Temporary dev switch: keep SMS code intact, but do not require it for account login.
-const ACCOUNT_PHONE_VERIFICATION_ENABLED = false;
+// SMS verification for new accounts. Only flips to false during development to skip credit usage.
+const ACCOUNT_PHONE_VERIFICATION_ENABLED = true;
 
 // Create JWT token for logged-in users
 const createToken = (user) => {
@@ -116,7 +117,10 @@ async function buildUserResponse(user) {
 
 function verificationPayload({ user, message, emailCode, emailDelivery, phoneCode, phoneDelivery }) {
   const needsEmail = Boolean(user.email && user.emailVerified === false);
-  const needsPhone = Boolean(user.phone && user.phoneVerified !== true);
+  // Only surface phone verification to the frontend when SMS is actually being sent.
+  const needsPhone = Boolean(
+    ACCOUNT_PHONE_VERIFICATION_ENABLED && user.phone && user.phoneVerified !== true
+  );
   const payload = {
     message,
     requiresAccountVerification: needsEmail || needsPhone,
@@ -173,7 +177,7 @@ const registerUser = async (req, res) => {
 
     if (termsAccepted !== true) {
       return res.status(400).json({
-        message: 'Please read and accept the Terms and Conditions before creating an account.',
+        message: 'Accept the Terms first.',
       });
     }
 
@@ -255,7 +259,9 @@ const registerUser = async (req, res) => {
         emailCode = assignEmailVerificationCode(user);
       }
 
-      const phoneCode = assignPhoneVerificationCode(user);
+      const phoneCode = ACCOUNT_PHONE_VERIFICATION_ENABLED
+        ? assignPhoneVerificationCode(user)
+        : null;
 
       await user.save();
       await syncProfileComplete(user._id);
@@ -268,7 +274,10 @@ const registerUser = async (req, res) => {
         );
       }
 
-      const phoneDelivery = await sendPhoneVerificationSms(normalizedPhone, phoneCode);
+      const phoneDelivery =
+        ACCOUNT_PHONE_VERIFICATION_ENABLED && phoneCode
+          ? await sendPhoneVerificationSms(normalizedPhone, phoneCode)
+          : null;
 
       return res.status(201).json(
         verificationPayload({
@@ -362,7 +371,9 @@ const registerUser = async (req, res) => {
     if (hasProviderEmail) {
       emailCode = assignEmailVerificationCode(user);
     }
-    const phoneCode = assignPhoneVerificationCode(user);
+    const phoneCode = ACCOUNT_PHONE_VERIFICATION_ENABLED
+      ? assignPhoneVerificationCode(user)
+      : null;
     await user.save();
 
     await Junkshop.create({
@@ -386,7 +397,10 @@ const registerUser = async (req, res) => {
         cleanedFirstName
       );
     }
-    const phoneDelivery = await sendPhoneVerificationSms(normalizedPhone, phoneCode);
+    const phoneDelivery =
+      ACCOUNT_PHONE_VERIFICATION_ENABLED && phoneCode
+        ? await sendPhoneVerificationSms(normalizedPhone, phoneCode)
+        : null;
 
     res.status(201).json(
       verificationPayload({
@@ -527,7 +541,7 @@ const loginUser = async (req, res) => {
     );
     if (needsEmailVerification || needsPhoneVerification) {
       return res.status(403).json({
-        message: 'Verify your account before signing in. Request a new code if yours expired.',
+        message: 'Verify your account first.',
         requiresAccountVerification: true,
         requiresEmailVerification: needsEmailVerification,
         requiresPhoneVerification: needsPhoneVerification,
@@ -547,7 +561,8 @@ const loginUser = async (req, res) => {
       user: userResponse,
       requiresPhoneSetup: userResponse.requiresPhoneSetup,
       passwordNeedsUpdate: !validatePasswordStrength(password).ok,
-      passwordSecurityMessage: PASSWORD_REQUIREMENTS_MESSAGE,
+      passwordSecurityMessage:
+        'For your security, please update your password to meet the latest requirements.',
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error during login.' });
@@ -777,7 +792,7 @@ const updateMe = async (req, res) => {
         const lng = Number(req.user.location?.lng);
         if (!req.user.address || !Number.isFinite(lat) || !Number.isFinite(lng)) {
           return res.status(400).json({
-            message: 'Search and confirm your address on the map before saving.',
+            message: 'Confirm address first.',
           });
         }
       }
@@ -842,7 +857,7 @@ const deactivateAccount = async (req, res) => {
     req.user.status = 'suspended';
     await req.user.save();
 
-    res.json({ message: 'Account deactivated. Contact support to restore access.' });
+    res.json({ message: 'Account deactivated.' });
   } catch (error) {
     res.status(500).json({ message: 'Could not deactivate account.' });
   }
@@ -938,13 +953,13 @@ const forgotPassword = async (req, res) => {
 
     if (!user) {
       return res.json({
-        message: 'If that email or number is registered, a reset code has been generated.',
+        message: 'Reset code sent if registered.',
       });
     }
 
     if (parsed.type === 'phone' && !normalizePhone(user.phone)) {
       return res.json({
-        message: 'If that email or number is registered, a reset code has been generated.',
+        message: 'Reset code sent if registered.',
       });
     }
 
@@ -967,7 +982,7 @@ const forgotPassword = async (req, res) => {
       await user.save();
       console.error('[password-reset] delivery failed:', deliveryError.message);
       return res.status(503).json({
-        message: 'Could not send reset code right now. Please try again later.',
+        message: 'Could not send reset code.',
       });
     }
 
@@ -995,30 +1010,23 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-const resetPassword = async (req, res) => {
+const verifyResetCode = async (req, res) => {
   try {
     const parsed = resolveRecoveryInput(req.body);
-    const { resetToken, newPassword } = req.body;
+    const { resetToken } = req.body;
 
     if (!parsed.ok) {
       return res.status(400).json({ message: parsed.message });
     }
 
-    if (!resetToken || !newPassword) {
-      return res.status(400).json({
-        message: 'Recovery contact, reset code, and new password are required.',
-      });
+    if (!resetToken) {
+      return res.status(400).json({ message: 'Reset code is required.' });
     }
 
     if (!isValidResetCode(resetToken)) {
       return res.status(400).json({
         message: `Reset code must be ${RESET_CODE_LENGTH} digits.`,
       });
-    }
-
-    const passwordValidation = validatePasswordStrength(newPassword);
-    if (!passwordValidation.ok) {
-      return res.status(400).json({ message: passwordValidation.message });
     }
 
     const hashedToken = hashResetCode(resetToken);
@@ -1033,10 +1041,70 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired reset code.' });
     }
 
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const hashedSession = crypto.createHash('sha256').update(sessionToken).digest('hex');
+
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    user.passwordResetSessionToken = hashedSession;
+    user.passwordResetSessionExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    res.json({
+      message: 'Code verified. You can now set a new password.',
+      sessionToken,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not verify reset code.' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const parsed = resolveRecoveryInput(req.body);
+    const { sessionToken, newPassword } = req.body;
+
+    if (!parsed.ok) {
+      return res.status(400).json({ message: parsed.message });
+    }
+
+    if (!sessionToken || !newPassword) {
+      return res.status(400).json({
+        message: 'Session token and new password are required.',
+      });
+    }
+
+    const passwordValidation = validatePasswordStrength(newPassword);
+    if (!passwordValidation.ok) {
+      return res.status(400).json({ message: passwordValidation.message });
+    }
+
+    const hashedSession = crypto.createHash('sha256').update(sessionToken).digest('hex');
+    const user = await findUserByRecovery(parsed);
+
+    if (
+      !user ||
+      user.passwordResetSessionToken !== hashedSession ||
+      !user.passwordResetSessionExpires ||
+      user.passwordResetSessionExpires <= new Date()
+    ) {
+      return res.status(400).json({ message: 'Invalid or expired session. Please start over.' });
+    }
+
     user.password = await bcrypt.hash(newPassword, 10);
     user.passwordResetToken = null;
     user.passwordResetExpires = null;
+    user.passwordResetSessionToken = null;
+    user.passwordResetSessionExpires = null;
     await user.save();
+
+    try {
+      if (user.email) {
+        await sendPasswordChangedEmail(user.email, user.firstName);
+      }
+    } catch (notifyError) {
+      console.error('[password-reset] change notification failed:', notifyError.message);
+    }
 
     res.json({ message: 'Password reset successful. You can log in now.' });
   } catch (error) {
@@ -1180,7 +1248,9 @@ const resendAccountVerification = async (req, res) => {
     }
 
     const needsEmail = Boolean(user.email && user.emailVerified === false);
-    const needsPhone = Boolean(user.phone && user.phoneVerified !== true);
+    const needsPhone = Boolean(
+      ACCOUNT_PHONE_VERIFICATION_ENABLED && user.phone && user.phoneVerified !== true
+    );
 
     if (!needsEmail && !needsPhone) {
       return res.status(400).json({ message: 'This account is already verified.' });
@@ -1281,5 +1351,6 @@ module.exports = {
   getFavorites,
   toggleFavorite,
   forgotPassword,
+  verifyResetCode,
   resetPassword,
 };

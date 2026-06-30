@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     ArrowLeft,
     MapPin,
@@ -13,6 +13,8 @@ import {
     AlertCircle,
     RefreshCw,
     SlidersHorizontal,
+    LayoutGrid,
+    Table2,
 } from "lucide-react";
 import { Heart } from "lucide-react";
 import JunkshopsMap from "../maps/JunkshopsMap";
@@ -22,7 +24,6 @@ import VerifiedPartnerIcon, { isVerified } from "../ui/VerifiedPartnerIcon";
 import { isFavoriteShopId } from "../../utils/favorites";
 import { priceCategories } from "../../data/prices";
 import { useCatalogJunkshops, useFeaturedMaterials } from "../../hooks/useCatalogData";
-import { domainApi } from "../../services/api";
 import {
     formatUpdatedDate,
     formatMaterialCategoryLabel,
@@ -43,6 +44,13 @@ const LOCATION_FILTERS = [
     { id: "sta-mesa", label: "Sta. Mesa" },
 ];
 
+const DISTANCE_FILTERS = [
+    { id: "5", label: "Within 5 km", value: 5 },
+    { id: "10", label: "Within 10 km", value: 10 },
+    { id: "20", label: "Within 20 km", value: 20 },
+    { id: "all", label: "Any distance", value: null },
+];
+
 const HIGHLIGHT_CATEGORIES = [
     { id: "plastic", label: "Plastic" },
     { id: "paper", label: "Paper" },
@@ -61,7 +69,7 @@ function materialUnitLabel(item) {
     return item?.unit === "piece" ? "piece" : "kg";
 }
 
-function PanelStatus({ loading, error, source, onRetry }) {
+function PanelStatus({ loading, error, onRetry }) {
     if (loading) {
         return (
             <p className="text-sm text-[#72796e] animate-pulse" role="status">
@@ -147,6 +155,7 @@ const filterSelectClass =
     "bg-[#f9f9f8] border border-[#c2c9bb] rounded-xl px-3 py-2.5 text-sm font-medium text-[#42493e] outline-none focus:ring-2 focus:ring-[#154212]";
 
 export function JunkshopsPanel({
+    user = null,
     favoriteIds = [],
     onToggleFavorite,
     initialShopId = null,
@@ -154,9 +163,27 @@ export function JunkshopsPanel({
     onRouteDrawn,
     onViewProfile,
 }) {
-    const { shops, loading, error, source, refresh } = useCatalogJunkshops({ partnersOnly: true });
+    const savedOrigin = useMemo(() => {
+        const lat = Number(user?.location?.lat);
+        const lng = Number(user?.location?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+        return {
+            lat,
+            lng,
+            label: user?.address || "Saved profile address",
+            source: "profile",
+        };
+    }, [user?.address, user?.location?.lat, user?.location?.lng]);
+    const [originOverride, setOriginOverride] = useState(null);
+    const effectiveOrigin = originOverride || savedOrigin;
+    const { shops, loading, error, source, refresh } = useCatalogJunkshops({
+        partnersOnly: true,
+        originCoordinates: effectiveOrigin,
+    });
     const [query, setQuery] = useState("");
     const [locationFilter, setLocationFilter] = useState("all");
+    const [distanceFilter, setDistanceFilter] = useState("5");
     const [materialFilter, setMaterialFilter] = useState("all");
     const [sortBy, setSortBy] = useState("default");
     const [selectedMapId, setSelectedMapId] = useState(initialShopId);
@@ -164,10 +191,13 @@ export function JunkshopsPanel({
     const effectiveRouteId = autoRouteShopId || pendingRouteId;
 
     useEffect(() => {
-        if (initialShopId) setSelectedMapId(initialShopId);
+        if (!initialShopId) return undefined;
+        const timer = window.setTimeout(() => setSelectedMapId(initialShopId), 0);
+        return () => window.clearTimeout(timer);
     }, [initialShopId]);
 
     const filteredShops = useMemo(() => {
+        const distanceLimit = DISTANCE_FILTERS.find((item) => item.id === distanceFilter)?.value ?? null;
         let result = shops.filter((shop) => {
             const q = query.trim().toLowerCase();
             const matchesQuery =
@@ -189,7 +219,11 @@ export function JunkshopsPanel({
                     m.toLowerCase().includes(materialFilter)
                 );
 
-            return matchesQuery && matchesLocation && matchesMaterial;
+            const matchesDistance =
+                distanceLimit == null ||
+                (Number.isFinite(Number(shop.distanceKm)) && Number(shop.distanceKm) <= distanceLimit);
+
+            return matchesQuery && matchesLocation && matchesMaterial && matchesDistance;
         });
 
         if (sortBy === "open_first") {
@@ -210,23 +244,29 @@ export function JunkshopsPanel({
         }
 
         return result;
-    }, [shops, query, locationFilter, materialFilter, sortBy]);
+    }, [shops, query, locationFilter, distanceFilter, materialFilter, sortBy]);
 
     const hasActiveFilters =
-        query.trim() || locationFilter !== "all" || materialFilter !== "all" || sortBy !== "default";
+        query.trim() ||
+        locationFilter !== "all" ||
+        distanceFilter !== "5" ||
+        materialFilter !== "all" ||
+        sortBy !== "default";
 
     return (
         <div className="space-y-6">
             <PanelStatus loading={loading} error={error} source={source} onRetry={refresh} />
 
-            {/* Map — always shows all approved shops */}
+            {/* Map follows the same visible shop filters as the cards. */}
             {!loading ? (
                 <JunkshopsMap
-                    shops={shops}
+                    shops={filteredShops}
                     selectedId={selectedMapId}
                     onSelectShop={setSelectedMapId}
                     routingEnabled
                     autoRouteShopId={effectiveRouteId}
+                    initialOrigin={effectiveOrigin}
+                    onOriginChange={setOriginOverride}
                     onRouteDrawn={() => {
                         setPendingRouteId(null);
                         onRouteDrawn?.();
@@ -273,6 +313,16 @@ export function JunkshopsPanel({
                             aria-label="Area filter"
                         >
                             {LOCATION_FILTERS.map((opt) => (
+                                <option key={opt.id} value={opt.id}>{opt.label}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={distanceFilter}
+                            onChange={(e) => setDistanceFilter(e.target.value)}
+                            className={filterSelectClass}
+                            aria-label="Distance range"
+                        >
+                            {DISTANCE_FILTERS.map((opt) => (
                                 <option key={opt.id} value={opt.id}>{opt.label}</option>
                             ))}
                         </select>
@@ -454,6 +504,7 @@ function TrendBadge({ trend }) {
 export function MaterialPricesPanel() {
     const { materials, loading, error, refresh } = useFeaturedMaterials();
     const [activeCategory, setActiveCategory] = useState("all");
+    const [viewMode, setViewMode] = useState("cards");
 
     const filteredPrices = useMemo(() => {
         if (activeCategory === "all") return materials;
@@ -509,22 +560,109 @@ export function MaterialPricesPanel() {
                 ))}
             </div>
 
-            <div className="flex flex-wrap gap-2">
-                {priceCategories.map((cat) => (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap gap-2">
+                    {priceCategories.map((cat) => (
+                        <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setActiveCategory(cat.id)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${activeCategory === cat.id
+                                ? "bg-[#154212] text-white"
+                                : "bg-white border border-zinc-200 text-[#42493e] hover:border-emerald-300"
+                                }`}
+                        >
+                            {cat.label}
+                        </button>
+                    ))}
+                </div>
+                <div className="inline-flex h-9 w-fit rounded-xl border border-zinc-200 bg-white p-0.5 shadow-sm">
                     <button
-                        key={cat.id}
                         type="button"
-                        onClick={() => setActiveCategory(cat.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${activeCategory === cat.id
-                            ? "bg-[#154212] text-white"
-                            : "bg-white border border-zinc-200 text-[#42493e] hover:border-emerald-300"
-                            }`}
+                        onClick={() => setViewMode("cards")}
+                        className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+                            viewMode === "cards"
+                                ? "bg-[#154212] text-white"
+                                : "text-[#42493e] hover:bg-emerald-50"
+                        }`}
+                        aria-pressed={viewMode === "cards"}
                     >
-                        {cat.label}
+                        <LayoutGrid size={13} />
+                        Cards
                     </button>
-                ))}
+                    <button
+                        type="button"
+                        onClick={() => setViewMode("table")}
+                        className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+                            viewMode === "table"
+                                ? "bg-[#154212] text-white"
+                                : "text-[#42493e] hover:bg-emerald-50"
+                        }`}
+                        aria-pressed={viewMode === "table"}
+                    >
+                        <Table2 size={13} />
+                        Table
+                    </button>
+                </div>
             </div>
 
+            {viewMode === "table" ? (
+                <div className="scroll-x-clean overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+                    <table className="w-full min-w-[780px] text-sm">
+                        <thead className="bg-[#f3f4f3] text-[#42493e]">
+                            <tr>
+                                <th className="px-4 py-3 text-left font-semibold">Material</th>
+                                <th className="px-4 py-3 text-left font-semibold">Category</th>
+                                <th className="px-4 py-3 text-left font-semibold">Price</th>
+                                <th className="px-4 py-3 text-left font-semibold">Trend</th>
+                                <th className="px-4 py-3 text-left font-semibold">Examples</th>
+                                <th className="px-4 py-3 text-left font-semibold">Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                            {filteredPrices.map((item) => {
+                                const trend =
+                                    item.price != null
+                                        ? getMaterialTrend(item)
+                                        : ["up", "down", "stable"][
+                                        (item.id?.length || 0) % 3
+                                        ];
+                                const unitLabel = materialUnitLabel(item);
+                                const mid = parsePriceMid(item.perKgPrice);
+
+                                return (
+                                    <tr key={item.id} className="hover:bg-zinc-50">
+                                        <td className="px-4 py-4">
+                                            <p className="font-bold text-[#191c1c]">{item.material}</p>
+                                            <p className="text-xs text-[#72796e]">Midpoint: ₱{mid}</p>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">
+                                                {formatMaterialCategoryLabel(item.category)}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-4 font-bold text-emerald-900">
+                                            {item.perKgPrice}
+                                            <span className="ml-1 text-xs font-semibold text-[#72796e]">
+                                                / {unitLabel === "piece" ? "pc" : "kg"}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <TrendBadge trend={trend} />
+                                        </td>
+                                        <td className="px-4 py-4 text-[#42493e]">
+                                            <span className="line-clamp-2">{item.examples}</span>
+                                        </td>
+                                        <td className="px-4 py-4 text-[#72796e]">
+                                            {formatUpdatedDate(item.updatedAt)}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredPrices.map((item) => {
                     const trend =
@@ -571,6 +709,7 @@ export function MaterialPricesPanel() {
                     );
                 })}
             </div>
+            )}
         </div>
     );
 }
@@ -715,6 +854,7 @@ export function RecyclingGuidePanel() {
     );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const OVERVIEW_PANELS = {
     junkshops: {
         title: "",

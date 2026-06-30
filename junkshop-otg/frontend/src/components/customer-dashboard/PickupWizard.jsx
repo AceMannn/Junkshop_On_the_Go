@@ -102,6 +102,12 @@ function FieldLabel({ children }) {
 const inputClass =
   'w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600';
 
+const NEARBY_RADIUS_OPTIONS = [
+  { value: 5, label: 'Within 5 km' },
+  { value: 10, label: 'Within 10 km' },
+  { value: 20, label: 'Within 20 km' },
+];
+
 export default function PickupWizard({ user, shops, onClose, onSuccess, prefill = null }) {
   const { materials: marketMaterials } = useFeaturedMaterials({ autoRefresh: false });
   const scheduleDates = useMemo(() => buildScheduleDates(), []);
@@ -123,6 +129,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
 
   const [requestType, setRequestType] = useState('home_pickup');
   const [assignmentMode, setAssignmentMode] = useState(prefill?.junkshopId ? 'specific' : 'specific');
+  const [nearbyRadiusKm, setNearbyRadiusKm] = useState(5);
   const [junkshopId, setJunkshopId] = useState(prefill?.junkshopId ? String(prefill.junkshopId) : '');
   const [selectedMaterials, setSelectedMaterials] = useState(
     prefill?.name
@@ -210,7 +217,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
     setError('');
     if (currentLabel === 'Shop') {
       if (assignmentMode === 'specific' && !junkshopId) {
-        setError('Select a junkshop or choose nearest available.');
+        setError('Select a junkshop.');
         return false;
       }
       return true;
@@ -243,7 +250,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
         return false;
       }
       if (!addressConfirmed || !address.trim()) {
-        setError('Confirm your pickup location on the map before continuing.');
+        setError('Confirm pickup location.');
         return false;
       }
       if (!/^09\d{9}$/.test(phone)) {
@@ -272,6 +279,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
       await pickupApi.create({
         requestType,
         assignmentMode,
+        nearbyRadiusKm,
         junkshopId: assignmentMode === 'specific' ? junkshopId : undefined,
         contactName: contactName.trim(),
         contactPhone: contactPhone.replace(/\D/g, '').slice(0, 11),
@@ -445,6 +453,25 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                       </option>
                     ))}
                   </select>
+                </label>
+              )}
+              {assignmentMode === 'nearest' && (
+                <label className="block space-y-1.5">
+                  <FieldLabel>Nearby range</FieldLabel>
+                  <select
+                    value={nearbyRadiusKm}
+                    onChange={(event) => setNearbyRadiusKm(Number(event.target.value))}
+                    className={inputClass}
+                  >
+                    {NEARBY_RADIUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-[#72796e]">
+                    If no shops are found, expand this range or choose a shop manually.
+                  </p>
                 </label>
               )}
             </div>
@@ -646,7 +673,10 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                 </p>
                 <p>
                   <span className="text-[#72796e]">Shop · </span>
-                  <strong>{reviewShopName}</strong>
+                  <strong>
+                    {reviewShopName}
+                    {assignmentMode === 'nearest' ? ` · ${nearbyRadiusKm} km range` : ''}
+                  </strong>
                 </p>
                 <p>
                   <span className="text-[#72796e]">Materials · </span>

@@ -136,7 +136,7 @@ export default function ProviderSignUpWizard({
 
   const confirmAddress = () => {
     if (!canConfirmAddress) {
-      setError('Search and select your business address on the map first.');
+      setError('Select address on the map.');
       return;
     }
     updateField('addressConfirmed', true);
@@ -154,7 +154,7 @@ export default function ProviderSignUpWizard({
         return 'Search your business address and set the map pin.';
       }
       if (!form.addressConfirmed) {
-        return 'Please confirm your business address before continuing.';
+        return 'Confirm your address first.';
       }
     }
 
@@ -185,7 +185,7 @@ export default function ProviderSignUpWizard({
         return 'Please confirm that your information is accurate.';
       }
       if (!form.acceptedTerms) {
-        return 'Please read and accept the Terms and Conditions before creating an account.';
+        return 'Accept the Terms first.';
       }
     }
 

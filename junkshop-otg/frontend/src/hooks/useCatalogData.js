@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { domainApi } from '../services/api';
 
@@ -8,31 +8,55 @@ import { REFRESH_INTERVAL_MS, useAutoRefresh } from './useAutoRefresh';
 
 const DEFAULT_CENTER = { lat: 14.5995, lng: 121.0055 };
 
-function useCustomerCoords() {
-  const [coords, setCoords] = useState(null);
+function useCustomerCoords(originCoordinates = null) {
+  const [gpsCoords, setGpsCoords] = useState(null);
+
+  const originLat = Number(originCoordinates?.lat);
+  const originLng = Number(originCoordinates?.lng);
+  const hasOrigin =
+    Number.isFinite(originLat) &&
+    Number.isFinite(originLng);
+  const explicitCoords = useMemo(
+    () => (hasOrigin ? { lat: originLat, lng: originLng } : null),
+    [hasOrigin, originLat, originLng]
+  );
 
   useEffect(() => {
+    if (hasOrigin) {
+      return;
+    }
+
     if (!navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setCoords({
+        setGpsCoords({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         });
       },
       () => {
-        setCoords(DEFAULT_CENTER);
+        setGpsCoords(DEFAULT_CENTER);
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 120000 }
     );
-  }, []);
+  }, [hasOrigin, originLat, originLng]);
 
-  return coords;
+  return explicitCoords || gpsCoords;
 }
 
-export function useCatalogJunkshops({ autoRefresh = true, partnersOnly = false, withPending = false } = {}) {
-  const coords = useCustomerCoords();
+export function useCatalogJunkshops({
+  autoRefresh = true,
+  partnersOnly = false,
+  withPending = false,
+  originCoordinates = null,
+} = {}) {
+  const stableOrigin = useMemo(() => {
+    const lat = Number(originCoordinates?.lat);
+    const lng = Number(originCoordinates?.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }, [originCoordinates?.lat, originCoordinates?.lng]);
+  const coords = useCustomerCoords(stableOrigin);
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

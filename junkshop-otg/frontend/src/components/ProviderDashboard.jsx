@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Info, XCircle } from "lucide-react";
 import { authApi } from "../services/api";
 import ProviderPickupRequests from "./provider-dashboard/ProviderPickupRequests";
 import ProviderTopbar from "./provider-dashboard/ProviderTopbar";
@@ -33,12 +33,50 @@ function saveSidebarPinnedPreference(key, value) {
     window.localStorage.setItem(key, String(value));
 }
 
+const TOAST_STYLES = {
+    success: {
+        wrapper: "bg-emerald-50 border-emerald-200 text-emerald-800",
+        icon: CheckCircle,
+        iconClass: "text-emerald-600",
+    },
+    warning: {
+        wrapper: "bg-amber-50 border-amber-200 text-amber-900",
+        icon: AlertTriangle,
+        iconClass: "text-amber-600",
+    },
+    error: {
+        wrapper: "bg-red-50 border-red-200 text-red-800",
+        icon: XCircle,
+        iconClass: "text-red-600",
+    },
+    info: {
+        wrapper: "bg-sky-50 border-sky-200 text-sky-800",
+        icon: Info,
+        iconClass: "text-sky-600",
+    },
+};
+
+function inferToastType(message) {
+    const text = String(message || "").toLowerCase();
+    if (/(could not|failed|error|not found|server|expired|cannot reach|too many)/.test(text)) {
+        return "error";
+    }
+    if (/(please|required|enter|add|invalid|missing|complete|security|before|cannot|must)/.test(text)) {
+        return "warning";
+    }
+    if (/(loading|sent|check|review)/.test(text)) {
+        return "info";
+    }
+    return "success";
+}
+
 export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     const navigate = useNavigate();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState("dashboard");
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
+    const [toastType, setToastType] = useState("success");
     const [showToast, setShowToast] = useState(false);
     const [passwordNoticeShown, setPasswordNoticeShown] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
@@ -102,8 +140,9 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
         navigate(buildProviderPath({ tab: target.tab }));
     };
 
-    const showNotification = (message) => {
+    const showNotification = (message, type) => {
         setToastMessage(message);
+        setToastType(type || inferToastType(message));
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3200);
     };
@@ -117,11 +156,22 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
 
     useEffect(() => {
         if (!user?.passwordNeedsUpdate || passwordNoticeShown) return;
-        setToastMessage(user.passwordSecurityMessage || "For your security, change your password.");
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3200);
-        setPasswordNoticeShown(true);
+        const noticeTimer = setTimeout(() => {
+            setToastMessage(
+                user.passwordSecurityMessage ||
+                    "For your security, please update your password to meet the latest requirements."
+            );
+            setToastType("warning");
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3200);
+            setPasswordNoticeShown(true);
+        }, 0);
+
+        return () => clearTimeout(noticeTimer);
     }, [passwordNoticeShown, user?.passwordNeedsUpdate, user?.passwordSecurityMessage]);
+
+    const toastStyle = TOAST_STYLES[toastType] || TOAST_STYLES.success;
+    const ToastIcon = toastStyle.icon;
 
     return (
         <div
@@ -162,8 +212,8 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
             <main className="md:pl-[var(--dashboard-sidebar-offset)] pt-16 min-h-screen pb-24 md:pb-8 transition-[padding] duration-300">
                 <div className={dashboardMainPaddingClass}>
                     {showToast && (
-                        <div className="fixed top-20 right-4 left-4 sm:left-auto z-50 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 sm:px-5 rounded-xl shadow-lg max-w-md sm:ml-auto">
-                            <CheckCircle size={20} className="text-emerald-600 shrink-0" />
+                        <div className={`fixed top-20 right-4 left-4 sm:left-auto z-50 flex items-center gap-3 border px-4 py-3 sm:px-5 rounded-xl shadow-lg max-w-md sm:ml-auto ${toastStyle.wrapper}`}>
+                            <ToastIcon size={20} className={`${toastStyle.iconClass} shrink-0`} />
                             <p className="text-sm font-semibold">{toastMessage}</p>
                         </div>
                     )}

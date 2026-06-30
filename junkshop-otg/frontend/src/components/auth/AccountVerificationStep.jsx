@@ -84,11 +84,22 @@ export default function AccountVerificationStep({
     }
   };
 
+  const descriptionText = (() => {
+    if (requiresPhone && requiresEmail) {
+      return 'Enter the 6-digit codes we sent to your mobile number and email to activate your account.';
+    }
+    if (requiresPhone) {
+      return 'Enter the 6-digit code we sent to your mobile number to activate your account.';
+    }
+    if (requiresEmail) {
+      return 'Enter the 6-digit code we sent to your email to activate your account.';
+    }
+    return 'Your account will be verified when you continue.';
+  })();
+
   return (
     <form onSubmit={handleVerify} className="space-y-4">
-      <p className="text-sm text-charcoal/70">
-        Verify your account before logging in. SMS is required, and email is verified when provided.
-      </p>
+      <p className="text-sm text-charcoal/70">{descriptionText}</p>
 
       {info && (
         <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 break-all">

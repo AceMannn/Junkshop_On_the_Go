@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ExternalLink, Inbox, Loader2, Mail, Send, Trash2, X } from 'lucide-react';
 import { adminApi } from '../services/api';
 import { formatDate, statusPillClass } from '../utils/format';
@@ -11,6 +12,7 @@ import {
 } from '../utils/adminUi';
 
 export default function ContactPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [messages, setMessages] = useState([]);
@@ -69,6 +71,20 @@ export default function ContactPage() {
       setError(err.message || 'Could not mark message as read.');
     }
   };
+
+  useEffect(() => {
+    if (loading || messages.length === 0 || selectedMessage) return;
+
+    const messageId = searchParams.get('message');
+    if (!messageId) return;
+
+    const message = messages.find((row) => row._id === messageId);
+    if (!message) return;
+
+    openMessage(message);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, messages, searchParams, selectedMessage, setSearchParams]);
 
   const deleteMessage = async (messageId) => {
     const confirmed = window.confirm(

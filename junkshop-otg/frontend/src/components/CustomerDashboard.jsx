@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+    AlertTriangle,
     LayoutDashboard,
     History,
     Heart,
@@ -9,17 +10,19 @@ import {
     Store,
     BookOpen,
     Recycle,
-    TreePine,
+    Coins,
     MapPin,
     ReceiptText,
     ChevronRight,
     Download,
     CalendarDays,
     CheckCircle,
+    Info,
     Truck,
     MoreHorizontal,
     Pin,
     PinOff,
+    XCircle,
 } from "lucide-react";
 import CustomerPickupsTab from "./customer-dashboard/CustomerPickupsTab";
 import ProfileCompletionBanner from "./ui/ProfileCompletionBanner";
@@ -52,6 +55,44 @@ import {
     parseCustomerPath,
 } from "../utils/dashboardRoutes";
 import { getCustomerNotificationTarget } from "../utils/notificationNavigation";
+import { formatPoints } from "../utils/pickupPoints";
+
+const TOAST_STYLES = {
+    success: {
+        wrapper: "bg-emerald-50 border-emerald-200 text-emerald-800",
+        icon: CheckCircle,
+        iconClass: "text-emerald-600",
+    },
+    warning: {
+        wrapper: "bg-amber-50 border-amber-200 text-amber-900",
+        icon: AlertTriangle,
+        iconClass: "text-amber-600",
+    },
+    error: {
+        wrapper: "bg-red-50 border-red-200 text-red-800",
+        icon: XCircle,
+        iconClass: "text-red-600",
+    },
+    info: {
+        wrapper: "bg-sky-50 border-sky-200 text-sky-800",
+        icon: Info,
+        iconClass: "text-sky-600",
+    },
+};
+
+function inferToastType(message) {
+    const text = String(message || "").toLowerCase();
+    if (/(could not|failed|error|not found|server|expired|cannot reach|too many)/.test(text)) {
+        return "error";
+    }
+    if (/(please|required|enter|add|invalid|missing|complete|security|before|cannot|must)/.test(text)) {
+        return "warning";
+    }
+    if (/(loading|sent|check|review)/.test(text)) {
+        return "info";
+    }
+    return "success";
+}
 
 function SidebarPesoIcon({ size = 20 }) {
     return (
@@ -144,6 +185,7 @@ export default function CustomerDashboard({
     const [focusPickupId, setFocusPickupId] = useState(null);
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
+    const [toastType, setToastType] = useState("success");
     const [passwordNoticeShown, setPasswordNoticeShown] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
     const [showPointsWallet, setShowPointsWallet] = useState(false);
@@ -209,8 +251,9 @@ export default function CustomerDashboard({
         }
     }, [location.pathname, location.state, shops, navigate, user?.profileComplete]);
 
-    const showNotification = (message) => {
+    const showNotification = (message, type) => {
         setToastMessage(message);
+        setToastType(type || inferToastType(message));
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3200);
     };
@@ -222,11 +265,22 @@ export default function CustomerDashboard({
 
     useEffect(() => {
         if (!user?.passwordNeedsUpdate || passwordNoticeShown) return;
-        setToastMessage(user.passwordSecurityMessage || "For your security, change your password.");
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3200);
-        setPasswordNoticeShown(true);
+        const noticeTimer = setTimeout(() => {
+            setToastMessage(
+                user.passwordSecurityMessage ||
+                    "For your security, please update your password to meet the latest requirements."
+            );
+            setToastType("warning");
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3200);
+            setPasswordNoticeShown(true);
+        }, 0);
+
+        return () => clearTimeout(noticeTimer);
     }, [passwordNoticeShown, user?.passwordNeedsUpdate, user?.passwordSecurityMessage]);
+
+    const toastStyle = TOAST_STYLES[toastType] || TOAST_STYLES.success;
+    const ToastIcon = toastStyle.icon;
 
     const openOverviewPanel = (panelId, shopId = null) => {
         navigate(
@@ -409,8 +463,8 @@ export default function CustomerDashboard({
             >
                 <div className={isSidePanelOpen ? undefined : dashboardMainPaddingClass}>
                     {showToast && (
-                        <div className="fixed top-20 right-4 left-4 sm:left-auto z-50 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 sm:px-5 rounded-xl shadow-lg max-w-md sm:ml-auto">
-                            <CheckCircle size={20} className="text-emerald-600 shrink-0" />
+                        <div className={`fixed top-20 right-4 left-4 sm:left-auto z-50 flex items-center gap-3 border px-4 py-3 sm:px-5 rounded-xl shadow-lg max-w-md sm:ml-auto ${toastStyle.wrapper}`}>
+                            <ToastIcon size={20} className={`${toastStyle.iconClass} shrink-0`} />
                             <p className="text-sm font-semibold">{toastMessage || "Saved successfully"}</p>
                         </div>
                     )}
@@ -476,6 +530,7 @@ export default function CustomerDashboard({
                     {!accountView && overviewPanel && !shopProfile && (
                         <CustomerSidePanel
                             panelId={overviewPanel}
+                            user={user}
                             shops={shops}
                             favoriteIds={favoriteIds}
                             junkshopFocusId={junkshopFocusId}
@@ -522,6 +577,7 @@ export default function CustomerDashboard({
                                         : {}),
                                 });
                             }}
+                            onOpenPointsWallet={() => setShowPointsWallet(true)}
                         />
                     )}
                     {!accountView && !overviewPanel && !shopProfile && pickupsTabMounted && (
@@ -769,6 +825,7 @@ function MobileNav({ activeTab, setActiveTab, overviewPanel, onOpenPanel }) {
 
 function CustomerSidePanel({
     panelId,
+    user,
     shops,
     favoriteIds,
     junkshopFocusId,
@@ -785,6 +842,7 @@ function CustomerSidePanel({
         return (
             <DashboardPanelShell title={title} onClose={onClose}>
                 <Component
+                    user={user}
                     favoriteIds={favoriteIds}
                     onToggleFavorite={onToggleFavorite}
                     {...(panelId === "junkshops"
@@ -829,6 +887,7 @@ function OverviewTab({
     onViewAllPrices,
     onViewShopProfile,
     onBookShop,
+    onOpenPointsWallet,
 }) {
     const welcomeName = user?.firstName || "there";
     const overviewStats = useMemo(() => {
@@ -845,9 +904,9 @@ function OverviewTab({
             totalKg: totalKg.toFixed(1),
             totalEarnings: totalEarnings.toFixed(2),
             transactions: paidTransactions,
-            trees: Math.max(1, Math.floor(totalKg / 10)),
+            points: user?.recyclingPoints ?? 0,
         };
-    }, [historyRows]);
+    }, [historyRows, user?.recyclingPoints]);
 
     const recentActivities = useMemo(
         () =>
@@ -923,11 +982,13 @@ function OverviewTab({
                         accentColor="blue"
                     />
                     <StatCard
-                        label="Trees Saved"
-                        value={String(overviewStats.trees)}
-                        icon={TreePine}
+                        label="Points"
+                        value={formatPoints(overviewStats.points)}
+                        unit="pts"
+                        icon={Coins}
                         showHelperIcon={false}
-                        accentColor="teal"
+                        accentColor="amber"
+                        onClick={onOpenPointsWallet}
                     />
                 </div>
 

@@ -1,5 +1,5 @@
 const PASSWORD_REQUIREMENTS_MESSAGE =
-  'Password must be at least 10 characters and include uppercase, lowercase, number, and special character.';
+  'Invalid password.';
 
 function validatePasswordStrength(password) {
   const value = String(password || '');

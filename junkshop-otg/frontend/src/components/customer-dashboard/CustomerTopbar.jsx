@@ -5,10 +5,8 @@ import {
     Settings,
     LogOut,
     UserX,
-    Recycle,
 } from "lucide-react";
 import { getUserInitials, getUserFullName } from "../../utils/userDisplay";
-import { formatPoints } from "../../utils/pickupPoints";
 import logoImage from "../../assets/junkshop-logo.png";
 import DashboardNotificationMenu from "../dashboard/DashboardNotificationMenu";
 import { isCustomerNotificationNavigable } from "../../utils/notificationNavigation";
@@ -38,7 +36,6 @@ export default function CustomerTopbar({
     onLogout,
     onDeactivate,
     onNotificationNavigate,
-    onOpenPointsWallet,
 }) {
     const menuRef = useRef(null);
     const displayName = getDisplayName(user);
@@ -83,16 +80,6 @@ export default function CustomerTopbar({
                 </div>
 
                 <div className={dashboardTopbarActionsClass}>
-                    <button
-                        type="button"
-                        onClick={onOpenPointsWallet}
-                        className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-300 transition-colors"
-                        title="View recycling points"
-                    >
-                        <Recycle size={14} />
-                        {formatPoints(user?.recyclingPoints ?? 0)} pts
-                    </button>
-
                     <DashboardNotificationMenu
                         isNavigable={isCustomerNotificationNavigable}
                         onNavigate={(notification) => {

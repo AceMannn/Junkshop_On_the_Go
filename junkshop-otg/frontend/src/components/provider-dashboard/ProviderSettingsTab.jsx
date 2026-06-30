@@ -54,6 +54,7 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
         lng: "121.0055",
         description: "",
     });
+    const [shopAddressConfirmed, setShopAddressConfirmed] = useState(false);
     const [savingShop, setSavingShop] = useState(false);
 
     useEffect(() => {
@@ -67,6 +68,10 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                 lng: String(shop.lng ?? 121.0055),
                 description: shop.description || "",
             });
+            setShopAddressConfirmed(
+                Number.isFinite(Number(shop.lat)) &&
+                Number.isFinite(Number(shop.lng))
+            );
         }
     }, [shop]);
 
@@ -74,6 +79,14 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
         e.preventDefault();
         if (!shopForm.name.trim() || !shopForm.address.trim()) {
             onNotify?.("Shop name and address are required.");
+            return;
+        }
+        if (
+            !shopAddressConfirmed ||
+            !Number.isFinite(Number(shopForm.lat)) ||
+            !Number.isFinite(Number(shopForm.lng))
+        ) {
+            onNotify?.("Confirm your shop map pin before saving the address.");
             return;
         }
         setSavingShop(true);
@@ -151,7 +164,10 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                     <Field
                         label="Address"
                         value={shopForm.address}
-                        onChange={(v) => setShopForm({ ...shopForm, address: v })}
+                        onChange={(v) => {
+                            setShopForm({ ...shopForm, address: v });
+                            setShopAddressConfirmed(false);
+                        }}
                         required
                     />
                     <Field
@@ -181,14 +197,22 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                         lat={shopForm.lat}
                         lng={shopForm.lng}
                         onChange={({ lat, lng, address }) =>
-                            setShopForm((prev) => ({
-                                ...prev,
-                                lat: String(lat),
-                                lng: String(lng),
-                                ...(address ? { address } : {}),
-                            }))
+                            {
+                                setShopForm((prev) => ({
+                                    ...prev,
+                                    lat: String(lat),
+                                    lng: String(lng),
+                                    ...(address ? { address } : {}),
+                                }));
+                                setShopAddressConfirmed(true);
+                            }
                         }
                     />
+                    {!shopAddressConfirmed && (
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                            Address changed. Search, tap, or drag the map pin to confirm the exact shop location.
+                        </p>
+                    )}
                     <button
                         type="submit"
                         disabled={savingShop}

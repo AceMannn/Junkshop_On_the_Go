@@ -73,10 +73,45 @@ const materialSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    expiryNotifiedAt: {
+      type: Date,
+      default: null,
+    },
+    changelog: {
+      type: [
+        {
+          action: {
+            type: String,
+            required: true,
+            trim: true,
+          },
+          label: {
+            type: String,
+            required: true,
+            trim: true,
+          },
+          details: {
+            type: mongoose.Schema.Types.Mixed,
+            default: {},
+          },
+          actor: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );
 
 materialSchema.index({ provider: 1 });
+materialSchema.index({ provider: 1, deletedAt: 1 });
 
 module.exports = mongoose.model('Material', materialSchema);

@@ -19,13 +19,20 @@ export default function StatCard({
   layout = 'vertical',
   suffix,
   className = '',
+  onClick,
 }) {
   const c = STAT_COLORS[accentColor] || STAT_COLORS.green;
+  const Component = onClick ? 'button' : 'div';
+  const interactiveClass = onClick
+    ? 'text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-200'
+    : '';
 
   if (layout === 'horizontal') {
     return (
-      <div
-        className={`bg-white px-4 py-3 rounded-xl border border-zinc-200 border-t-2 ${c.border} shadow-sm flex items-center gap-3 ${className}`}
+      <Component
+        type={onClick ? 'button' : undefined}
+        onClick={onClick}
+        className={`bg-white px-4 py-3 rounded-xl border border-zinc-200 border-t-2 ${c.border} shadow-sm flex items-center gap-3 ${interactiveClass} ${className}`}
       >
         {Icon && (
           <div
@@ -44,13 +51,15 @@ export default function StatCard({
             {suffix}
           </p>
         </div>
-      </div>
+      </Component>
     );
   }
 
   return (
-    <div
-      className={`bg-white p-4 sm:p-5 rounded-xl border border-zinc-200 border-t-2 ${c.border} shadow-[0_4px_12px_rgba(141,170,145,0.12)] flex flex-col gap-3 ${className}`}
+    <Component
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={`bg-white p-4 sm:p-5 rounded-xl border border-zinc-200 border-t-2 ${c.border} shadow-[0_4px_12px_rgba(141,170,145,0.12)] flex flex-col gap-3 ${interactiveClass} ${className}`}
     >
       <div className="flex items-start justify-between">
         {Icon ? (
@@ -80,6 +89,6 @@ export default function StatCard({
           <p className="text-xs text-[#72796e] mt-1">{helper}</p>
         )}
       </div>
-    </div>
+    </Component>
   );
 }

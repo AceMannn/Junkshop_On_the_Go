@@ -137,6 +137,39 @@ async function sendPhoneVerificationSms(phone, code) {
   return sendSms({ to: phone, body });
 }
 
+async function sendPasswordChangedEmail(email, firstName = '') {
+  const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
+  const subject = `${APP_NAME} — your password was changed`;
+  const text = [
+    greeting,
+    '',
+    'Your password was successfully changed.',
+    '',
+    'If you did not make this change, please contact support immediately.',
+    '',
+    `— ${APP_NAME}`,
+  ].join('\n');
+
+  return sendEmail({ to: email, subject, text });
+}
+
+async function sendMaterialExpiryWarningEmail(email, firstName = '', materialName = '') {
+  const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
+  const subject = `${APP_NAME} material trash reminder`;
+  const name = materialName || 'One of your materials';
+  const text = [
+    greeting,
+    '',
+    `${name} has been in your trash for almost 30 days.`,
+    '',
+    'It will be permanently deleted in about 3 days unless you restore it from your Materials trash.',
+    '',
+    `— ${APP_NAME}`,
+  ].join('\n');
+
+  return sendEmail({ to: email, subject, text });
+}
+
 async function sendTransactionalEmail(email, subject, message) {
   if (!email) return { ok: false, skipped: true };
   const text = `${message}\n\n— ${APP_NAME}`;
@@ -154,6 +187,8 @@ module.exports = {
   isSmsConfigured,
   sendPasswordResetEmail,
   sendPasswordResetSms,
+  sendPasswordChangedEmail,
+  sendMaterialExpiryWarningEmail,
   sendEmailVerificationEmail,
   sendPhoneVerificationSms,
   sendTransactionalEmail,

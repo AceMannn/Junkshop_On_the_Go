@@ -45,6 +45,7 @@ import {
     formatPoints,
     POINTS_PER_KG,
 } from "../../utils/pickupPoints";
+import { maskCustomerName } from "../../utils/maskCustomerName";
 import PickupDetailDrawerShell from "../ui/PickupDetailDrawerShell";
 
 function formatWeightKg(value) {
@@ -64,6 +65,45 @@ function PickupCustomerRating({ rating }) {
             <Star size={14} className="fill-amber-400 text-amber-400" />
             {score}/5
         </span>
+    );
+}
+
+function CustomerReviewBlock({ rating, customerName }) {
+    const score = Number(rating?.score);
+    if (!score || score < 1) return null;
+
+    return (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <p className="text-sm font-semibold text-amber-950">Customer review</p>
+                    <p className="text-xs text-amber-800">
+                        From {maskCustomerName(customerName)}
+                    </p>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-100">
+                    <Star size={13} className="fill-amber-400 text-amber-400" />
+                    {score}/5
+                </span>
+            </div>
+            {rating.comment ? (
+                <p className="text-sm leading-relaxed text-[#42493e] whitespace-pre-wrap">
+                    “{rating.comment}”
+                </p>
+            ) : (
+                <p className="text-sm italic text-[#72796e]">No written comment.</p>
+            )}
+            {rating.createdAt && (
+                <p className="text-xs text-[#72796e]">
+                    Reviewed{" "}
+                    {new Date(rating.createdAt).toLocaleDateString("en-PH", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                    })}
+                </p>
+            )}
+        </div>
     );
 }
 
@@ -826,6 +866,11 @@ function ProviderPickupDetailDrawer({
                         </div>
                     )}
 
+                    <CustomerReviewBlock
+                        rating={request.rating}
+                        customerName={customerName}
+                    />
+
                     <PickupMaterialPhotosGallery
                         photos={request.materialPhotos}
                         title="Customer material photos"
@@ -846,12 +891,6 @@ function ProviderPickupDetailDrawer({
                             {request.providerLocation?.updatedAt && (
                                 <p className="text-xs text-[#72796e]">
                                     {formatLastUpdated(request.providerLocation.updatedAt)}
-                                </p>
-                            )}
-                            {request.rating?.score && (
-                                <p className="text-xs font-semibold text-amber-700 flex items-center gap-1">
-                                    <Star size={12} className="fill-amber-400 text-amber-400" />
-                                    Customer rated {request.rating.score}/5
                                 </p>
                             )}
                             <PickupTrackingMap

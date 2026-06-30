@@ -6,6 +6,7 @@ import { mapApi } from "../../services/api";
 import { formatShopRating } from "../../utils/shopRating";
 
 /** Teresa / Sta. Mesa default; map pans across Metro Manila. */
+// eslint-disable-next-line react-refresh/only-export-components
 export const JUNKSHOP_MAP_CENTER = { lat: 14.5995, lng: 121.0055 };
 export const JUNKSHOP_MAP_ZOOM = 13;
 
@@ -32,7 +33,7 @@ function formatDuration(seconds) {
 }
 
 function shopPinIcon(isOpen, selected) {
-    const color = selected ? "#0d9488" : isOpen ? "#154212" : "#72796e";
+    const color = selected ? "#0f766e" : isOpen ? "#154212" : "#2f6b2f";
     const size = selected ? 18 : 14;
     return L.divIcon({
         className: "junkshop-pin",
@@ -74,8 +75,11 @@ export default function JunkshopsMap({
     onSelectShop,
     className = "",
     routingEnabled = false,
+    compactRoutingControls = false,
     autoRouteShopId = null,
     onRouteDrawn,
+    initialOrigin = null,
+    onOriginChange,
     fillContainer = false,
 }) {
     const containerRef = useRef(null);
@@ -89,11 +93,15 @@ export default function JunkshopsMap({
     const [origin, setOrigin] = useState(null);
     const [originQuery, setOriginQuery] = useState("");
     const [originSuggestions, setOriginSuggestions] = useState([]);
-    const [originLoading, setOriginLoading] = useState(false);
     const [gpsStatus, setGpsStatus] = useState("idle");
     const [routeInfo, setRouteInfo] = useState(null);
     const [routeLoading, setRouteLoading] = useState(false);
     const [routeError, setRouteError] = useState("");
+    const initialOriginLat = Number(initialOrigin?.lat);
+    const initialOriginLng = Number(initialOrigin?.lng);
+    const hasInitialOrigin =
+        Number.isFinite(initialOriginLat) &&
+        Number.isFinite(initialOriginLng);
 
     const mappableShops = useMemo(
         () =>
@@ -109,7 +117,8 @@ export default function JunkshopsMap({
     const setOriginPoint = useCallback((point) => {
         setOrigin(point);
         setRouteError("");
-    }, []);
+        onOriginChange?.(point);
+    }, [onOriginChange]);
 
     const requestGpsOrigin = useCallback(() => {
         if (!navigator.geolocation) {
@@ -136,9 +145,23 @@ export default function JunkshopsMap({
     }, [setOriginPoint]);
 
     useEffect(() => {
-        if (!routingEnabled) return;
-        requestGpsOrigin();
-    }, [routingEnabled, requestGpsOrigin]);
+        if (!routingEnabled || !hasInitialOrigin) return;
+
+        setOriginPoint({
+            lat: initialOriginLat,
+            lng: initialOriginLng,
+            label: initialOrigin.label || "Saved address",
+            source: initialOrigin.source || "profile",
+        });
+    }, [
+        routingEnabled,
+        hasInitialOrigin,
+        initialOriginLat,
+        initialOriginLng,
+        initialOrigin?.label,
+        initialOrigin?.source,
+        setOriginPoint,
+    ]);
 
     const hasMappableShops = mappableShops.length > 0;
 
@@ -357,13 +380,10 @@ export default function JunkshopsMap({
 
         searchTimerRef.current = setTimeout(async () => {
             try {
-                setOriginLoading(true);
                 const { results } = await mapApi.geocode(q);
                 setOriginSuggestions(results || []);
             } catch {
                 setOriginSuggestions([]);
-            } finally {
-                setOriginLoading(false);
             }
         }, 450);
 
@@ -395,6 +415,15 @@ export default function JunkshopsMap({
     const mapContainerClassName = fillContainer
         ? "fluid-map-min-height h-full w-full min-h-0 z-0 bg-zinc-100 overflow-hidden [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]"
         : "min-h-[18rem] sm:min-h-[22rem] lg:min-h-[26rem] w-full z-0 bg-zinc-100 overflow-hidden rounded-xl [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]";
+    const routingOverlayClassName = compactRoutingControls
+        ? "absolute top-3 left-1/2 z-[800] w-[calc(100%-1.5rem)] max-w-[18rem] -translate-x-1/2 pointer-events-none"
+        : "absolute top-3 left-3 right-3 z-[800] pointer-events-none sm:right-auto sm:max-w-[26rem]";
+    const routingSearchClassName = compactRoutingControls
+        ? "flex h-10 items-center bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md rounded-xl px-3"
+        : "flex items-center bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md rounded-xl px-3 py-2.5";
+    const routingButtonClassName = compactRoutingControls
+        ? "inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md text-[#154212] hover:bg-emerald-50 shrink-0"
+        : "inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md px-3 py-2.5 text-xs font-semibold text-[#154212] hover:bg-emerald-50 shrink-0 whitespace-nowrap";
 
     return (
         <div className={shellClassName}>
@@ -402,17 +431,17 @@ export default function JunkshopsMap({
 
                 {/* Search overlay — floats on top of the map */}
                 {routingEnabled && (
-                    <div className="absolute top-3 left-3 right-3 z-[800] pointer-events-none sm:right-auto sm:max-w-[26rem]">
+                    <div className={routingOverlayClassName}>
                         <div className="pointer-events-auto space-y-1.5">
                             <div className="flex gap-2">
                                 <div className="relative flex-1 min-w-0">
-                                    <div className="flex items-center bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md rounded-xl px-3 py-2.5">
+                                    <div className={routingSearchClassName}>
                                         <Search size={15} className="text-[#72796e] shrink-0 mr-2" />
                                         <input
                                             type="search"
                                             value={originQuery}
                                             onChange={(e) => setOriginQuery(e.target.value)}
-                                            placeholder="Search address for directions…"
+                                            placeholder={compactRoutingControls ? "Search" : "Search address for directions…"}
                                             className="w-full bg-transparent outline-none text-sm min-w-0"
                                         />
                                     </div>
@@ -436,11 +465,14 @@ export default function JunkshopsMap({
                                 <button
                                     type="button"
                                     onClick={requestGpsOrigin}
-                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md px-3 py-2.5 text-xs font-semibold text-[#154212] hover:bg-emerald-50 shrink-0 whitespace-nowrap"
+                                    className={routingButtonClassName}
                                     title="Use my location"
+                                    aria-label="Use my location"
                                 >
                                     <LocateFixed size={14} />
-                                    <span className="hidden sm:inline">Use my location</span>
+                                    {!compactRoutingControls && (
+                                        <span className="hidden sm:inline">Use my location</span>
+                                    )}
                                 </button>
                             </div>
 

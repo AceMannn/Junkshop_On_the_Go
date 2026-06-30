@@ -146,8 +146,8 @@ export default function ProviderAvailabilityTab({ user, onNotify, onRefreshProfi
                             }`}
                         >
                             {isOpen
-                                ? <><CheckCircle size={15} /> Open — tap to close</>
-                                : <><XCircle size={15} /> Closed — tap to open</>
+                                ? <><CheckCircle size={15} /> Shop open</>
+                                : <><XCircle size={15} /> Shop closed</>
                             }
                         </button>
                     </div>

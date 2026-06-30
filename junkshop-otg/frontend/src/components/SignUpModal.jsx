@@ -123,7 +123,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
     }
 
     if (!formData.acceptedTerms) {
-      setError('Please read and accept the Terms and Conditions before creating an account.');
+      setError('Accept the Terms first.');
       return;
     }
 
@@ -148,7 +148,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
           role: 'customer',
           requiresEmail: Boolean(result.requiresEmailVerification),
           requiresPhone: Boolean(result.requiresPhoneVerification),
-          message: result.message || 'Check your email/SMS for verification codes.',
+          message: result.message || 'Check your codes.',
           devEmailCode: result.devEmailVerificationCode || result.devVerificationCode || '',
           devPhoneCode: result.devPhoneVerificationCode || '',
         });

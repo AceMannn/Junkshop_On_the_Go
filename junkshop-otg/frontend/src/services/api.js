@@ -16,6 +16,7 @@ const AUTH_LOCAL_ERROR_PATHS = [
   '/api/auth/verify-account',
   '/api/auth/resend-account-verification',
   '/api/auth/forgot-password',
+  '/api/auth/verify-reset-code',
   '/api/auth/reset-password',
   '/api/auth/password',
 ];
@@ -188,6 +189,12 @@ export const authApi = {
       body: JSON.stringify(payload),
     });
   },
+  verifyResetCode(payload) {
+    return request('/api/auth/verify-reset-code', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
   resetPassword(payload) {
     return request('/api/auth/reset-password', {
       method: 'POST',
@@ -251,6 +258,12 @@ export const domainApi = {
   getMyMaterials() {
     return request('/api/materials/mine');
   },
+  getDeletedMaterials() {
+    return request('/api/materials/deleted');
+  },
+  getMaterialHistory(id) {
+    return request(`/api/materials/${id}/history`);
+  },
   createMaterial(payload) {
     return request('/api/materials', {
       method: 'POST',
@@ -265,6 +278,9 @@ export const domainApi = {
   },
   deleteMaterial(id) {
     return request(`/api/materials/${id}`, { method: 'DELETE' });
+  },
+  restoreMaterial(id) {
+    return request(`/api/materials/${id}/restore`, { method: 'PATCH' });
   },
   getTransactions({ from, to } = {}) {
     const params = new URLSearchParams();

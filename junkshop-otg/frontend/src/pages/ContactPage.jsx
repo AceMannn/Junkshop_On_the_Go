@@ -386,14 +386,16 @@ export default function ContactPage() {
                     className={`${inputClass} min-h-[80px] resize-y`}
                   />
                 </div>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`${siteBtnPrimaryClass} w-full disabled:opacity-60`}
-                >
-                  <Send size={16} />
-                  {isSubmitting ? 'Sending…' : 'Send to platform support'}
-                </button>
+                <div className="flex justify-center">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-[#154212] px-4 text-xs font-semibold text-white transition-colors hover:bg-emerald-900 disabled:opacity-60"
+                  >
+                    <Send size={13} />
+                    {isSubmitting ? 'Sending…' : 'Send to platform support'}
+                  </button>
+                </div>
               </form>
             )}
           </ContactCard>
@@ -457,7 +459,12 @@ export default function ContactPage() {
                   />
                 ) : (
                   <div className="overflow-hidden rounded-lg border border-gray-200">
-                    <JunkshopsMap shops={shops} routingEnabled className="min-h-[220px]" />
+                    <JunkshopsMap
+                      shops={shops}
+                      routingEnabled
+                      compactRoutingControls
+                      className="min-h-[220px]"
+                    />
                   </div>
                 )}
                 <p className="text-[11px] text-gray-500">
