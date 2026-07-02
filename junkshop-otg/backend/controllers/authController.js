@@ -21,6 +21,7 @@ const {
   PASSWORD_REQUIREMENTS_MESSAGE,
   validatePasswordStrength,
 } = require('../utils/passwordPolicy');
+const { getSystemSettings } = require('../utils/systemSettings');
 const {
   sendPasswordResetEmail,
   sendPasswordResetSms,
@@ -174,6 +175,22 @@ const registerUser = async (req, res) => {
 
     if (!allowedRoles.includes(cleanedRole)) {
       return res.status(400).json({ message: 'Invalid account role.' });
+    }
+
+    const settings = await getSystemSettings();
+    if (settings.maintenanceMode) {
+      return res.status(503).json({
+        message: settings.maintenanceMessage,
+        maintenanceMode: true,
+      });
+    }
+
+    if (cleanedRole === 'customer' && !settings.allowCustomerRegistration) {
+      return res.status(403).json({ message: 'Customer registration is currently disabled.' });
+    }
+
+    if (cleanedRole === 'provider' && !settings.allowProviderRegistration) {
+      return res.status(403).json({ message: 'Provider registration is currently disabled.' });
     }
 
     if (termsAccepted !== true) {
@@ -553,21 +570,25 @@ const loginUser = async (req, res) => {
         return res.status(401).json({ message: 'Invalid email or password.' });
       }
     } else {
-      // Admin login by email
+      // Admin / Super Admin login by email
       const normalizedEmail = loginId.toLowerCase();
       if (!emailRegex.test(normalizedEmail)) {
         return res.status(400).json({ message: 'Please enter a valid email address.' });
       }
-      user = await User.findOne({ email: normalizedEmail, role: 'admin' }).select(AUTH_LOOKUP_EXCLUDE);
+      user = await User.findOne({
+        email: normalizedEmail,
+        role: { $in: ['admin', 'super_admin'] },
+      }).select(AUTH_LOOKUP_EXCLUDE);
       if (!user) {
         return res.status(401).json({ message: 'Invalid login details or password.' });
       }
     }
 
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'super_admin') {
       if (cleanedRole) {
+        const portalLabel = user.role === 'super_admin' ? 'super admin portal' : 'admin portal';
         return res.status(403).json({
-          message: 'Admin accounts must sign in through the admin portal.',
+          message: `${user.role === 'super_admin' ? 'Super Admin' : 'Admin'} accounts must sign in through the ${portalLabel}.`,
         });
       }
     } else if (cleanedRole && user.role !== cleanedRole) {
@@ -586,6 +607,17 @@ const loginUser = async (req, res) => {
 
     if (user.status === 'suspended') {
       return res.status(403).json({ message: 'This account is currently suspended.' });
+    }
+
+    const platformSettings = await getSystemSettings();
+    if (
+      (user.role === 'customer' || user.role === 'provider') &&
+      platformSettings.maintenanceMode
+    ) {
+      return res.status(503).json({
+        message: platformSettings.maintenanceMessage,
+        maintenanceMode: true,
+      });
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);

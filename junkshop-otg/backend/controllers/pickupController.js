@@ -1,4 +1,5 @@
 const PickupRequest = require('../models/PickupRequest');
+const { isAdminPortalRole } = require('../utils/adminRoles');
 const Junkshop = require('../models/Junkshop');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
@@ -28,6 +29,7 @@ const {
 const { PICKUP_LIST_LIMIT } = require('../utils/listLimits');
 const { sendTransactionalEmail } = require('../utils/deliveryService');
 const { writeAuditLog } = require('../utils/auditLogger');
+const { getSystemSettings } = require('../utils/systemSettings');
 
 const POPULATE_FIELDS =
   'firstName lastName email phone junkshopName name address pickupServiceFee gcashNumber gcashQrUrl pickupEnabled status role';
@@ -261,7 +263,7 @@ exports.listPickupRequests = async (req, res) => {
         ],
       };
       query = await filterPickupQueryForModeration(query, req.user.role);
-    } else if (req.user.role === 'admin') {
+    } else if (isAdminPortalRole(req.user.role)) {
       query = { deletedAt: null };
     } else {
       return res.status(403).json({ message: 'Not allowed.' });
@@ -316,7 +318,7 @@ exports.getPickupRequest = async (req, res) => {
     const isProvider =
       request.provider?._id?.toString() === req.user._id.toString() ||
       (req.user.role === 'provider' && request.status === 'pending');
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = isAdminPortalRole(req.user.role);
 
     if (!isCustomer && !isProvider && !isAdmin) {
       return res.status(403).json({ message: 'Not allowed to view this request.' });
@@ -347,6 +349,18 @@ exports.createPickupRequest = async (req, res) => {
   try {
     if (req.user.role !== 'customer') {
       return res.status(403).json({ message: 'Only customers can book pickups.' });
+    }
+
+    const platformSettings = await getSystemSettings();
+    if (!platformSettings.allowPickupRequests) {
+      return res.status(403).json({ message: 'Pickup and drop-off requests are temporarily disabled.' });
+    }
+
+    if (platformSettings.maintenanceMode) {
+      return res.status(503).json({
+        message: platformSettings.maintenanceMessage,
+        maintenanceMode: true,
+      });
     }
 
     if (!canStartNewActivity(req.user.status)) {

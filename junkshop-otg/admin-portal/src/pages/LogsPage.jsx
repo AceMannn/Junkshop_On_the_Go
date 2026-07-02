@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { adminApi } from '../services/api';
 import { formatCurrency, formatDate } from '../utils/format';
 import { adminCardClass, adminPageTitleClass } from '../utils/adminUi';
@@ -9,7 +9,6 @@ export default function LogsPage() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [deletingId, setDeletingId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -34,34 +33,12 @@ export default function LogsPage() {
     };
   }, []);
 
-  const deleteTransaction = async (transactionId) => {
-    const confirmed = window.confirm(
-      'Move this transaction to Deleted Records? You can restore it later.'
-    );
-    if (!confirmed) return;
-
-    setDeletingId(transactionId);
-    setError('');
-    try {
-      await adminApi.deleteTransaction(transactionId);
-      setTransactions((prev) =>
-        prev.map((tx) =>
-          tx.id === transactionId ? { ...tx, status: 'deleted', deletedAt: new Date().toISOString() } : tx
-        )
-      );
-    } catch (err) {
-      setError(err.message || 'Could not delete transaction.');
-    } finally {
-      setDeletingId('');
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className={adminPageTitleClass}>Transaction & Audit Logs</h1>
         <p className="mt-1 text-sm text-[#5c6658]">
-          Review financial history and admin/system actions.
+          Read-only financial history and moderation activity. Deletions are Super Admin only.
         </p>
       </div>
 
@@ -83,7 +60,7 @@ export default function LogsPage() {
               <h2 className="font-bold text-[#191c1c]">Transaction Logs</h2>
             </div>
             <div className="scroll-x-clean">
-              <table className="w-full min-w-[860px] text-sm">
+              <table className="w-full min-w-[760px] text-sm">
                 <thead className="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500">
                   <tr>
                     <th className="px-4 py-3">Date</th>
@@ -92,13 +69,12 @@ export default function LogsPage() {
                     <th className="px-4 py-3">Material</th>
                     <th className="px-4 py-3">Amount</th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {transactions.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">
+                      <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
                         No transactions found.
                       </td>
                     </tr>
@@ -111,17 +87,6 @@ export default function LogsPage() {
                         <td className="px-4 py-3">{tx.material}</td>
                         <td className="px-4 py-3 font-semibold">{formatCurrency(tx.totalAmount)}</td>
                         <td className="px-4 py-3 capitalize">{tx.deletedAt ? 'deleted' : tx.status}</td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => deleteTransaction(tx.id)}
-                            disabled={Boolean(tx.deletedAt) || deletingId === tx.id}
-                            className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                            {deletingId === tx.id ? 'Deleting...' : 'Delete'}
-                          </button>
-                        </td>
                       </tr>
                     ))
                   )}

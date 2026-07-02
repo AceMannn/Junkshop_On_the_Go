@@ -2,13 +2,14 @@
   "name": "junkshop-otg-monorepo",
   "private": true,
   "version": "1.0.0",
-  "description": "JunkShop On-The-Go — run frontend, admin portal, and backend together",
+  "description": "JunkShop On-The-Go — run frontend, admin portal, super admin portal, and backend together",
   "scripts": {
-    "dev": "concurrently -n backend,frontend,admin -c blue,green,magenta \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\" \"npm run dev --prefix admin-portal\"",
+    "dev": "concurrently -n backend,frontend,admin,super -c blue,green,magenta,cyan \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\" \"npm run dev --prefix admin-portal\" \"npm run dev --prefix super-admin-portal\"",
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:admin": "npm run dev --prefix admin-portal",
-    "install:all": "npm install --prefix backend && npm install --prefix frontend && npm install --prefix admin-portal",
+    "dev:super": "npm run dev --prefix super-admin-portal",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend && npm install --prefix admin-portal && npm install --prefix super-admin-portal",
     "seed": "npm run seed --prefix backend",
     "smoke": "npm run smoke --prefix backend"
   },

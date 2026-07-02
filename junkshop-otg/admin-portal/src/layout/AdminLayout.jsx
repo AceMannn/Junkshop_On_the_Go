@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { ClipboardList, History, Mail, RotateCcw, Shield, Users } from 'lucide-react';
+import { ClipboardList, History, Mail, RotateCcw, Shield, UserCog, Users } from 'lucide-react';
 import AdminTopbar from './AdminTopbar';
 import { adminApi } from '../services/api';
 import { adminSidebarLinkClass } from '../utils/adminUi';
@@ -11,6 +11,7 @@ const navItems = [
   { to: '/users', label: 'Users', icon: Users, end: false },
   { to: '/logs', label: 'Logs', icon: History, end: false },
   { to: '/deleted-records', label: 'Deleted Records', icon: RotateCcw, end: false },
+  { to: '/admin-team', label: 'Admin Team', icon: UserCog, end: false },
   { to: '/contact', label: 'Contact', icon: Mail, end: false },
 ];
 

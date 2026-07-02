@@ -102,24 +102,6 @@ export default function ApplicationDetailPage() {
     }
   };
 
-  const handleHardReset = async () => {
-    const confirmed = window.confirm(
-      'Clear all verification documents for this provider? Previous files stay in admin audit only.'
-    );
-    if (!confirmed) return;
-
-    setActionLoading(true);
-    setError('');
-    try {
-      const { application: updated } = await adminApi.hardResetVerification(id, rejectNote.trim());
-      setApplication(updated);
-    } catch (err) {
-      setError(err.message || 'Could not reset verification.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-zinc-500">
@@ -360,14 +342,6 @@ export default function ApplicationDetailPage() {
                 placeholder="Explain why re-verification is needed..."
               />
               <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-                <button
-                  type="button"
-                  onClick={handleHardReset}
-                  disabled={actionLoading}
-                  className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
-                >
-                  Hard reset
-                </button>
                 <button
                   type="button"
                   onClick={handleRequestReVerification}

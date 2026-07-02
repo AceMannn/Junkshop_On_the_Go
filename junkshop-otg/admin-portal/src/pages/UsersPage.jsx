@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BadgeCheck, Loader2 } from 'lucide-react';
+import { BadgeCheck, Download, Loader2 } from 'lucide-react';
 import { adminApi } from '../services/api';
+import { downloadSheet } from '../utils/exportSheet';
 import { formatDate, statusPillClass } from '../utils/format';
 import {
   adminCardClass,
   adminPageTitleClass,
+  adminPrimaryButtonClass,
   adminSecondaryButtonClass,
   adminSelectClass,
 } from '../utils/adminUi';
@@ -79,6 +81,23 @@ export default function UsersPage() {
     }
   };
 
+  const handleExport = () => {
+    downloadSheet(
+      `users-${roleFilter || 'all'}`,
+      ['Name', 'Email', 'Phone', 'Role', 'Junkshop', 'Account Status', 'Verification', 'Joined'],
+      users.map((row) => [
+        row.name,
+        row.email,
+        row.phone,
+        row.role,
+        row.junkshopName,
+        row.status,
+        row.verificationStatus || '',
+        formatDate(row.createdAt),
+      ])
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -88,15 +107,26 @@ export default function UsersPage() {
             Manage customers, providers, badges, and account status.
           </p>
         </div>
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className={adminSelectClass}
-        >
-          <option value="">Customers & providers</option>
-          <option value="customer">Customers</option>
-          <option value="provider">Providers</option>
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={users.length === 0}
+            className={`${adminPrimaryButtonClass} gap-2`}
+          >
+            <Download size={16} />
+            Download Sheet
+          </button>
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className={adminSelectClass}
+          >
+            <option value="">Customers & providers</option>
+            <option value="customer">Customers</option>
+            <option value="provider">Providers</option>
+          </select>
+        </div>
       </div>
 
       {error && (
@@ -155,7 +185,6 @@ export default function UsersPage() {
                   <option value="active">Active</option>
                   <option value="suspended">Suspended</option>
                   <option value="banned">Banned</option>
-                  <option value="deleted">Deleted</option>
                 </select>
               </div>
 

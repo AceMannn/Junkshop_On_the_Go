@@ -14,6 +14,8 @@ const domainRoutes = require('./routes/domainRoutes');
 const mapRoutes = require('./routes/mapRoutes');
 const verificationRoutes = require('./routes/verificationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const superAdminRoutes = require('./routes/superAdminRoutes');
+const systemRoutes = require('./routes/systemRoutes');
 const { mapsLimiter } = require('./middlewares/rateLimiters');
 const { MAX_JSON_BODY } = require('./utils/verificationConstants');
 const logger = require('./utils/fileLogger');
@@ -40,6 +42,8 @@ const defaultOrigins = [
   'http://127.0.0.1:5174',
   'http://localhost:5175',
   'http://127.0.0.1:5175',
+  'http://localhost:5176',
+  'http://127.0.0.1:5176',
 ];
 const clientOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN.split(',').map((origin) => origin.trim())
@@ -47,7 +51,12 @@ const clientOrigins = process.env.CLIENT_ORIGIN
 const adminPortalOrigins = process.env.ADMIN_PORTAL_ORIGIN
   ? process.env.ADMIN_PORTAL_ORIGIN.split(',').map((origin) => origin.trim())
   : [];
-const allowedOrigins = [...new Set([...clientOrigins, ...adminPortalOrigins])];
+const superAdminPortalOrigins = process.env.SUPER_ADMIN_PORTAL_ORIGIN
+  ? process.env.SUPER_ADMIN_PORTAL_ORIGIN.split(',').map((origin) => origin.trim())
+  : [];
+const allowedOrigins = [
+  ...new Set([...clientOrigins, ...adminPortalOrigins, ...superAdminPortalOrigins]),
+];
 
 const isLocalDevOrigin = (origin) => {
   if (!origin) return false;
@@ -140,6 +149,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/maps', mapsLimiter, mapRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/super-admin', superAdminRoutes);
+app.use('/api/system', systemRoutes);
 app.use('/api', domainRoutes);
 
 app.use((req, res) => {

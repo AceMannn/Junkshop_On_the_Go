@@ -98,6 +98,29 @@ const seed = async () => {
   );
 
   console.log(`Admin account ready: ${adminEmail}`);
+
+  const superAdminEmail = (
+    process.env.SUPER_ADMIN_EMAIL || 'superadmin@junkshop-otg.ph'
+  )
+    .trim()
+    .toLowerCase();
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'SuperAdminChangeMe123!';
+
+  await User.findOneAndUpdate(
+    { email: superAdminEmail },
+    {
+      firstName: 'Platform',
+      lastName: 'Super Admin',
+      email: superAdminEmail,
+      password: await bcrypt.hash(superAdminPassword, 10),
+      role: 'super_admin',
+      status: 'active',
+      emailVerified: true,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  console.log(`Super Admin account ready: ${superAdminEmail}`);
   process.exit(0);
 };
 

@@ -6,6 +6,7 @@ const ROLE_LABELS = {
   customer: 'Customer',
   provider: 'Junkshop Owner',
   admin: 'Admin',
+  super_admin: 'Super Admin',
 };
 
 function roleLabel(role) {

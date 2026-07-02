@@ -7,7 +7,7 @@ import ApplicationDetailPage from './pages/ApplicationDetailPage';
 import UsersPage from './pages/UsersPage';
 import ContactPage from './pages/ContactPage';
 import DeletedRecordsPage from './pages/DeletedRecordsPage';
-import LogsPage from './pages/LogsPage';
+import AdminTeamPage from './pages/AdminTeamPage';
 
 export default function AdminApp({ user, onLogout }) {
   return (
@@ -21,6 +21,7 @@ export default function AdminApp({ user, onLogout }) {
           <Route path="users" element={<UsersPage />} />
           <Route path="logs" element={<LogsPage />} />
           <Route path="deleted-records" element={<DeletedRecordsPage />} />
+          <Route path="admin-team" element={<AdminTeamPage />} />
           <Route path="contact" element={<ContactPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/overview" replace />} />

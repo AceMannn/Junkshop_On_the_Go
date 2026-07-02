@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { adminApi } from '../services/api';
+import { downloadSheet } from '../utils/exportSheet';
 import { formatDate, statusPillClass } from '../utils/format';
 import {
   adminCardClass,
   adminFilterPillClass,
   adminPageTitleClass,
+  adminPrimaryButtonClass,
   adminSecondaryButtonClass,
 } from '../utils/adminUi';
 
@@ -55,6 +57,21 @@ export default function ApplicationsPage() {
     }
   };
 
+  const handleExport = () => {
+    downloadSheet(
+      `applications-${filter || 'all'}`,
+      ['Owner Name', 'Junkshop Name', 'Email', 'Phone', 'Status', 'Submitted Date'],
+      applications.map((row) => [
+        row.ownerName,
+        row.junkshopName,
+        row.email,
+        row.phone,
+        row.verificationStatus,
+        formatDate(row.verificationSubmittedAt),
+      ])
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -64,7 +81,16 @@ export default function ApplicationsPage() {
             Review junkshop verification submissions.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={applications.length === 0}
+            className={`${adminPrimaryButtonClass} gap-2`}
+          >
+            <Download size={16} />
+            Download Sheet
+          </button>
           {filters.map((item) => (
             <button
               key={item.id || 'all'}

@@ -1,0 +1,25 @@
+@import "tailwindcss";
+@import "./styles/scrollbars.css";
+
+@theme {
+  --color-dashboard-green: #154212;
+  --color-super-sidebar: #3f465c;
+  --font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  html {
+    overflow-x: clip;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    background-color: #f8f9ff;
+    color: #191c1c;
+    font-family: var(--font-family-base);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

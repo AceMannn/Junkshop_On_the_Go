@@ -10,6 +10,7 @@ const { syncProfileComplete } = require('../utils/profileCompletion');
 const { syncJunkshopMaterialTags } = require('../utils/syncJunkshopTags');
 const { writeAuditLog } = require('../utils/auditLogger');
 const { applyStatusSideEffects } = require('../utils/accountModeration');
+const { isStrictAdmin } = require('../utils/adminRoles');
 const { BADGE_OPTIONS } = require('../utils/verificationConstants');
 const { serializeVerificationForAdmin } = require('./verificationController');
 const {
@@ -62,13 +63,14 @@ async function listProviderApplications({ status } = {}) {
 
 exports.getOverview = async (req, res) => {
   try {
-    const [pending, approved, rejected, draft, users, messages] = await Promise.all([
+    const [pending, approved, rejected, draft, users, messages, activeAdmins] = await Promise.all([
       User.countDocuments({ role: 'provider', verificationStatus: 'pending', status: { $ne: 'deleted' }, deletedAt: null }),
       User.countDocuments({ role: 'provider', verificationStatus: 'approved', status: { $ne: 'deleted' }, deletedAt: null }),
       User.countDocuments({ role: 'provider', verificationStatus: 'rejected', status: { $ne: 'deleted' }, deletedAt: null }),
       User.countDocuments({ role: 'provider', verificationStatus: 'draft', status: { $ne: 'deleted' }, deletedAt: null }),
       User.countDocuments({ role: { $in: ['customer', 'provider'] }, status: { $ne: 'deleted' }, deletedAt: null }),
       ContactMessage.countDocuments({ status: 'new', deletedAt: null }),
+      User.countDocuments({ role: 'admin', status: 'active', deletedAt: null }),
     ]);
 
     res.json({
@@ -79,11 +81,33 @@ exports.getOverview = async (req, res) => {
         draftApplications: draft,
         totalUsers: users,
         unreadContactMessages: messages,
+        activeAdmins,
       },
       badgeOptions: BADGE_OPTIONS,
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not load admin overview.' });
+  }
+};
+
+exports.listAdminTeam = async (req, res) => {
+  try {
+    const admins = await User.find({ role: 'admin' })
+      .select('firstName lastName email status createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      admins: admins.map((admin) => ({
+        id: String(admin._id),
+        name: [admin.firstName, admin.lastName].filter(Boolean).join(' '),
+        email: admin.email || '',
+        status: admin.status,
+        createdAt: admin.createdAt,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load admin team.' });
   }
 };
 
@@ -460,13 +484,17 @@ exports.updateUserBadges = async (req, res) => {
 exports.updateUserStatus = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    if (!user || user.role === 'admin') {
+    if (!user || user.role === 'admin' || user.role === 'super_admin') {
       return res.status(404).json({ message: 'User not found.' });
     }
 
     const nextStatus = String(req.body.status || '').trim();
     if (!['active', 'suspended', 'banned', 'deleted'].includes(nextStatus)) {
       return res.status(400).json({ message: 'Invalid account status.' });
+    }
+
+    if (nextStatus === 'deleted' && isStrictAdmin(req.user.role)) {
+      return res.status(403).json({ message: 'Only Super Admin can delete accounts.' });
     }
 
     const previousStatus = user.status;
@@ -690,6 +718,7 @@ exports.listDeletedRecords = async (req, res) => {
           : { deletedAt: { $ne: null } };
 
       const records = await Model.find(query)
+        .populate('deletedBy', 'firstName lastName email role')
         .sort({ deletedAt: -1, updatedAt: -1 })
         .limit(30)
         .lean();
@@ -709,6 +738,15 @@ exports.listDeletedRecords = async (req, res) => {
           status: record.status || '',
           deletedAt: record.deletedAt,
           createdAt: record.createdAt,
+          deletedBy: record.deletedBy
+            ? {
+                name: [record.deletedBy.firstName, record.deletedBy.lastName]
+                  .filter(Boolean)
+                  .join(' '),
+                email: record.deletedBy.email || '',
+                role: record.deletedBy.role || '',
+              }
+            : null,
         });
       });
     }

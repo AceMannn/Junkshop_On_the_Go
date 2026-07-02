@@ -1,0 +1,144 @@
+/* Reusable scrollbar utilities — unlayered so WebKit pseudo-elements apply on Windows */
+
+/*
+ * No arrow buttons — thumb drag + track click still work.
+ * !important needed on Windows Chromium classic scrollbars.
+ */
+.scrollbar-clean::-webkit-scrollbar-button,
+.scrollbar-clean-h::-webkit-scrollbar-button,
+.scroll-y-clean::-webkit-scrollbar-button,
+.scroll-x-clean::-webkit-scrollbar-button,
+.scrollbar-clean::-webkit-scrollbar-button:single-button,
+.scrollbar-clean-h::-webkit-scrollbar-button:single-button,
+.scroll-y-clean::-webkit-scrollbar-button:single-button,
+.scroll-x-clean::-webkit-scrollbar-button:single-button,
+.scrollbar-clean::-webkit-scrollbar-button:double-button,
+.scrollbar-clean-h::-webkit-scrollbar-button:double-button,
+.scroll-y-clean::-webkit-scrollbar-button:double-button,
+.scroll-x-clean::-webkit-scrollbar-button:double-button,
+.scroll-y-clean::-webkit-scrollbar-button:vertical,
+.scroll-x-clean::-webkit-scrollbar-button:horizontal,
+.scroll-y-clean::-webkit-scrollbar-button:vertical:start:decrement,
+.scroll-y-clean::-webkit-scrollbar-button:vertical:end:increment,
+.scroll-x-clean::-webkit-scrollbar-button:horizontal:start:decrement,
+.scroll-x-clean::-webkit-scrollbar-button:horizontal:end:increment,
+.scrollbar-clean::-webkit-scrollbar-button:vertical:start:decrement,
+.scrollbar-clean::-webkit-scrollbar-button:vertical:end:increment,
+.scrollbar-clean-h::-webkit-scrollbar-button:horizontal:start:decrement,
+.scrollbar-clean-h::-webkit-scrollbar-button:horizontal:end:increment {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  max-width: 0 !important;
+  max-height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.scrollbar-clean {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.scrollbar-clean::-webkit-scrollbar {
+  width: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.scrollbar-clean::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-clean::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 9999px;
+}
+
+.scrollbar-clean::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.scrollbar-clean-h {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.scrollbar-clean-h::-webkit-scrollbar {
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.scrollbar-clean-h::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-clean-h::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 9999px;
+}
+
+.scroll-y-clean {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.scroll-y-clean::-webkit-scrollbar {
+  width: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.scroll-y-clean::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-y-clean::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 9999px;
+  min-height: 32px;
+}
+
+.scroll-y-clean::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.scroll-y-inset {
+  padding-inline-end: 4px;
+}
+
+.scroll-clip-y {
+  overflow: hidden;
+}
+
+.scroll-x-clean {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.scroll-x-clean::-webkit-scrollbar {
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.scroll-x-clean::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-x-clean::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 9999px;
+  min-width: 32px;
+}

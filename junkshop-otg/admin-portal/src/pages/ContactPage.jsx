@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ExternalLink, Inbox, Loader2, Mail, Send, Trash2, X } from 'lucide-react';
+import { ExternalLink, Download, Inbox, Loader2, Mail, Send, X } from 'lucide-react';
 import { adminApi } from '../services/api';
+import { downloadSheet } from '../utils/exportSheet';
 import { formatDate, statusPillClass } from '../utils/format';
 import {
   adminCardClass,
@@ -17,7 +18,6 @@ export default function ContactPage() {
   const [error, setError] = useState('');
   const [messages, setMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
-  const [deletingId, setDeletingId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -83,36 +83,40 @@ export default function ContactPage() {
 
     openMessage(message);
     setSearchParams({}, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, messages, searchParams, selectedMessage, setSearchParams]);
 
-  const deleteMessage = async (messageId) => {
-    const confirmed = window.confirm(
-      'Move this contact message to Deleted Records? You can restore it later.'
+  const handleExport = () => {
+    downloadSheet(
+      'contact-messages',
+      ['Name', 'Email', 'Subject', 'Status', 'Received'],
+      messages.map((row) => [
+        row.name,
+        row.email,
+        row.subject,
+        row.status,
+        formatDate(row.createdAt),
+      ])
     );
-    if (!confirmed) return;
-
-    setDeletingId(messageId);
-    setError('');
-    try {
-      await adminApi.deleteContactMessage(messageId);
-      setMessages((prev) => prev.filter((row) => row._id !== messageId));
-      setSelectedMessage((prev) => (prev?._id === messageId ? null : prev));
-      window.dispatchEvent(new Event('admin-contact-updated'));
-    } catch (err) {
-      setError(err.message || 'Could not delete contact message.');
-    } finally {
-      setDeletingId('');
-    }
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className={adminPageTitleClass}>Contact messages</h1>
-        <p className="mt-1 text-sm text-[#5c6658]">
-          Public contact form submissions from the website.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className={adminPageTitleClass}>Contact messages</h1>
+          <p className="mt-1 text-sm text-[#5c6658]">
+            Public contact form submissions from the website.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={messages.length === 0}
+          className={`${adminPrimaryButtonClass} gap-2 self-start`}
+        >
+          <Download size={16} />
+          Download Sheet
+        </button>
       </div>
 
       {error && (
@@ -201,8 +205,6 @@ export default function ContactPage() {
           message={selectedMessage}
           onClose={() => setSelectedMessage(null)}
           onStatusChange={handleContactStatus}
-          onDelete={deleteMessage}
-          deleting={deletingId === selectedMessage._id}
         />
       )}
     </div>
@@ -217,7 +219,7 @@ function buildReplyUrl(message) {
   return `mailto:${message.email}?subject=${subject}&body=${body}`;
 }
 
-function ContactMessageDrawer({ message, onClose, onStatusChange, onDelete, deleting }) {
+function ContactMessageDrawer({ message, onClose, onStatusChange }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/35">
       <div
@@ -306,15 +308,6 @@ function ContactMessageDrawer({ message, onClose, onStatusChange, onDelete, dele
               className={`${adminSecondaryButtonClass} flex-1`}
             >
               Mark resolved
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(message._id)}
-              disabled={deleting}
-              className="inline-flex flex-1 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {deleting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </div>
