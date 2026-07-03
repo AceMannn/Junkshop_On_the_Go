@@ -7,6 +7,7 @@ import ApplicationDetailPage from './pages/ApplicationDetailPage';
 import UsersPage from './pages/UsersPage';
 import ContactPage from './pages/ContactPage';
 import DeletedRecordsPage from './pages/DeletedRecordsPage';
+import LogsPage from './pages/LogsPage';
 import AdminTeamPage from './pages/AdminTeamPage';
 
 export default function AdminApp({ user, onLogout }) {
