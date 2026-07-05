@@ -35,6 +35,8 @@ const {
   filterTransactionsForViewer,
 } = require('../utils/accountModeration');
 const { sendMaterialExpiryWarningEmail } = require('../utils/deliveryService');
+const reportController = require('../controllers/reportController');
+const { loadCancelledPickupsForHistory } = require('../utils/historyMerge');
 
 const router = express.Router();
 const MAX_AMOUNT = 20000;
@@ -895,7 +897,12 @@ router.delete('/notifications', protect, pickupController.clearNotifications);
 
 router.get('/transactions', protect, async (req, res) => {
   const key = req.user.role === 'provider' ? 'provider' : 'customer';
-  const query = { [key]: req.user._id, totalAmount: { $gt: 0 }, deletedAt: null };
+  const query = {
+    [key]: req.user._id,
+    deletedAt: null,
+    status: { $in: ['completed', 'cancelled'] },
+    totalAmount: { $gt: 0 },
+  };
 
   if (req.query.from || req.query.to) {
     query.createdAt = {};
@@ -919,10 +926,26 @@ router.get('/transactions', protect, async (req, res) => {
     transactions.flatMap((row) => [row.customer?._id, row.provider?._id]).filter(Boolean)
   );
 
+  const cancelledPickups = await loadCancelledPickupsForHistory(req.user, {
+    from: req.query.from,
+    to: req.query.to,
+  });
+
+  const transactionRows = filterTransactionsForViewer(transactions, req.user.role, statusMap).map(
+    (row) => ({ ...row, historyType: 'transaction' })
+  );
+
+  const merged = [...transactionRows, ...cancelledPickups].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
+
   res.json({
-    transactions: filterTransactionsForViewer(transactions, req.user.role, statusMap),
+    transactions: merged.slice(0, TRANSACTION_LIST_LIMIT),
   });
 });
+
+router.get('/reports/mine', protect, reportController.listMyReports);
+router.post('/reports', protect, reportController.submitReport);
 
 router.post('/transactions', protect, requireProvider, async (req, res) => {
   const body = pickAllowed(req.body, TRANSACTION_CREATE_KEYS);

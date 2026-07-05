@@ -31,6 +31,7 @@ import {
     normalizeMaterialCategory,
     shopStatusBadgeClass,
 } from "../../utils/catalogMappers";
+import { getMaterialCategoryColors } from "../../utils/materialCategoryColors";
 import {
     recyclingSteps,
     recyclingDos,
@@ -505,13 +506,25 @@ export function MaterialPricesPanel() {
     const { materials, loading, error, refresh } = useFeaturedMaterials();
     const [activeCategory, setActiveCategory] = useState("all");
     const [viewMode, setViewMode] = useState("cards");
+    const [search, setSearch] = useState("");
 
     const filteredPrices = useMemo(() => {
-        if (activeCategory === "all") return materials;
-        return materials.filter(
-            (item) => normalizeMaterialCategory(item.category, item.material) === activeCategory
-        );
-    }, [materials, activeCategory]);
+        const query = search.trim().toLowerCase();
+        return materials.filter((item) => {
+            const category = normalizeMaterialCategory(item.category, item.material);
+            const matchesCategory = activeCategory === "all" || category === activeCategory;
+            if (!matchesCategory) return false;
+            if (!query) return true;
+            const haystack = [
+                item.material,
+                formatMaterialCategoryLabel(item.category),
+                item.examples,
+            ]
+                .join(" ")
+                .toLowerCase();
+            return haystack.includes(query);
+        });
+    }, [materials, activeCategory, search]);
 
     const highlightRows = useMemo(() => {
         return HIGHLIGHT_CATEGORIES.map((category) => {
@@ -560,23 +573,34 @@ export function MaterialPricesPanel() {
                 ))}
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap gap-2">
-                    {priceCategories.map((cat) => (
-                        <button
-                            key={cat.id}
-                            type="button"
-                            onClick={() => setActiveCategory(cat.id)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${activeCategory === cat.id
-                                ? "bg-[#154212] text-white"
-                                : "bg-white border border-zinc-200 text-[#42493e] hover:border-emerald-300"
-                                }`}
-                        >
-                            {cat.label}
-                        </button>
-                    ))}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                <div className="flex items-center bg-white border border-zinc-200 px-3 py-2 rounded-xl w-full lg:flex-1 lg:min-w-0">
+                    <Search size={18} className="text-[#72796e] mr-2 shrink-0" />
+                    <input
+                        type="search"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        className="outline-none text-sm w-full bg-transparent"
+                        placeholder="Search materials..."
+                        aria-label="Search materials"
+                    />
                 </div>
-                <div className="inline-flex h-9 w-fit rounded-xl border border-zinc-200 bg-white p-0.5 shadow-sm">
+
+                <div className="flex items-center gap-3">
+                    <select
+                        value={activeCategory}
+                        onChange={(event) => setActiveCategory(event.target.value)}
+                        className="h-10 min-w-[10rem] flex-1 sm:flex-none rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium text-[#42493e] focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                        aria-label="Filter by category"
+                    >
+                        {priceCategories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                                {cat.label}
+                            </option>
+                        ))}
+                    </select>
+
+                    <div className="inline-flex h-10 w-fit shrink-0 rounded-xl border border-zinc-200 bg-white p-0.5 shadow-sm">
                     <button
                         type="button"
                         onClick={() => setViewMode("cards")}
@@ -603,10 +627,17 @@ export function MaterialPricesPanel() {
                         <Table2 size={13} />
                         Table
                     </button>
+                    </div>
                 </div>
             </div>
 
-            {viewMode === "table" ? (
+            {filteredPrices.length === 0 ? (
+                <EmptyState
+                    compact
+                    title="No materials match your search"
+                    description="Try another keyword or reset the category filter."
+                />
+            ) : viewMode === "table" ? (
                 <div className="scroll-x-clean overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
                     <table className="w-full min-w-[780px] text-sm">
                         <thead className="bg-[#f3f4f3] text-[#42493e]">
@@ -674,15 +705,18 @@ export function MaterialPricesPanel() {
                     const unitLabel = materialUnitLabel(item);
                     const mid = parsePriceMid(item.perKgPrice);
                     const updatedLabel = formatUpdatedDate(item.updatedAt);
+                    const colors = getMaterialCategoryColors(
+                        normalizeMaterialCategory(item.category, item.material)
+                    );
 
                     return (
                         <div
                             key={item.id}
-                            className="min-w-0 bg-white border border-zinc-200 rounded-xl p-4 sm:p-5"
+                            className={`min-w-0 border rounded-xl p-4 sm:p-5 ${colors.card}`}
                         >
                             <div className="flex justify-between items-start gap-2 mb-2">
                                 <div>
-                                    <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">
+                                    <span className={`text-[10px] uppercase font-bold tracking-wider ${colors.badge}`}>
                                         {formatMaterialCategoryLabel(item.category)}
                                     </span>
                                     <h3 className="font-bold text-[#191c1c] mt-0.5">
@@ -692,7 +726,7 @@ export function MaterialPricesPanel() {
                                 <TrendBadge trend={trend} />
                             </div>
 
-                            <p className="text-2xl font-bold text-emerald-900">
+                            <p className={`text-2xl font-bold ${colors.price}`}>
                                 {item.perKgPrice}
                                 <span className="text-sm font-semibold text-[#72796e] ml-1">
                                     / {unitLabel === "piece" ? "pc" : "kg"}

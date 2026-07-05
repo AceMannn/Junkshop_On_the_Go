@@ -182,11 +182,49 @@ export function normalizeProviderJunkshop(shop) {
   };
 }
 
-export function normalizeTransaction(row) {
+export function normalizeTransaction(row, viewerRole = 'customer') {
+  if (row.historyType === 'pickup_cancelled') {
+    const counterparty = row.viewerCounterparty || row.shopLabel || row.customerLabel || '—';
+    return {
+      id: row._id,
+      historyType: 'pickup_cancelled',
+      reportSourceType: 'pickup',
+      reportTargetLabel: viewerRole === 'provider' ? 'Customer' : 'Shop',
+      date: new Date(row.createdAt).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      material: row.material,
+      weightKg: Number(row.weightKg) || 0,
+      weightUnit: row.weightUnit || 'kg',
+      weight: row.weight || '—',
+      amount: row.amount || '—',
+      amountValue: Number(row.amountValue) || 0,
+      isPaidTransaction: false,
+      shop: counterparty,
+      counterparty,
+      status: 'Cancelled',
+      canReport: true,
+      requestType: row.requestType,
+      scheduledDate: row.scheduledDate,
+      timeSlot: row.timeSlot,
+    };
+  }
+
   const provider = row.provider;
   const customer = row.customer;
   const amountValue = Number(row.totalAmount) || 0;
-  const amount = `₱${amountValue.toFixed(2)}`;
+  const amount = amountValue > 0 ? `₱${amountValue.toFixed(2)}` : '—';
+
+  const formatStatus = (status) => {
+    if (status === 'completed') return 'Completed';
+    if (status === 'cancelled') return 'Cancelled';
+    if (status === 'processing') return 'Processing';
+    return status;
+  };
+
+  const canReport = ['completed', 'cancelled'].includes(String(row.status || '').toLowerCase());
 
   if (provider?.accountStatus === 'suspended') {
     return {
@@ -204,19 +242,22 @@ export function normalizeTransaction(row) {
       amountValue,
       isPaidTransaction: amountValue > 0,
       shop: 'Suspended Junkshop Owner',
-      status:
-        row.status === 'completed'
-          ? 'Completed'
-          : row.status === 'processing'
-            ? 'Processing'
-            : row.status,
+      counterparty: 'Suspended Junkshop Owner',
+      status: formatStatus(row.status),
       accountStatus: 'suspended',
+      historyType: 'transaction',
+      reportSourceType: 'transaction',
+      reportTargetLabel: viewerRole === 'provider' ? 'Customer' : 'Shop',
+      canReport,
     };
   }
 
   if (customer?.accountStatus === 'suspended') {
     return {
       id: row._id,
+      historyType: 'transaction',
+      reportSourceType: 'transaction',
+      reportTargetLabel: viewerRole === 'provider' ? 'Customer' : 'Shop',
       date: new Date(row.createdAt).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -230,13 +271,10 @@ export function normalizeTransaction(row) {
       amountValue,
       isPaidTransaction: amountValue > 0,
       shop: 'Suspended Customer',
-      status:
-        row.status === 'completed'
-          ? 'Completed'
-          : row.status === 'processing'
-            ? 'Processing'
-            : row.status,
+      counterparty: 'Suspended Customer',
+      status: formatStatus(row.status),
       accountStatus: 'suspended',
+      canReport,
     };
   }
 
@@ -245,8 +283,18 @@ export function normalizeTransaction(row) {
     [provider?.firstName, provider?.lastName].filter(Boolean).join(' ') ||
     'Junkshop';
 
+  const customerLabel =
+    [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') ||
+    customer?.email ||
+    'Customer';
+
+  const counterparty = viewerRole === 'provider' ? customerLabel : shopLabel;
+
   return {
     id: row._id,
+    historyType: 'transaction',
+    reportSourceType: 'transaction',
+    reportTargetLabel: viewerRole === 'provider' ? 'Customer' : 'Shop',
     date: new Date(row.createdAt).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -259,12 +307,9 @@ export function normalizeTransaction(row) {
     amount,
     amountValue,
     isPaidTransaction: amountValue > 0,
-    shop: shopLabel,
-    status:
-      row.status === 'completed'
-        ? 'Completed'
-        : row.status === 'processing'
-          ? 'Processing'
-          : row.status,
+    shop: counterparty,
+    counterparty,
+    status: formatStatus(row.status),
+    canReport,
   };
 }

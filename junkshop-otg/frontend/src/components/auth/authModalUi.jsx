@@ -25,7 +25,7 @@ export function authRoleTabClass(isActive) {
 }
 
 export const authRoleHints = {
-  customer: 'Customer — Log in with your mobile number',
+  customer: 'Customer — register with your email',
   provider: 'Junkshop Owner — Register your shop for admin verification',
 };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, LogIn, User } from 'lucide-react';
+import { Menu, X, LogIn } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import logoImage from '../assets/junkshop-logo.png';
 import {
@@ -15,7 +15,6 @@ export default function Header({
   onNavigate,
   isAuthenticated = false,
   onShowLogin,
-  onShowSignUp,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -90,20 +89,10 @@ export default function Header({
               <button
                 type="button"
                 onClick={onShowLogin}
-                className={`${headerAuthBtnClass} text-[#42493e] hover:bg-emerald-50 hover:text-[#154212]`}
+                className={`${headerAuthBtnClass} bg-[#154212] text-white hover:bg-emerald-900 shadow-sm`}
               >
                 Login
                 <LogIn size={18} />
-              </button>
-            )}
-            {!isAuthenticated && onShowSignUp && (
-              <button
-                type="button"
-                onClick={onShowSignUp}
-                className={`${headerAuthBtnClass} bg-[#154212] text-white hover:bg-emerald-900 shadow-sm`}
-              >
-                Sign Up
-                <User size={18} />
               </button>
             )}
           </div>
@@ -152,25 +141,13 @@ export default function Header({
               {!isAuthenticated && onShowLogin && (
                 <button
                   type="button"
-                  className="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-[#42493e] hover:bg-zinc-50 border-t border-zinc-100 mt-2 pt-4"
+                  className={`${headerAuthBtnClass} w-full justify-center mt-3 bg-[#154212] text-white hover:bg-emerald-900 shadow-sm`}
                   onClick={() => {
                     onShowLogin();
                     setIsMobileMenuOpen(false);
                   }}
                 >
                   Login
-                </button>
-              )}
-              {!isAuthenticated && onShowSignUp && (
-                <button
-                  type="button"
-                  className={`${headerAuthBtnClass} w-full justify-center mt-3 bg-[#154212] text-white hover:bg-emerald-900 shadow-sm`}
-                  onClick={() => {
-                    onShowSignUp();
-                    setIsMobileMenuOpen(false);
-                  }}
-                >
-                  Sign Up
                 </button>
               )}
             </nav>

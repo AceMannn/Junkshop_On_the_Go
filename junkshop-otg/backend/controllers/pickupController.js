@@ -369,13 +369,19 @@ exports.createPickupRequest = async (req, res) => {
       });
     }
 
+    if (!hasValidPhone(req.user.phone)) {
+      return res.status(403).json({
+        message: 'Add your mobile number in Account Settings before booking a pickup.',
+      });
+    }
+
     const customerProfile = await evaluateProfile(req.user);
     if (!customerProfile.complete) {
       const missing = customerProfile.missing || [];
       return res.status(403).json({
         message: missing.includes('address')
-          ? 'Add your street address in Account Settings before booking a pickup.'
-          : 'Add your mobile number in Account Settings before booking a pickup.',
+          ? 'Add your street address in Account Settings before booking a home pickup.'
+          : 'Complete your profile in Account Settings before booking a pickup.',
         profileStatus: customerProfile,
       });
     }
@@ -521,9 +527,11 @@ exports.createPickupRequest = async (req, res) => {
       return res.status(400).json({ message: 'Address is required for this booking.' });
     }
 
-    const normalizedPhone = normalizePhone(contactPhone || req.user.phone);
-    if (!isDropOff && !hasValidPhone(normalizedPhone)) {
-      return res.status(400).json({ message: 'Contact phone is required (09XXXXXXXXX).' });
+    const normalizedPhone = normalizePhone(req.user.phone);
+    if (!hasValidPhone(normalizedPhone)) {
+      return res.status(403).json({
+        message: 'Add your mobile number in Account Settings before booking a pickup.',
+      });
     }
 
     let resolvedPickupLocation = null;
@@ -654,6 +662,12 @@ exports.acceptPickupRequest = async (req, res) => {
   try {
     if (req.user.role !== 'provider') {
       return res.status(403).json({ message: 'Provider account required.' });
+    }
+
+    if (!hasValidPhone(req.user.phone)) {
+      return res.status(403).json({
+        message: 'Add your mobile number in Account Settings before accepting pickups.',
+      });
     }
 
     const providerProfile = await evaluateProfile(req.user);
@@ -820,6 +834,16 @@ exports.updatePickupStatus = async (req, res) => {
       request.rejectMessage = message;
     } else if (!isProvider) {
       return res.status(403).json({ message: 'Not allowed to update this request.' });
+    }
+
+    if (
+      isProvider &&
+      ['accepted', 'in_transit', 'completed'].includes(status) &&
+      !hasValidPhone(req.user.phone)
+    ) {
+      return res.status(403).json({
+        message: 'Add your mobile number in Account Settings before updating pickup transactions.',
+      });
     }
 
     if (status === 'in_transit') {

@@ -548,53 +548,38 @@ const loginUser = async (req, res) => {
     }
 
     let user = null;
+    const parsed = resolveRecoveryInput({ identifier: loginId });
+    const isStaffLogin =
+      cleanedRole === 'admin' || cleanedRole === 'super_admin' || cleanedRole === 'staff';
 
-    if (cleanedRole === 'provider' || cleanedRole === 'customer') {
-      // Email-first login for customers and providers
-      const normalizedEmail = loginId.toLowerCase();
-      if (!emailRegex.test(normalizedEmail)) {
-        return res.status(400).json({ message: 'Please enter a valid email address.' });
-      }
-      user = await User.findOne({ email: normalizedEmail, role: cleanedRole }).select(AUTH_LOOKUP_EXCLUDE);
-      if (!user) {
-        // Check if the email belongs to a different role
-        const crossRoleUser = await User.findOne({
-          email: normalizedEmail,
-          role: cleanedRole === 'customer' ? 'provider' : 'customer',
-          status: { $ne: 'deleted' },
-          deletedAt: null,
-        }).select(AUTH_LOOKUP_EXCLUDE);
-        if (crossRoleUser) {
-          return res.status(403).json({ message: emailConflictMessage(crossRoleUser.role) });
-        }
-        return res.status(401).json({ message: 'Invalid email or password.' });
-      }
-    } else {
-      // Admin / Super Admin login by email
-      const normalizedEmail = loginId.toLowerCase();
-      if (!emailRegex.test(normalizedEmail)) {
+    if (isStaffLogin) {
+      if (!parsed.ok || parsed.type !== 'email') {
         return res.status(400).json({ message: 'Please enter a valid email address.' });
       }
       user = await User.findOne({
-        email: normalizedEmail,
+        email: parsed.email,
         role: { $in: ['admin', 'super_admin'] },
       }).select(AUTH_LOOKUP_EXCLUDE);
       if (!user) {
         return res.status(401).json({ message: 'Invalid login details or password.' });
       }
-    }
+    } else {
+      if (!parsed.ok) {
+        return res.status(400).json({ message: parsed.message });
+      }
 
-    if (user.role === 'admin' || user.role === 'super_admin') {
-      if (cleanedRole) {
+      user = await findUserByRecovery(parsed);
+
+      if (user?.role === 'admin' || user?.role === 'super_admin') {
         const portalLabel = user.role === 'super_admin' ? 'super admin portal' : 'admin portal';
         return res.status(403).json({
           message: `${user.role === 'super_admin' ? 'Super Admin' : 'Admin'} accounts must sign in through the ${portalLabel}.`,
         });
       }
-    } else if (cleanedRole && user.role !== cleanedRole) {
-      return res.status(403).json({
-        message: 'This account does not match the selected role.',
-      });
+
+      if (!user || !['customer', 'provider'].includes(user.role)) {
+        return res.status(401).json({ message: 'Invalid email or password.' });
+      }
     }
 
     if (user.status === 'deleted' || user.deletedAt) {
@@ -623,10 +608,9 @@ const loginUser = async (req, res) => {
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
     if (!isPasswordCorrect) {
-      const message =
-        cleanedRole === 'provider' || cleanedRole === 'customer'
-          ? 'Invalid email or password.'
-          : 'Invalid login details or password.';
+      const message = isStaffLogin
+        ? 'Invalid login details or password.'
+        : 'Invalid email or password.';
       return res.status(401).json({ message });
     }
 
@@ -649,6 +633,7 @@ const loginUser = async (req, res) => {
         requiresPhoneVerification: needsPhoneVerification,
         email: user.email,
         phone: user.phone,
+        role: user.role,
       });
     }
 

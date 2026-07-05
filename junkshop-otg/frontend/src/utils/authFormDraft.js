@@ -11,7 +11,6 @@ const CUSTOMER_FORM_DEFAULTS = {
   firstName: '',
   middleName: '',
   lastName: '',
-  phone: '',
   email: '',
   password: '',
   confirmPassword: '',
@@ -69,6 +68,11 @@ export function clearSignUpDrafts() {
   clearAuthDraft(AUTH_DRAFT_KEYS.SIGNUP_CUSTOMER);
   clearAuthDraft(AUTH_DRAFT_KEYS.SIGNUP_PROVIDER);
   clearAuthDraft(AUTH_DRAFT_KEYS.SIGNUP_META);
+}
+
+/** Reset signup entry to customer without wiping in-progress form drafts. */
+export function resetSignUpMetaRole() {
+  saveAuthDraft(AUTH_DRAFT_KEYS.SIGNUP_META, { selectedRole: 'customer' });
 }
 
 /** Login: phone/email, role, view — never passwords or OTP codes. */

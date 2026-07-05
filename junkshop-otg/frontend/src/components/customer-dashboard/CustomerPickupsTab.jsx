@@ -12,8 +12,12 @@ import { pickupApi } from "../../services/api";
 import { useCatalogJunkshops } from "../../hooks/useCatalogData";
 import PickupWizard from "./PickupWizard";
 import { REFRESH_INTERVAL_MS, REFRESH_INTERVAL_FAST_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
+import { hasValidPhilippinePhone, TRANSACTION_PHONE_SETTINGS_MESSAGE } from '../../utils/phone';
 import {
-    STATUS_LABELS,
+  hasConfirmedCustomerAddress,
+  TRANSACTION_ADDRESS_SETTINGS_MESSAGE,
+} from '../../utils/transactionGates';
+import {
     STATUS_STYLES,
     formatPickupSchedule,
     formatPeso,
@@ -133,18 +137,33 @@ export default function CustomerPickupsTab({
         load(false);
     }, [load]);
 
+    const requireTransactionProfile = () => {
+        if (!hasValidPhilippinePhone(user?.phone)) {
+            onNotify?.(TRANSACTION_PHONE_SETTINGS_MESSAGE);
+            onGoProfile?.();
+            return false;
+        }
+        if (!hasConfirmedCustomerAddress(user)) {
+            onNotify?.(TRANSACTION_ADDRESS_SETTINGS_MESSAGE);
+            onGoProfile?.();
+            return false;
+        }
+        return true;
+    };
+
     useEffect(() => {
         if (openWizardSignal > 0) {
             setWizardSeed(wizardPrefill);
+            if (!requireTransactionProfile()) return;
             setWizardOpen(true);
         }
-    }, [openWizardSignal, wizardPrefill]);
+    }, [openWizardSignal, wizardPrefill, user?.phone, user?.address, user?.addressConfirmed, user?.location]);
 
     useEffect(() => {
-        if (openWizardOnMount && user?.profileComplete) {
+        if (openWizardOnMount && hasValidPhilippinePhone(user?.phone) && hasConfirmedCustomerAddress(user)) {
             setWizardOpen(true);
         }
-    }, [openWizardOnMount, user?.profileComplete]);
+    }, [openWizardOnMount, user?.phone, user?.address, user?.addressConfirmed, user?.location]);
 
     useEffect(() => {
         if (!focusPickupId) return;
@@ -161,15 +180,8 @@ export default function CustomerPickupsTab({
         onFocusHandled?.();
     }, [focusPickupId, requests, loading, onFocusHandled]);
 
-    const profileCompletionMessage = () =>
-        "Add your street address in Profile Settings before booking a pickup.";
-
     const startWizard = () => {
-        if (!user?.profileComplete) {
-            onNotify?.(profileCompletionMessage());
-            onGoProfile?.();
-            return;
-        }
+        if (!requireTransactionProfile()) return;
         setWizardOpen(true);
     };
 

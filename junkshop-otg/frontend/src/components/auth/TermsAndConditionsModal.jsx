@@ -25,6 +25,18 @@ const TERMS_COPY = {
         title: 'Security and account moderation',
         body: 'Accounts may be reviewed, suspended, banned, or soft-deleted when fraud, abuse, fake bookings, harassment, or policy violations are detected. Deleted records may remain in the database for safety, audit, and restoration purposes.',
       },
+      {
+        title: 'Lawful materials only',
+        body: 'You agree not to sell, offer, or deliver stolen, illegally obtained, or restricted materials through the platform. You are responsible for ensuring that recyclables you provide are yours to sell or dispose of lawfully.',
+      },
+      {
+        title: 'Platform limitation on stolen goods disputes',
+        body: 'JunkShop On-The-Go connects customers and junkshops for legitimate recycling transactions. If a dispute arises regarding whether materials were stolen, providers act in good faith based on the information available at the time of purchase. Unless required by applicable law, the platform and participating junkshops are not automatically liable for criminal acts of third parties when listings, pickups, and payments were processed in the ordinary course of business without known fraud.',
+      },
+      {
+        title: 'Cooperation with authorities',
+        body: 'We may cooperate with lawful investigations and may preserve account, transaction, photo, and communication records when required by school administration, barangay officials, law enforcement, or courts.',
+      },
     ],
     tl: [
       {
@@ -46,6 +58,18 @@ const TERMS_COPY = {
       {
         title: 'Security at account moderation',
         body: 'Maaaring ma-review, ma-suspend, ma-ban, o ma-soft delete ang account kapag may fraud, abuse, fake bookings, harassment, o paglabag sa rules. Ang deleted records ay maaaring manatili sa database para sa safety, audit, at restoration.',
+      },
+      {
+        title: 'Lehitimong materials lamang',
+        body: 'Sumasang-ayon kang hindi magbenta, mag-alok, o mag-deliver ng nakaw, ilegal, o restricted materials sa platform. Responsable ka na ang mga recyclable na ibinibigay mo ay sa iyo o legal mong maibebenta o maide-dispose.',
+      },
+      {
+        title: 'Limitasyon ng platform sa stolen goods disputes',
+        body: 'Ang JunkShop On-The-Go ay nag-uugnay ng customers at junkshops para sa lehitimong recycling transactions. Kung may dispute kung nakaw ang materyales, kumikilos ang providers nang good faith base sa available na impormasyon noong bumili. Maliban kung hinihingi ng batas, hindi automatic na liable ang platform at junkshops sa kriminal na gawa ng third parties kapag ang listing, pickup, at payment ay ginawa nang ordinary course of business nang walang known fraud.',
+      },
+      {
+        title: 'Pakikipagtulungan sa awtoridad',
+        body: 'Maaari kaming makipagtulungan sa lawful investigations at mag-imbak ng account, transaction, photo, at communication records kapag hinihingi ng school administration, barangay, law enforcement, o korte.',
       },
     ],
   },
@@ -72,6 +96,18 @@ const TERMS_COPY = {
         title: 'Security, moderation, and soft delete',
         body: 'Provider accounts and shop listings may be reviewed, suspended, banned, unpublished, or soft-deleted for fraud, unsafe conduct, fake pricing, invalid documents, abuse, or policy violations. Deleted records may be restored by admins when appropriate.',
       },
+      {
+        title: 'Good-faith purchase of recyclables',
+        body: 'Providers buy materials based on visible condition, customer representations, and ordinary inspection during weighing. You are not automatically criminally or civilly liable for every dispute alleging stolen goods if you did not know, and had no reasonable basis to know, that the materials were stolen when the transaction was completed in good faith.',
+      },
+      {
+        title: 'Customer representations',
+        body: 'Customers represent that materials they sell or drop off are lawfully owned or disposed of by them. Providers may refuse suspicious materials, document the transaction, and cooperate with lawful investigations.',
+      },
+      {
+        title: 'Platform role',
+        body: 'JunkShop On-The-Go provides listing, booking, and record-keeping tools. It does not take ownership of materials at pickup and is not a substitute for compliance with local ordinances, business permits, or environmental regulations.',
+      },
     ],
     tl: [
       {
@@ -94,11 +130,23 @@ const TERMS_COPY = {
         title: 'Security, moderation, at soft delete',
         body: 'Maaaring ma-review, ma-suspend, ma-ban, ma-unpublish, o ma-soft delete ang provider accounts at shop listings dahil sa fraud, unsafe conduct, fake pricing, invalid documents, abuse, o paglabag sa rules. Maaaring i-restore ng admins ang deleted records kung nararapat.',
       },
+      {
+        title: 'Good-faith na pagbili ng recyclables',
+        body: 'Bumibili ang providers base sa visible condition, representation ng customer, at ordinary inspection habang tinitimbang. Hindi automatic na criminally o civilly liable ang provider sa bawat dispute na nakaw ang materyales kung hindi niya alam, at walang reasonable basis na malaman, na nakaw ang materyales nang natapos ang transaction nang good faith.',
+      },
+      {
+        title: 'Representasyon ng customer',
+        body: 'Kinakatawan ng customers na ang materyales na ibinebenta o dine-drop off ay legal nila o legal nilang maide-dispose. Maaaring tumanggi ang providers sa suspicious materials, mag-document ng transaction, at makipagtulungan sa lawful investigations.',
+      },
+      {
+        title: 'Papel ng platform',
+        body: 'Nagbibigay ang JunkShop On-The-Go ng listing, booking, at record-keeping tools. Hindi ito kumukuha ng ownership ng materials sa pickup at hindi kapalit ng compliance sa local ordinances, business permits, o environmental regulations.',
+      },
     ],
   },
 };
 
-export const TERMS_VERSION = '2026-06-29';
+export const TERMS_VERSION = '2026-07-05';
 
 export default function TermsAndConditionsModal({ isOpen, onClose, role = 'customer' }) {
   const [language, setLanguage] = useState('en');
@@ -171,9 +219,9 @@ export default function TermsAndConditionsModal({ isOpen, onClose, role = 'custo
             version can be updated later with official school or legal wording.
           </p>
           {terms.map((item) => (
-            <section key={item.title} className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
-              <h3 className="font-bold text-charcoal">{item.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-charcoal/70">{item.body}</p>
+            <section key={item.title} className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3.5">
+              <h3 className="text-sm font-bold text-charcoal">{item.title}</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-charcoal/70">{item.body}</p>
             </section>
           ))}
         </div>

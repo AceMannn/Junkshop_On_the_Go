@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,7 +8,6 @@ import {
   Package,
   Store,
   Camera,
-  Calendar,
   User,
   ClipboardCheck,
   Truck,
@@ -27,27 +26,25 @@ import {
   materialsSummary,
 } from '../../utils/pickupHelpers';
 import { getUserFullName } from '../../utils/userDisplay';
+import { hasValidPhilippinePhone, normalizePhilippinePhone } from '../../utils/phone';
+import { haversineKm, NEAREST_SHOP_RADIUS_KM } from '../../utils/geo';
 import PickupAddressPicker from './PickupAddressPicker';
 
-const PICKUP_STEPS = ['Type', 'Shop', 'Materials', 'Photos', 'Schedule', 'Contact', 'Review'];
-const DROP_OFF_STEPS = ['Type', 'Shop', 'Materials', 'Photos', 'Schedule', 'Review'];
+const PICKUP_STEPS = ['Type', 'Shop & Materials', 'Photos & Schedule', 'Contact', 'Review'];
+const DROP_OFF_STEPS = ['Type', 'Shop & Materials', 'Photos & Schedule', 'Review'];
 
 const STEP_ICONS = {
   Type: Truck,
-  Shop: Store,
-  Materials: Package,
-  Photos: Camera,
-  Schedule: Calendar,
+  'Shop & Materials': Store,
+  'Photos & Schedule': Camera,
   Contact: User,
   Review: ClipboardCheck,
 };
 
 const STEP_HINTS = {
   Type: 'Choose how you will hand over your recyclables.',
-  Shop: 'Pick a partner junkshop or let us find the nearest one.',
-  Materials: 'Select what you are selling and how much.',
-  Photos: 'Show the shop what you are bringing — crop or replace anytime.',
-  Schedule: 'Pick a date and time that works for you.',
+  'Shop & Materials': 'Pick a junkshop and select what you are selling.',
+  'Photos & Schedule': 'Add photos and choose when the shop should meet you.',
   Contact: 'Where should the shop pick up your items?',
   Review: 'Double-check everything before you submit.',
 };
@@ -102,11 +99,13 @@ function FieldLabel({ children }) {
 const inputClass =
   'w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600';
 
-const NEARBY_RADIUS_OPTIONS = [
-  { value: 5, label: 'Within 5 km' },
-  { value: 10, label: 'Within 10 km' },
-  { value: 20, label: 'Within 20 km' },
-];
+function shopDistanceKm(shop, origin) {
+  if (!origin) return shop.distanceKm ?? null;
+  const shopLat = Number(shop.lat ?? shop.location?.lat);
+  const shopLng = Number(shop.lng ?? shop.location?.lng);
+  if (!Number.isFinite(shopLat) || !Number.isFinite(shopLng)) return null;
+  return Math.round(haversineKm(origin.lat, origin.lng, shopLat, shopLng) * 100) / 100;
+}
 
 export default function PickupWizard({ user, shops, onClose, onSuccess, prefill = null }) {
   const { materials: marketMaterials } = useFeaturedMaterials({ autoRefresh: false });
@@ -129,7 +128,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
 
   const [requestType, setRequestType] = useState('home_pickup');
   const [assignmentMode, setAssignmentMode] = useState(prefill?.junkshopId ? 'specific' : 'specific');
-  const [nearbyRadiusKm, setNearbyRadiusKm] = useState(5);
+  const nearbyRadiusKm = NEAREST_SHOP_RADIUS_KM;
   const [junkshopId, setJunkshopId] = useState(prefill?.junkshopId ? String(prefill.junkshopId) : '');
   const [selectedMaterials, setSelectedMaterials] = useState(
     prefill?.name
@@ -149,7 +148,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
   const [scheduledDate, setScheduledDate] = useState(scheduleDates[0]?.value || '');
   const [timeSlot, setTimeSlot] = useState('morning');
   const [contactName, setContactName] = useState(getUserFullName(user));
-  const [contactPhone, setContactPhone] = useState(user?.phone || '');
+  const accountPhone = normalizePhilippinePhone(user?.phone || '');
   const [contactEmail, setContactEmail] = useState(
     user?.email || ''
   );
@@ -177,8 +176,49 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
 
   const selectedShop = shops.find((shop) => String(shop._id || shop.id) === String(junkshopId));
 
+  const userOrigin = savedLocation;
+
+  const shopsWithDistance = useMemo(() => {
+    return openShops
+      .map((shop) => {
+        const distance = shopDistanceKm(shop, userOrigin);
+        return { ...shop, computedDistanceKm: distance };
+      })
+      .sort((a, b) => {
+        if (a.computedDistanceKm == null && b.computedDistanceKm == null) return 0;
+        if (a.computedDistanceKm == null) return 1;
+        if (b.computedDistanceKm == null) return -1;
+        return a.computedDistanceKm - b.computedDistanceKm;
+      });
+  }, [openShops, userOrigin]);
+
+  const nearbyShops = useMemo(() => {
+    return shopsWithDistance.filter(
+      (shop) =>
+        shop.computedDistanceKm != null && shop.computedDistanceKm <= NEAREST_SHOP_RADIUS_KM
+    );
+  }, [shopsWithDistance]);
+
+  const shopDropdownOptions =
+    assignmentMode === 'nearest' ? nearbyShops : shopsWithDistance;
+
+  useEffect(() => {
+    if (assignmentMode !== 'nearest') return;
+    if (!nearbyShops.length) {
+      setJunkshopId('');
+      return;
+    }
+    const stillValid = nearbyShops.some(
+      (shop) => String(shop._id || shop.id) === String(junkshopId)
+    );
+    if (!stillValid) {
+      const first = nearbyShops[0];
+      setJunkshopId(String(first._id || first.id));
+    }
+  }, [assignmentMode, nearbyShops, junkshopId]);
+
   const materialOptions = useMemo(() => {
-    if (assignmentMode === 'specific' && junkshopId && selectedShop?.listingPrices?.length > 0) {
+    if (junkshopId && selectedShop?.listingPrices?.length > 0) {
       return selectedShop.listingPrices.map((row, index) => ({
         catalogId: `shop-${row.name}-${index}`,
         name: row.name,
@@ -194,7 +234,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
       unit: row.unit === 'piece' ? 'piece' : 'kg',
       price: Number(row.price) || 0,
     }));
-  }, [assignmentMode, junkshopId, marketMaterials, selectedShop]);
+  }, [junkshopId, marketMaterials, selectedShop]);
 
   const toggleMaterial = (item) => {
     setSelectedMaterials((prev) => {
@@ -215,28 +255,26 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
 
   const validateStep = () => {
     setError('');
-    if (currentLabel === 'Shop') {
-      if (assignmentMode === 'specific' && !junkshopId) {
-        setError('Select a junkshop.');
+    if (currentLabel === 'Shop & Materials') {
+      if (!junkshopId) {
+        setError(
+          assignmentMode === 'nearest'
+            ? `No shops within ${NEAREST_SHOP_RADIUS_KM} km. Choose a shop manually or update your profile address.`
+            : 'Select a junkshop.'
+        );
         return false;
       }
-      return true;
-    }
-    if (currentLabel === 'Materials') {
       if (selectedMaterials.length === 0) {
         setError('Select at least one material.');
         return false;
       }
       return true;
     }
-    if (currentLabel === 'Photos') {
+    if (currentLabel === 'Photos & Schedule') {
       if (photos.length < 1) {
         setError('Upload at least one photo of your materials.');
         return false;
       }
-      return true;
-    }
-    if (currentLabel === 'Schedule') {
       if (!scheduledDate) {
         setError('Choose a date.');
         return false;
@@ -244,17 +282,16 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
       return true;
     }
     if (currentLabel === 'Contact') {
-      const phone = contactPhone.replace(/\D/g, '').slice(0, 11);
       if (!contactName.trim()) {
         setError('Full name is required.');
         return false;
       }
-      if (!addressConfirmed || !address.trim()) {
-        setError('Confirm pickup location.');
+      if (!hasValidPhilippinePhone(accountPhone)) {
+        setError('Add your mobile number in Account Settings before booking.');
         return false;
       }
-      if (!/^09\d{9}$/.test(phone)) {
-        setError('Enter a valid contact phone (09XXXXXXXXX).');
+      if (!isDropOff && (!addressConfirmed || !address.trim())) {
+        setError('Confirm pickup location.');
         return false;
       }
       return true;
@@ -278,11 +315,11 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
     try {
       await pickupApi.create({
         requestType,
-        assignmentMode,
+        assignmentMode: 'specific',
         nearbyRadiusKm,
-        junkshopId: assignmentMode === 'specific' ? junkshopId : undefined,
+        junkshopId,
         contactName: contactName.trim(),
-        contactPhone: contactPhone.replace(/\D/g, '').slice(0, 11),
+        contactPhone: accountPhone,
         contactEmail: contactEmail.trim(),
         materials: selectedMaterials.map((row) => ({
           catalogId: row.catalogId,
@@ -316,10 +353,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
   };
 
   const selectedTimeLabel = TIME_SLOTS.find((row) => row.id === timeSlot)?.label || timeSlot;
-  const reviewShopName =
-    assignmentMode === 'nearest'
-      ? 'Nearest available'
-      : openShops.find((shop) => String(shop._id || shop.id) === String(junkshopId))?.name;
+  const reviewShopName = selectedShop?.name || '—';
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
@@ -409,7 +443,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
             </div>
           )}
 
-          {currentLabel === 'Shop' && (
+          {currentLabel === 'Shop & Materials' && (
             <div className="space-y-4">
               {prefill?.junkshopId && (
                 <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-800">
@@ -438,142 +472,139 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                   </button>
                 ))}
               </div>
-              {assignmentMode === 'specific' && (
-                <label className="block space-y-1.5">
-                  <FieldLabel>Junkshop</FieldLabel>
-                  <select
-                    value={junkshopId}
-                    onChange={(event) => setJunkshopId(event.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Select junkshop</option>
-                    {openShops.map((shop) => (
-                      <option key={shop.id} value={shop._id || shop.id}>
-                        {shop.name} {shop.status === 'Closed' ? '(closed)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {assignmentMode === 'nearest' && (
-                <label className="block space-y-1.5">
-                  <FieldLabel>Nearby range</FieldLabel>
-                  <select
-                    value={nearbyRadiusKm}
-                    onChange={(event) => setNearbyRadiusKm(Number(event.target.value))}
-                    className={inputClass}
-                  >
-                    {NEARBY_RADIUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-[#72796e]">
-                    If no shops are found, expand this range or choose a shop manually.
+
+              <label className="block space-y-1.5">
+                <FieldLabel>Junkshop</FieldLabel>
+                <select
+                  value={junkshopId}
+                  onChange={(event) => setJunkshopId(event.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select junkshop</option>
+                  {shopDropdownOptions.map((shop) => (
+                    <option key={shop.id} value={shop._id || shop.id}>
+                      {shop.name}
+                      {shop.computedDistanceKm != null ? ` · ${shop.computedDistanceKm} km` : ''}
+                      {shop.status === 'Closed' ? ' (closed)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {assignmentMode === 'nearest' && nearbyShops.length === 0 ? (
+                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    No shops within {NEAREST_SHOP_RADIUS_KM} km of your profile address. Switch to
+                    Choose shop or update your address in Profile.
                   </p>
-                </label>
+                ) : assignmentMode === 'nearest' ? (
+                  <p className="text-xs text-[#72796e]">
+                    Showing partner shops within {NEAREST_SHOP_RADIUS_KM} km. Closest shop is
+                    pre-selected.
+                  </p>
+                ) : null}
+              </label>
+
+              {selectedShop && (
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm space-y-1">
+                  <p className="font-semibold text-[#191c1c]">{selectedShop.name}</p>
+                  <p className="text-[#72796e]">{selectedShop.address || 'Address not listed'}</p>
+                  <p className="text-xs text-emerald-800 font-medium">{selectedShop.status}</p>
+                </div>
               )}
+
+              {junkshopId ? (
+                materialOptions.length === 0 ? (
+                  <EmptyState
+                    compact
+                    title="No materials listed yet"
+                    description="Choose a verified partner shop with materials."
+                  />
+                ) : (
+                  <div className="scroll-y-clean space-y-2 max-h-64">
+                    <FieldLabel>Materials</FieldLabel>
+                    {materialOptions.map((item) => {
+                      const selected = selectedMaterials.find((row) => row.catalogId === item.catalogId);
+                      return (
+                        <div
+                          key={item.catalogId}
+                          className={`rounded-xl border px-3 py-3 transition ${
+                            selected
+                              ? 'border-emerald-500 bg-emerald-50/80'
+                              : 'border-zinc-200 bg-white'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleMaterial(item)}
+                            className="w-full text-left"
+                          >
+                            <p className="font-semibold text-sm">{item.name}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                              <span className="font-semibold text-[#154212]">
+                                {materialPriceLabel(item)}
+                              </span>
+                              <span className="text-[#72796e] capitalize">
+                                Sold per {item.unit === 'piece' ? 'piece' : 'kg'}
+                              </span>
+                            </div>
+                          </button>
+                          {selected && (
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <span className="text-xs font-semibold text-[#72796e]">Quantity</span>
+                                <p className="text-xs font-bold text-[#154212] mt-0.5">
+                                  Est. subtotal: {formatPeso(materialEstimatedSubtotal(selected))}
+                                </p>
+                              </div>
+                              <div className="inline-flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.catalogId, -1)}
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white"
+                                  aria-label="Decrease quantity"
+                                >
+                                  <Minus size={16} />
+                                </button>
+                                <span className="min-w-[2rem] text-center font-bold">
+                                  {selected.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.catalogId, 1)}
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white"
+                                  aria-label="Increase quantity"
+                                >
+                                  <Plus size={16} />
+                                </button>
+                                <span className="text-xs font-semibold text-[#72796e]">
+                                  {selected.unit === 'piece' ? 'pc' : 'kg'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {estimatedTotal > 0 && (
+                      <div className="sticky bottom-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-semibold text-emerald-900">Estimated total</p>
+                          <p className="text-base font-bold text-[#154212]">
+                            {formatPeso(estimatedTotal)}
+                          </p>
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-[#72796e]">
+                          Final amount may change after the junkshop verifies weight and materials.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )
+              ) : null}
             </div>
           )}
 
-          {currentLabel === 'Materials' && (
-            <>
-              {materialOptions.length === 0 ? (
-                <EmptyState
-                  compact
-                  title="No materials listed yet"
-                  description="Choose a verified partner shop with materials."
-                />
-              ) : (
-                <div className="scroll-y-clean space-y-2 max-h-64">
-                  {materialOptions.map((item) => {
-                    const selected = selectedMaterials.find((row) => row.catalogId === item.catalogId);
-                    return (
-                      <div
-                        key={item.catalogId}
-                        className={`rounded-xl border px-3 py-3 transition ${
-                          selected
-                            ? 'border-emerald-500 bg-emerald-50/80'
-                            : 'border-zinc-200 bg-white'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggleMaterial(item)}
-                          className="w-full text-left"
-                        >
-                          <p className="font-semibold text-sm">{item.name}</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                            <span className="font-semibold text-[#154212]">
-                              {materialPriceLabel(item)}
-                            </span>
-                            <span className="text-[#72796e] capitalize">
-                              Sold per {item.unit === 'piece' ? 'piece' : 'kg'}
-                            </span>
-                          </div>
-                        </button>
-                        {selected && (
-                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <span className="text-xs font-semibold text-[#72796e]">Quantity</span>
-                              <p className="text-xs font-bold text-[#154212] mt-0.5">
-                                Est. subtotal: {formatPeso(materialEstimatedSubtotal(selected))}
-                              </p>
-                            </div>
-                            <div className="inline-flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(item.catalogId, -1)}
-                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white"
-                                aria-label="Decrease quantity"
-                              >
-                                <Minus size={16} />
-                              </button>
-                              <span className="min-w-[2rem] text-center font-bold">
-                                {selected.quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(item.catalogId, 1)}
-                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white"
-                                aria-label="Increase quantity"
-                              >
-                                <Plus size={16} />
-                              </button>
-                              <span className="text-xs font-semibold text-[#72796e]">
-                                {selected.unit === 'piece' ? 'pc' : 'kg'}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {estimatedTotal > 0 && (
-                    <div className="sticky bottom-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 shadow-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold text-emerald-900">Estimated total</p>
-                        <p className="text-base font-bold text-[#154212]">
-                          {formatPeso(estimatedTotal)}
-                        </p>
-                      </div>
-                      <p className="mt-0.5 text-[11px] text-[#72796e]">
-                        Final amount may change after the junkshop verifies weight and materials.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
-          {currentLabel === 'Photos' && (
-            <MaterialPhotoUploader photos={photos} onChange={setPhotos} maxPhotos={3} />
-          )}
-
-          {currentLabel === 'Schedule' && (
+          {currentLabel === 'Photos & Schedule' && (
             <div className="space-y-4">
+              <MaterialPhotoUploader photos={photos} onChange={setPhotos} maxPhotos={3} />
               <label className="block space-y-1.5">
                 <FieldLabel>Date</FieldLabel>
                 <select
@@ -613,16 +644,12 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                 value={contactName}
                 onChange={(event) => setContactName(event.target.value)}
               />
-              <input
-                className={inputClass}
-                placeholder="Phone (09XXXXXXXXX) *"
-                inputMode="numeric"
-                maxLength={11}
-                value={contactPhone}
-                onChange={(event) =>
-                  setContactPhone(event.target.value.replace(/\D/g, '').slice(0, 11))
-                }
-              />
+              <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                Contact number: <strong>{accountPhone || 'Not set'}</strong>
+                {!hasValidPhilippinePhone(accountPhone) ? (
+                  <span> — add your mobile number in Account Settings first.</span>
+                ) : null}
+              </p>
               <input
                 className={inputClass}
                 placeholder="Email (optional)"
@@ -673,10 +700,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                 </p>
                 <p>
                   <span className="text-[#72796e]">Shop · </span>
-                  <strong>
-                    {reviewShopName}
-                    {assignmentMode === 'nearest' ? ` · ${nearbyRadiusKm} km range` : ''}
-                  </strong>
+                  <strong>{reviewShopName}</strong>
                 </p>
                 <p>
                   <span className="text-[#72796e]">Materials · </span>
@@ -713,7 +737,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                     )}
                     <p>
                       <span className="text-[#72796e]">Phone · </span>
-                      <strong>{contactPhone}</strong>
+                      <strong>{accountPhone}</strong>
                     </p>
                   </>
                 )}

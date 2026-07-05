@@ -39,6 +39,7 @@ import {
 import CustomerSellRecyclablesSection from "./customer-dashboard/CustomerSellRecyclablesSection";
 import CustomerTopbar from "./customer-dashboard/CustomerTopbar";
 import HelpModal from "./ui/HelpModal";
+import ReportTransactionModal from "./ui/ReportTransactionModal";
 import EmptyState from "./ui/EmptyState";
 import StatCard from "./ui/StatCard";
 import ShopRating from "./ui/ShopRating";
@@ -47,6 +48,11 @@ import {
     AccountSettingsPage,
     DeactivateAccountModal,
 } from "./customer-dashboard/CustomerAccountViews";
+import { hasValidPhilippinePhone, TRANSACTION_PHONE_SETTINGS_MESSAGE } from "../utils/phone";
+import {
+    hasConfirmedCustomerAddress,
+    TRANSACTION_ADDRESS_SETTINGS_MESSAGE,
+} from "../utils/transactionGates";
 import CustomerShopProfile from "./customer-dashboard/CustomerShopProfile";
 import CustomerShopSummaryCard from "./customer-dashboard/CustomerShopSummaryCard";
 import CustomerPointsWallet from "./customer-dashboard/CustomerPointsWallet";
@@ -242,14 +248,16 @@ export default function CustomerDashboard({
         if (parsed.tab === "pickups") {
             setPickupsTabMounted(true);
             if (location.state?.openWizard) {
-                setOpenPickupWizard(Boolean(user?.profileComplete));
+                setOpenPickupWizard(
+                    hasValidPhilippinePhone(user?.phone) && hasConfirmedCustomerAddress(user)
+                );
             }
         }
 
-        if (location.state?.openWizard && !user?.profileComplete) {
+        if (location.state?.openWizard && (!hasValidPhilippinePhone(user?.phone) || !hasConfirmedCustomerAddress(user))) {
             setOpenPickupWizard(false);
         }
-    }, [location.pathname, location.state, shops, navigate, user?.profileComplete]);
+    }, [location.pathname, location.state, shops, navigate, user?.phone, user?.address, user?.addressConfirmed, user?.location]);
 
     const showNotification = (message, type) => {
         setToastMessage(message);
@@ -257,9 +265,6 @@ export default function CustomerDashboard({
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3200);
     };
-
-    const profileCompletionMessage = () =>
-        "Add your street address in Profile Settings before booking a pickup.";
 
     useEffect(() => {
         if (!user?.passwordNeedsUpdate || passwordNoticeShown) return;
@@ -313,12 +318,22 @@ export default function CustomerDashboard({
         navigate(buildCustomerPath({ tab: tabId }));
     };
 
-    const openPickupsTab = (withWizard = false) => {
-        if (withWizard && !user?.profileComplete) {
-            showNotification(profileCompletionMessage());
-            navigate(buildCustomerPath({ accountView: "profile" }));
-            return;
+    const requireTransactionProfile = () => {
+        if (!hasValidPhilippinePhone(user?.phone)) {
+            showNotification(TRANSACTION_PHONE_SETTINGS_MESSAGE);
+            openAccountView("profile");
+            return false;
         }
+        if (!hasConfirmedCustomerAddress(user)) {
+            showNotification(TRANSACTION_ADDRESS_SETTINGS_MESSAGE);
+            openAccountView("profile");
+            return false;
+        }
+        return true;
+    };
+
+    const openPickupsTab = (withWizard = false) => {
+        if (withWizard && !requireTransactionProfile()) return;
         navigate(buildCustomerPath({ tab: "pickups" }), {
             state: withWizard ? { openWizard: true } : undefined,
         });
@@ -363,7 +378,7 @@ export default function CustomerDashboard({
                 from: historyDateFrom || undefined,
                 to: historyDateTo || undefined,
             });
-            setHistoryRows((transactions || []).map(normalizeTransaction));
+            setHistoryRows((transactions || []).map((row) => normalizeTransaction(row, 'customer')));
         } catch {
             setHistoryRows([]);
         } finally {
@@ -505,11 +520,7 @@ export default function CustomerDashboard({
                             onBack={closeShopProfile}
                             backLabel={shopProfileBackLabel}
                             onBookPickup={(shop, item) => {
-                                if (!user?.profileComplete) {
-                                    showNotification(profileCompletionMessage());
-                                    navigate(buildCustomerPath({ accountView: "profile" }));
-                                    return;
-                                }
+                                if (!requireTransactionProfile()) return;
                                 handleTabChange("pickups");
                                 onBookMaterial?.({
                                     junkshopId: shop._id || shop.id,
@@ -605,6 +616,7 @@ export default function CustomerDashboard({
                             onDateFromChange={setHistoryDateFrom}
                             onDateToChange={setHistoryDateTo}
                             onRefresh={loadHistory}
+                            onNotify={showNotification}
                         />
                     )}
                     {!accountView && !overviewPanel && !shopProfile && activeTab === "favorites" && (
@@ -1096,6 +1108,13 @@ function OverviewQuickAccess({ onOpenPanel }) {
     );
 }
 
+function historyStatusClass(status) {
+    const value = String(status || "").toLowerCase();
+    if (value === "completed") return "bg-emerald-100 text-emerald-700";
+    if (value === "cancelled") return "bg-red-100 text-red-700";
+    return "bg-yellow-100 text-yellow-700";
+}
+
 function HistoryTab({
     historyRows,
     loading,
@@ -1104,11 +1123,13 @@ function HistoryTab({
     onDateFromChange,
     onDateToChange,
     onRefresh,
+    onNotify,
 }) {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [showDateFilter, setShowDateFilter] = useState(false);
     const [expandedRowId, setExpandedRowId] = useState(null);
+    const [reportRow, setReportRow] = useState(null);
 
     const toggleRow = (rowId) => {
         setExpandedRowId((current) => (current === rowId ? null : rowId));
@@ -1196,12 +1217,43 @@ function HistoryTab({
                     <p className="font-semibold text-emerald-700">{row.amount}</p>
                 </div>
             </div>
+            {row.historyType === "pickup_cancelled" && (
+                <p className="text-xs text-red-700 font-medium">Cancelled pickup — no payment recorded.</p>
+            )}
             <p className="text-xs text-[#72796e]">Recorded on {row.date}</p>
+        </div>
+    );
+
+    const renderRowActions = (row) => (
+        <div className="flex items-center justify-end gap-3">
+            <button
+                type="button"
+                onClick={() => toggleRow(row.id)}
+                className="text-[#154212] hover:underline text-sm font-semibold"
+            >
+                {expandedRowId === row.id ? "Hide" : "View"}
+            </button>
+            {row.canReport ? (
+                <button
+                    type="button"
+                    onClick={() => setReportRow(row)}
+                    className="text-red-700 hover:underline text-sm font-semibold"
+                >
+                    Report
+                </button>
+            ) : null}
         </div>
     );
 
     return (
         <div className="space-y-8 pb-24 md:pb-8">
+            <ReportTransactionModal
+                isOpen={Boolean(reportRow)}
+                row={reportRow}
+                onClose={() => setReportRow(null)}
+                onSuccess={(message) => onNotify?.(message)}
+                onError={(message) => onNotify?.(message)}
+            />
             <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-[#191c1c]">
                     Recycling History
@@ -1242,6 +1294,7 @@ function HistoryTab({
                     >
                         <option value="all">All statuses</option>
                         <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
                         <option value="processing">Processing</option>
                     </select>
                 </div>
@@ -1366,10 +1419,7 @@ function HistoryTab({
                                         <p className="text-xs text-[#72796e]">{row.date}</p>
                                     </div>
                                     <span
-                                        className={`px-2 py-1 rounded-full text-xs font-semibold shrink-0 ${row.status === "Completed"
-                                            ? "bg-emerald-100 text-emerald-700"
-                                            : "bg-yellow-100 text-yellow-700"
-                                            }`}
+                                        className={`px-2 py-1 rounded-full text-xs font-semibold shrink-0 ${historyStatusClass(row.status)}`}
                                     >
                                         {row.status}
                                     </span>
@@ -1389,13 +1439,7 @@ function HistoryTab({
                                 {isExpanded && renderExpandedDetails(row)}
                                 <div className="flex items-center justify-between gap-3 text-sm">
                                     <p className="text-[#72796e] truncate">{row.shop}</p>
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleRow(row.id)}
-                                        className="text-[#154212] hover:underline text-sm shrink-0 font-semibold"
-                                    >
-                                        {isExpanded ? "Hide" : "View"}
-                                    </button>
+                                    {renderRowActions(row)}
                                 </div>
                             </div>
                             );
@@ -1433,23 +1477,14 @@ function HistoryTab({
 
                                         <td className="p-3 sm:p-4">
                                             <span
-                                                className={`px-2 py-1 rounded-full text-xs font-semibold ${row.status === "Completed"
-                                                    ? "bg-emerald-100 text-emerald-700"
-                                                    : "bg-yellow-100 text-yellow-700"
-                                                    }`}
+                                                className={`px-2 py-1 rounded-full text-xs font-semibold ${historyStatusClass(row.status)}`}
                                             >
                                                 {row.status}
                                             </span>
                                         </td>
 
                                         <td className="p-3 sm:p-4 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => toggleRow(row.id)}
-                                                className="text-[#154212] hover:underline text-sm font-semibold"
-                                            >
-                                                {isExpanded ? "Hide" : "View"}
-                                            </button>
+                                            {renderRowActions(row)}
                                         </td>
                                     </tr>
                                     {isExpanded && (

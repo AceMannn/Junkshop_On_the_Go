@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, Fragment } from "react";
 import { Search, Download, Plus, ReceiptText } from "lucide-react";
 import { domainApi } from "../../services/api";
 import LoadErrorBanner from "../ui/LoadErrorBanner";
+import ReportTransactionModal from "../ui/ReportTransactionModal";
 import { normalizeTransaction } from "../../utils/catalogMappers";
 import { REFRESH_INTERVAL_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
 import NumberInput from "../ui/NumberInput";
+
+function historyStatusClass(status) {
+    const value = String(status || "").toLowerCase();
+    if (value === "completed") return "bg-emerald-100 text-emerald-700";
+    if (value === "cancelled") return "bg-red-100 text-red-700";
+    return "bg-yellow-100 text-yellow-700";
+}
 
 function PesoIcon({ size = 18 }) {
     return (
@@ -25,6 +33,8 @@ export default function ProviderTransactionsTab({ onNotify }) {
     const [search, setSearch] = useState("");
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [expandedRowId, setExpandedRowId] = useState(null);
+    const [reportRow, setReportRow] = useState(null);
     const [form, setForm] = useState({
         customerEmail: "",
         material: "",
@@ -36,7 +46,7 @@ export default function ProviderTransactionsTab({ onNotify }) {
         try {
             if (!silent) setLoading(true);
             const { transactions } = await domainApi.getTransactions();
-            setRows((transactions || []).map(normalizeTransaction));
+            setRows((transactions || []).map((row) => normalizeTransaction(row, "provider")));
             setLoadError("");
         } catch (err) {
             if (!silent) {
@@ -112,8 +122,67 @@ export default function ProviderTransactionsTab({ onNotify }) {
         }
     };
 
+    const toggleRow = (rowId) => {
+        setExpandedRowId((current) => (current === rowId ? null : rowId));
+    };
+
+    const renderExpandedDetails = (row) => (
+        <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 text-sm space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Customer</p>
+                    <p className="font-medium text-[#191c1c]">{row.shop}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Status</p>
+                    <p className="font-medium text-[#191c1c]">{row.status}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Weight</p>
+                    <p className="font-medium text-[#191c1c]">{row.weight}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Amount</p>
+                    <p className="font-semibold text-emerald-700">{row.amount}</p>
+                </div>
+            </div>
+            {row.historyType === "pickup_cancelled" && (
+                <p className="text-xs text-red-700 font-medium">Cancelled pickup — no payment recorded.</p>
+            )}
+            <p className="text-xs text-[#72796e]">Recorded on {row.date}</p>
+        </div>
+    );
+
+    const renderRowActions = (row) => (
+        <div className="flex items-center justify-end gap-3">
+            <button
+                type="button"
+                onClick={() => toggleRow(row.id)}
+                className="text-[#154212] hover:underline text-sm font-semibold"
+            >
+                {expandedRowId === row.id ? "Hide" : "View"}
+            </button>
+            {row.canReport ? (
+                <button
+                    type="button"
+                    onClick={() => setReportRow(row)}
+                    className="text-red-700 hover:underline text-sm font-semibold"
+                >
+                    Report
+                </button>
+            ) : null}
+        </div>
+    );
+
     return (
         <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
+            <ReportTransactionModal
+                isOpen={Boolean(reportRow)}
+                row={reportRow}
+                onClose={() => setReportRow(null)}
+                onSuccess={(message) => onNotify?.(message)}
+                onError={(message) => onNotify?.(message)}
+            />
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#191c1c]">
@@ -241,30 +310,39 @@ export default function ProviderTransactionsTab({ onNotify }) {
             ) : (
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                     <div className="md:hidden divide-y divide-zinc-100">
-                        {filtered.map((row) => (
+                        {filtered.map((row) => {
+                            const isExpanded = expandedRowId === row.id;
+                            return (
                             <div key={row.id} className="p-4 space-y-2">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
                                         <p className="font-semibold text-[#191c1c]">{row.material}</p>
                                         <p className="text-xs text-[#72796e]">{row.date}</p>
                                     </div>
-                                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 shrink-0">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold shrink-0 ${historyStatusClass(row.status)}`}>
                                         {row.status}
                                     </span>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div>
-                                        <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Weight</p>
-                                        <p>{row.weight}</p>
+                                {!isExpanded && (
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                        <div>
+                                            <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Weight</p>
+                                            <p>{row.weight}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Amount</p>
+                                            <p className="text-emerald-700 font-semibold">{row.amount}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-[10px] uppercase tracking-wide text-[#72796e]">Amount</p>
-                                        <p className="text-emerald-700 font-semibold">{row.amount}</p>
-                                    </div>
+                                )}
+                                {isExpanded && renderExpandedDetails(row)}
+                                <div className="flex items-center justify-between gap-3 text-sm">
+                                    <p className="text-[#72796e] truncate">Customer: {row.shop}</p>
+                                    {renderRowActions(row)}
                                 </div>
-                                <p className="text-sm text-[#72796e]">Customer: {row.shop}</p>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     <div className="hidden md:block scroll-x-clean">
@@ -277,11 +355,15 @@ export default function ProviderTransactionsTab({ onNotify }) {
                                     <th className="text-left p-3 sm:p-4">Amount</th>
                                     <th className="text-left p-3 sm:p-4">Customer</th>
                                     <th className="text-left p-3 sm:p-4">Status</th>
+                                    <th className="text-right p-3 sm:p-4">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {filtered.map((row) => (
-                                    <tr key={row.id} className="hover:bg-zinc-50">
+                                {filtered.map((row) => {
+                                    const isExpanded = expandedRowId === row.id;
+                                    return (
+                                    <Fragment key={row.id}>
+                                        <tr className="hover:bg-zinc-50">
                                         <td className="p-3 sm:p-4">{row.date}</td>
                                         <td className="p-3 sm:p-4 font-medium">{row.material}</td>
                                         <td className="p-3 sm:p-4">{row.weight}</td>
@@ -290,12 +372,24 @@ export default function ProviderTransactionsTab({ onNotify }) {
                                         </td>
                                         <td className="p-3 sm:p-4">{row.shop}</td>
                                         <td className="p-3 sm:p-4">
-                                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${historyStatusClass(row.status)}`}>
                                                 {row.status}
                                             </span>
                                         </td>
-                                    </tr>
-                                ))}
+                                        <td className="p-3 sm:p-4 text-right">
+                                            {renderRowActions(row)}
+                                        </td>
+                                        </tr>
+                                        {isExpanded && (
+                                            <tr className="bg-emerald-50/40">
+                                                <td colSpan={7} className="p-3 sm:p-4">
+                                                    {renderExpandedDetails(row)}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

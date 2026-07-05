@@ -10,23 +10,8 @@ import {
     X,
     TrendingUp,
 } from "lucide-react";
-
-const REQUEST_STAT_COLORS = {
-    amber: { iconBg: "bg-amber-100",   iconText: "text-amber-700",   border: "border-t-amber-400"   },
-    blue:  { iconBg: "bg-blue-100",    iconText: "text-blue-700",    border: "border-t-blue-400"    },
-    green: { iconBg: "bg-emerald-100", iconText: "text-emerald-700", border: "border-t-emerald-400" },
-    teal:  { iconBg: "bg-teal-100",    iconText: "text-teal-700",    border: "border-t-teal-400"    },
-};
-
-const REQUEST_STATUS_BORDERS = {
-    "Pending":    "border-l-amber-400",
-    "Accepted":   "border-l-blue-400",
-    "In Transit": "border-l-indigo-400",
-    "Completed":  "border-l-emerald-500",
-    "Declined":   "border-l-red-300",
-    "Cancelled":  "border-l-zinc-300",
-};
 import { pickupApi } from "../../services/api";
+import { hasValidPhilippinePhone, TRANSACTION_PHONE_SETTINGS_MESSAGE } from "../../utils/phone";
 import { REFRESH_INTERVAL_MS, REFRESH_INTERVAL_FAST_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
 import {
     STATUS_LABELS,
@@ -47,6 +32,22 @@ import {
 } from "../../utils/pickupPoints";
 import { maskCustomerName } from "../../utils/maskCustomerName";
 import PickupDetailDrawerShell from "../ui/PickupDetailDrawerShell";
+
+const REQUEST_STAT_COLORS = {
+    amber: { iconBg: "bg-amber-100",   iconText: "text-amber-700",   border: "border-t-amber-400"   },
+    blue:  { iconBg: "bg-blue-100",    iconText: "text-blue-700",    border: "border-t-blue-400"    },
+    green: { iconBg: "bg-emerald-100", iconText: "text-emerald-700", border: "border-t-emerald-400" },
+    teal:  { iconBg: "bg-teal-100",    iconText: "text-teal-700",    border: "border-t-teal-400"    },
+};
+
+const REQUEST_STATUS_BORDERS = {
+    "Pending":    "border-l-amber-400",
+    "Accepted":   "border-l-blue-400",
+    "In Transit": "border-l-indigo-400",
+    "Completed":  "border-l-emerald-500",
+    "Declined":   "border-l-red-300",
+    "Cancelled":  "border-l-zinc-300",
+};
 
 function formatWeightKg(value) {
     const n = Number(value);
@@ -146,6 +147,7 @@ function toApiStatus(label) {
 export default function ProviderPickupRequests({
     focusRequestId = null,
     onFocusHandled,
+    user = null,
 }) {
     const [activeRequestTab, setActiveRequestTab] = useState("All");
     const [toast, setToast] = useState("");
@@ -255,7 +257,14 @@ export default function ProviderPickupRequests({
         setTimeout(() => setToast(""), 2800);
     };
 
+    const requirePhoneForTransactions = () => {
+        if (hasValidPhilippinePhone(user?.phone)) return true;
+        showToast(TRANSACTION_PHONE_SETTINGS_MESSAGE);
+        return false;
+    };
+
     const handleAccept = async (id) => {
+        if (!requirePhoneForTransactions()) return;
         try {
             await pickupApi.accept(id);
             showToast("Request accepted.");
@@ -281,6 +290,7 @@ export default function ProviderPickupRequests({
     };
 
     const handleCompleteDropOff = async (id, actualWeight) => {
+        if (!requirePhoneForTransactions()) return;
         try {
             await pickupApi.updateStatus(id, "completed", { actualWeight });
             showToast("Drop-off completed. Points awarded to the customer.");
@@ -293,6 +303,7 @@ export default function ProviderPickupRequests({
     };
 
     const handleCompleteHomePickup = async (id, { actualWeight, totalAmount }) => {
+        if (!requirePhoneForTransactions()) return;
         try {
             await pickupApi.updateStatus(id, "completed", { actualWeight, totalAmount });
             showToast("Pickup completed. Transaction recorded.");
@@ -307,6 +318,10 @@ export default function ProviderPickupRequests({
     const handleStatus = async (id, label, extra = {}) => {
         const status = toApiStatus(label);
         if (!status) return;
+
+        if (["Accepted", "In Transit", "Completed"].includes(label) && !requirePhoneForTransactions()) {
+            return;
+        }
 
         try {
             if (label === "In Transit") {

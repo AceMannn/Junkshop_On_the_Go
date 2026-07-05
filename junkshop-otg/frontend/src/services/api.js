@@ -42,6 +42,7 @@ export class ApiError extends Error {
       requiresPhoneVerification = false,
       email = '',
       phone = '',
+      role = '',
     } = {}
   ) {
     super(message);
@@ -55,6 +56,7 @@ export class ApiError extends Error {
     this.requiresPhoneVerification = requiresPhoneVerification;
     this.email = email;
     this.phone = phone;
+    this.role = role;
   }
 }
 
@@ -113,6 +115,7 @@ async function request(path, options = {}, attempt = 0) {
       requiresPhoneVerification: Boolean(data.requiresPhoneVerification),
       email: data.email || '',
       phone: data.phone || '',
+      role: data.role || '',
     });
   }
 
@@ -291,6 +294,16 @@ export const domainApi = {
   },
   createTransaction(payload) {
     return request('/api/transactions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  getMyReports({ sourceType, sourceId }) {
+    const params = new URLSearchParams({ sourceType, sourceId });
+    return request(`/api/reports/mine?${params.toString()}`);
+  },
+  submitReport(payload) {
+    return request('/api/reports', {
       method: 'POST',
       body: JSON.stringify(payload),
     });

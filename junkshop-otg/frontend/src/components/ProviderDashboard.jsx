@@ -279,6 +279,7 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                         <ProviderPickupRequests
                             focusRequestId={focusRequestId}
                             onFocusHandled={() => setFocusRequestId(null)}
+                            user={user}
                         />
                     )}
                     {!accountView && activeTab === "transactions" && (

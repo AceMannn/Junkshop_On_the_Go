@@ -55,7 +55,6 @@ function PublicShell({
   onLogout,
   isAuthenticated,
   onShowLogin,
-  onShowSignUp,
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -91,7 +90,6 @@ function PublicShell({
         onLogout={onLogout}
         isAuthenticated={isAuthenticated}
         onShowLogin={onShowLogin}
-        onShowSignUp={onShowSignUp}
       />
       <main>{outlet}</main>
       <Footer onNavigate={handleNavigate} />
@@ -380,7 +378,6 @@ function AppRoutes() {
               onLogout={handleLogout}
               isAuthenticated={isAuthenticated}
               onShowLogin={openLogin}
-              onShowSignUp={() => setShowSignUpModal(true)}
             />
           }
         >
@@ -467,7 +464,6 @@ function AppRoutes() {
           onLoginSuccess={handleAuthSuccess}
           onClose={handleCloseLogin}
           initialEmail={loginPrefill.email}
-          initialRole={loginPrefill.role}
           successMessage={loginPrefill.message}
           onShowSignUp={() => {
             setShowLoginModal(false);

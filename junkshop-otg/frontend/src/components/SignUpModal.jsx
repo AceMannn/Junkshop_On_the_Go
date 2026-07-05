@@ -8,6 +8,7 @@ import {
   clearSignUpDrafts,
   loadAuthDraft,
   loadCustomerSignUpDraft,
+  resetSignUpMetaRole,
   saveAuthDraft,
   saveCustomerSignUpDraft,
 } from '../utils/authFormDraft';
@@ -27,12 +28,12 @@ import {
 import { validatePasswordStrength } from '../utils/passwordPolicy';
 import PasswordRequirements from './auth/PasswordRequirements';
 import TermsAndConditionsModal, { TERMS_VERSION } from './auth/TermsAndConditionsModal';
+import PrivacyPolicyModal from './auth/PrivacyPolicyModal';
 
 const EMPTY_CUSTOMER_FORM = {
   firstName: '',
   middleName: '',
   lastName: '',
-  phone: '',
   email: '',
   password: '',
   confirmPassword: '',
@@ -57,6 +58,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
   const [step, setStep] = useState(customerDraft?.step || 'form');
   const [verificationData, setVerificationData] = useState(null);
   const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   useEffect(() => {
     saveAuthDraft(AUTH_DRAFT_KEYS.SIGNUP_META, { selectedRole });
@@ -67,6 +69,21 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
     saveCustomerSignUpDraft({ formData, step });
   }, [formData, step, selectedRole]);
 
+  const resetSignUpEntry = () => {
+    setSelectedRole('customer');
+    resetSignUpMetaRole();
+  };
+
+  const handleClose = () => {
+    resetSignUpEntry();
+    onClose();
+  };
+
+  const handleShowLogin = () => {
+    resetSignUpEntry();
+    onShowLogin?.();
+  };
+
   if (!isOpen) {
     return null;
   }
@@ -75,9 +92,9 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
     return (
       <ProviderSignUpWizard
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={handleClose}
         onComplete={onSignUpComplete}
-        onShowLogin={onShowLogin}
+        onShowLogin={handleShowLogin}
         onSwitchToCustomer={() => setSelectedRole('customer')}
       />
     );
@@ -94,13 +111,6 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
 
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
       setError('Please fill in all required fields.');
-      return;
-    }
-
-    // Phone is optional — validate only when entered
-    const normalizedPhone = formData.phone.replace(/\D/g, '').slice(0, 11);
-    if (formData.phone.trim() && !/^09\d{9}$/.test(normalizedPhone)) {
-      setError('Enter a valid mobile number (09XXXXXXXXX).');
       return;
     }
 
@@ -122,7 +132,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
     }
 
     if (!formData.acceptedTerms) {
-      setError('Accept the Terms first.');
+      setError('Accept the Terms and Privacy Policy first.');
       return;
     }
 
@@ -133,7 +143,6 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
         firstName: formData.firstName,
         middleName: formData.middleName,
         lastName: formData.lastName,
-        phone: normalizedPhone || undefined,
         email: formData.email.trim(),
         password: formData.password,
         termsAccepted: true,
@@ -143,7 +152,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
       if (result.requiresAccountVerification || result.requiresEmailVerification || result.requiresPhoneVerification) {
         setVerificationData({
           email: result.email || formData.email.trim().toLowerCase(),
-          phone: result.phone || normalizedPhone,
+          phone: result.phone || '',
           role: 'customer',
           requiresEmail: true,
           requiresPhone: false,
@@ -156,7 +165,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
 
       onSignUpComplete?.(result);
       clearSignUpDrafts();
-      onClose();
+      handleClose();
     } catch (registerError) {
       setError(registerError.message);
     } finally {
@@ -170,7 +179,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
       role="dialog"
       aria-modal="true"
       aria-labelledby="signup-title"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className={`${authModalShellClass} max-w-lg`}
@@ -181,7 +190,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
             error ? 'overflow-hidden' : ''
           }`}
         >
-          <AuthModalClose onClick={onClose} label="Close sign up" />
+          <AuthModalClose onClick={handleClose} label="Close sign up" />
 
           <header className="mb-4 pr-10">
             <h2 id="signup-title" className="text-xl font-bold text-charcoal mb-1">
@@ -207,7 +216,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
                 setVerificationData(null);
                 clearSignUpDrafts();
                 onSignUpComplete?.(session);
-                onClose();
+                handleClose();
               }}
               onBack={() => {
                 setStep('form');
@@ -281,26 +290,6 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
                   disabled={isLoading}
                 />
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="signup-phone" className={authLabelClass}>
-                Mobile number{' '}
-                <span className="text-charcoal/40 font-normal text-xs">(optional)</span>
-              </label>
-              <input
-                type="tel"
-                id="signup-phone"
-                inputMode="numeric"
-                maxLength={11}
-                value={formData.phone}
-                onChange={(e) =>
-                  handleInputChange('phone', e.target.value.replace(/\D/g, '').slice(0, 11))
-                }
-                placeholder="09XXXXXXXXX"
-                className={authInputClass}
-                disabled={isLoading}
-              />
             </div>
 
             <div>
@@ -383,12 +372,12 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
               <PasswordRequirements password={formData.password} />
             </div>
 
-            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-charcoal/75">
+            <label className="flex items-start gap-2.5 text-sm leading-snug text-charcoal/75">
               <input
                 type="checkbox"
                 checked={formData.acceptedTerms}
                 onChange={(e) => handleInputChange('acceptedTerms', e.target.checked)}
-                className="mt-1"
+                className="mt-0.5 shrink-0"
                 disabled={isLoading}
               />
               <span>
@@ -399,6 +388,14 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
                   className="font-semibold text-eco-green hover:text-eco-green/80"
                 >
                   Terms and Conditions
+                </button>{' '}
+                and{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowPrivacy(true)}
+                  className="font-semibold text-eco-green hover:text-eco-green/80"
+                >
+                  Privacy Policy
                 </button>
                 .
               </span>
@@ -413,7 +410,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
             Already have an account?{' '}
             <button
               type="button"
-              onClick={onShowLogin}
+              onClick={handleShowLogin}
               className="text-eco-green hover:text-eco-green/80 font-semibold transition-colors"
               disabled={isLoading}
             >
@@ -430,6 +427,7 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
         onClose={() => setShowTerms(false)}
         role="customer"
       />
+      <PrivacyPolicyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
     </div>
   );
 }

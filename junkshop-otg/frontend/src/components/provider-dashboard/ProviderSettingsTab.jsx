@@ -156,10 +156,15 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                             required
                         />
                         <Field
-                            label="Phone"
+                            label="Contact number"
                             value={shopForm.phone}
                             onChange={(v) => setShopForm({ ...shopForm, phone: v })}
+                            placeholder="09XXXXXXXXX"
+                            inputMode="numeric"
                         />
+                        <p className="text-xs text-[#72796e] -mt-2">
+                          Required before accepting pickups. Shown to customers on your shop listing.
+                        </p>
                     </div>
                     <Field
                         label="Address"

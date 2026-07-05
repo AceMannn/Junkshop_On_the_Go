@@ -347,7 +347,7 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                             }
                         />
                         <p className="text-xs text-[#72796e] md:col-span-2 -mt-2">
-                            Used for pickup coordination and contact. Format{' '}
+                            Required for booking pickups and as a backup for password recovery. Format{' '}
                             <strong>09XXXXXXXXX</strong>.
                         </p>
                     </div>

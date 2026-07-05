@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Eye, EyeOff, CheckCircle, ShieldCheck } from 'lucide-react';
+import logoImage from '../assets/junkshop-logo.png';
 import { authApi } from '../services/api';
 import {
   AuthModalClose,
@@ -9,9 +10,6 @@ import {
   authLabelClass,
   authOverlayClass,
   authModalShellClass,
-  authRoleHints,
-  authRoleTabClass,
-  authRoleToggleWrapClass,
   authSubmitClass,
 } from './auth/authModalUi';
 import AccountVerificationStep from './auth/AccountVerificationStep';
@@ -86,7 +84,6 @@ export default function LoginScreen({
   onClose,
   onShowSignUp,
   initialEmail = '',
-  initialRole = 'customer',
   successMessage = '',
 }) {
   const savedDraft = readLoginDraft();
@@ -107,9 +104,6 @@ export default function LoginScreen({
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState(
-    () => initialRole || savedDraft.selectedRole || 'customer'
-  );
   const [rememberMe, setRememberMe] = useState(Boolean(savedDraft.rememberMe));
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -128,23 +122,19 @@ export default function LoginScreen({
       setEmail(initialEmail);
       setRecoveryContact(initialEmail);
     }
-    if (initialRole) {
-      setSelectedRole(initialRole);
-    }
     if (successMessage) {
       setPassword('');
     }
-  }, [initialEmail, initialRole, successMessage]);
+  }, [initialEmail, successMessage]);
 
   useEffect(() => {
     saveLoginDraft({
       view,
       email,
       recoveryContact,
-      selectedRole,
       rememberMe,
     });
-  }, [view, email, recoveryContact, selectedRole, rememberMe]);
+  }, [view, email, recoveryContact, rememberMe]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -168,7 +158,6 @@ export default function LoginScreen({
         identifier: email.trim(),
         email: email.trim(),
         password,
-        role: selectedRole,
       });
       onLoginSuccess({ ...session, rememberMe });
       clearLoginDraft();
@@ -181,7 +170,7 @@ export default function LoginScreen({
         setVerificationData({
           email: loginError.email || email.trim(),
           phone: loginError.phone || '',
-          role: selectedRole,
+          role: loginError.role || '',
           requiresEmail: Boolean(loginError.requiresEmailVerification),
           requiresPhone: false,
           message: loginError.message,
@@ -321,8 +310,8 @@ export default function LoginScreen({
   };
 
   const subtitles = {
-    login: 'Login to continue using JunkShop On-The-Go',
-    forgot: 'Enter your email or mobile number to receive a reset code',
+    login: 'Sign in with your email',
+    forgot: 'Enter your email to receive a reset code',
     resetCode: `We sent a ${OTP_LENGTH}-digit code to ${maskContact(recoveryContact)}`,
     resetPassword: 'Choose a strong password for your account',
     resetSuccess: '',
@@ -377,36 +366,26 @@ export default function LoginScreen({
             </div>
           ) : (
             <>
-              <header className="mb-4 pr-10">
+              {view === 'login' && (
+                <div className="mb-5 flex justify-center">
+                  <img
+                    src={logoImage}
+                    alt="JunkShop On-The-Go"
+                    className="h-11 sm:h-12 w-auto max-w-[11rem] sm:max-w-[13rem] object-contain"
+                  />
+                </div>
+              )}
+
+              <header className={`mb-4 ${view === 'login' ? 'text-center' : 'pr-10'}`}>
                 <h1 id="login-title" className="text-xl font-bold text-charcoal mb-1">
                   {titles[view]}
                 </h1>
-                <p className="text-charcoal/60 text-sm leading-snug">{subtitles[view]}</p>
+                {subtitles[view] ? (
+                  <p className="text-charcoal/60 text-sm leading-snug">{subtitles[view]}</p>
+                ) : null}
               </header>
 
               {isForgotView && <ResetStepIndicator step={forgotStep} />}
-
-              {view === 'login' && (
-                <>
-                  <div className={authRoleToggleWrapClass}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRole('customer')}
-                      className={authRoleTabClass(selectedRole === 'customer')}
-                    >
-                      Customer
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRole('provider')}
-                      className={authRoleTabClass(selectedRole === 'provider')}
-                    >
-                      Junkshop Owner
-                    </button>
-                  </div>
-                  <p className="text-xs text-charcoal/50 mb-4">{authRoleHints[selectedRole]}</p>
-                </>
-              )}
 
               {successMessage && view === 'login' && (
                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
@@ -502,12 +481,8 @@ export default function LoginScreen({
                   </div>
 
                   <button type="submit" disabled={isLoading} className={authSubmitClass}>
-                    {isLoading
-                      ? 'Logging in...'
-                      : `Log in as ${selectedRole === 'customer' ? 'Customer' : 'Junkshop Owner'}`}
+                    {isLoading ? 'Logging in...' : 'Log in'}
                   </button>
-
-                  <p className="text-xs text-charcoal/50">Your account is protected securely.</p>
                 </form>
               )}
 
@@ -515,7 +490,7 @@ export default function LoginScreen({
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <div>
                     <label htmlFor="forgot-recovery" className={authLabelClass}>
-                      Email or mobile number
+                      Email address
                     </label>
                     <input
                       type="text"
@@ -525,14 +500,15 @@ export default function LoginScreen({
                         setRecoveryContact(e.target.value);
                         setError('');
                       }}
-                      placeholder="your@email.com or 09XXXXXXXXX"
+                      placeholder="your@email.com"
                       className={authInputClass}
                       disabled={isLoading}
                       autoFocus
-                      autoComplete="username"
+                      autoComplete="email"
                     />
                     <p className="mt-2 text-xs text-charcoal/50">
-                      We&apos;ll send a 6-digit code to that address or number.
+                      We&apos;ll email your reset code. If email fails, a registered mobile number
+                      may also work as backup.
                     </p>
                   </div>
 
@@ -716,7 +692,7 @@ export default function LoginScreen({
                 <AccountVerificationStep
                   email={verificationData?.email || ''}
                   phone={verificationData?.phone || ''}
-                  role={verificationData?.role || selectedRole}
+                  role={verificationData?.role || undefined}
                   requiresEmail={verificationData?.requiresEmail}
                   initialMessage={verificationData?.message || ''}
                   onVerified={(session) => {

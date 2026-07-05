@@ -15,6 +15,9 @@ import {
   authLabelClass,
   authModalShellClass,
   authOverlayClass,
+  authRoleHints,
+  authRoleTabClass,
+  authRoleToggleWrapClass,
   authSubmitClass,
 } from './auth/authModalUi';
 import {
@@ -28,6 +31,7 @@ import { validatePasswordStrength } from '../utils/passwordPolicy';
 import AccountVerificationStep from './auth/AccountVerificationStep';
 import PasswordRequirements from './auth/PasswordRequirements';
 import TermsAndConditionsModal, { TERMS_VERSION } from './auth/TermsAndConditionsModal';
+import PrivacyPolicyModal from './auth/PrivacyPolicyModal';
 
 const STEPS = [
   { id: 1, title: 'Business info' },
@@ -42,7 +46,6 @@ const initialForm = {
   firstName: '',
   middleName: '',
   lastName: '',
-  phone: '',
   email: '',
   password: '',
   confirmPassword: '',
@@ -103,6 +106,7 @@ export default function ProviderSignUpWizard({
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [verificationData, setVerificationData] = useState(null);
 
   const hoursSummary = useMemo(
@@ -162,11 +166,6 @@ export default function ProviderSignUpWizard({
       if (!form.firstName.trim() || !form.lastName.trim()) {
         return 'First and last name are required.';
       }
-      // Phone is optional — validate only when entered
-      const trimmedPhone = form.phone.replace(/\D/g, '').slice(0, 11);
-      if (form.phone.trim() && !/^09\d{9}$/.test(trimmedPhone)) {
-        return 'Enter a valid mobile number (09XXXXXXXXX).';
-      }
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(form.email.trim())) {
         return 'Please enter a valid email address.';
@@ -185,7 +184,7 @@ export default function ProviderSignUpWizard({
         return 'Please confirm that your information is accurate.';
       }
       if (!form.acceptedTerms) {
-        return 'Accept the Terms first.';
+        return 'Accept the Terms and Privacy Policy first.';
       }
     }
 
@@ -224,7 +223,6 @@ export default function ProviderSignUpWizard({
         firstName: form.firstName.trim(),
         middleName: form.middleName.trim(),
         lastName: form.lastName.trim(),
-        phone: form.phone.replace(/\D/g, '').slice(0, 11) || undefined,
         email: form.email.trim(),
         password: form.password,
         location: form.location,
@@ -236,7 +234,7 @@ export default function ProviderSignUpWizard({
       if (session.requiresAccountVerification || session.requiresEmailVerification || session.requiresPhoneVerification) {
         setVerificationData({
           email: session.email || form.email.trim().toLowerCase(),
-          phone: session.phone || form.phone.replace(/\D/g, '').slice(0, 11),
+          phone: session.phone || '',
           role: 'provider',
           requiresEmail: true,
           requiresPhone: false,
@@ -333,17 +331,31 @@ export default function ProviderSignUpWizard({
               <p className="text-charcoal/60 text-sm">
                 Your shop stays hidden from customers until verification is complete.
               </p>
-              {onSwitchToCustomer && (
-                <button
-                  type="button"
-                  onClick={onSwitchToCustomer}
-                  className="mt-2 text-xs font-semibold text-eco-green hover:text-eco-green/80"
-                  disabled={isLoading}
-                >
-                  Sign up as customer instead
-                </button>
-              )}
             </header>
+
+            {onSwitchToCustomer && (
+              <>
+                <div className={authRoleToggleWrapClass}>
+                  <button
+                    type="button"
+                    onClick={onSwitchToCustomer}
+                    className={authRoleTabClass(false)}
+                    disabled={isLoading}
+                  >
+                    Customer
+                  </button>
+                  <button
+                    type="button"
+                    className={authRoleTabClass(true)}
+                    aria-current="true"
+                    disabled={isLoading}
+                  >
+                    Junkshop Owner
+                  </button>
+                </div>
+                <p className="text-xs text-charcoal/50 mb-4">{authRoleHints.provider}</p>
+              </>
+            )}
 
             <StepIndicator step={step} />
 
@@ -478,27 +490,6 @@ export default function ProviderSignUpWizard({
                     className={authInputClass}
                     disabled={isLoading}
                   />
-                </div>
-
-                <div>
-                  <label htmlFor="ownerPhone" className={authLabelClass}>
-                    Mobile number{' '}
-                    <span className="text-charcoal/40 font-normal text-xs">(optional)</span>
-                  </label>
-                  <input
-                    id="ownerPhone"
-                    type="tel"
-                    value={form.phone}
-                    onChange={(event) =>
-                      updateField('phone', event.target.value.replace(/\D/g, '').slice(0, 11))
-                    }
-                    placeholder="09XXXXXXXXX"
-                    className={authInputClass}
-                    disabled={isLoading}
-                  />
-                  <p className="mt-1 text-xs text-charcoal/50">
-                    Used for pickup coordination and contact, not for login.
-                  </p>
                 </div>
 
                 <div>
@@ -758,10 +749,6 @@ export default function ProviderSignUpWizard({
                     {[form.firstName, form.middleName, form.lastName].filter(Boolean).join(' ')}
                   </p>
                   <p>
-                    <span className="font-semibold text-charcoal">Mobile:</span>{' '}
-                    {form.phone.trim() || <span className="text-charcoal/40">Not provided</span>}
-                  </p>
-                  <p>
                     <span className="font-semibold text-charcoal">Email:</span>{' '}
                     {form.email.trim()}
                   </p>
@@ -788,13 +775,13 @@ export default function ProviderSignUpWizard({
                   <span>I confirm this information is accurate.</span>
                 </label>
 
-                <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-charcoal/80">
+                <label className="flex items-start gap-2.5 text-sm leading-snug text-charcoal/80">
                   <input
                     type="checkbox"
                     checked={form.acceptedTerms}
                     onChange={(event) => updateField('acceptedTerms', event.target.checked)}
                     disabled={isLoading}
-                    className="mt-1"
+                    className="mt-0.5 shrink-0"
                   />
                   <span>
                     I have read and agree to the{' '}
@@ -804,6 +791,14 @@ export default function ProviderSignUpWizard({
                       className="font-semibold text-eco-green hover:text-eco-green/80"
                     >
                       Terms and Conditions
+                    </button>{' '}
+                    and{' '}
+                    <button
+                      type="button"
+                      onClick={() => setShowPrivacy(true)}
+                      className="font-semibold text-eco-green hover:text-eco-green/80"
+                    >
+                      Privacy Policy
                     </button>
                     .
                   </span>
@@ -858,6 +853,7 @@ export default function ProviderSignUpWizard({
         onClose={() => setShowTerms(false)}
         role="provider"
       />
+      <PrivacyPolicyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
     </div>
   );
 }

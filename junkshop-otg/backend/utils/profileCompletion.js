@@ -136,10 +136,19 @@ async function syncProfileComplete(userId) {
   return status;
 }
 
+const TRANSACTION_PHONE_SETTINGS_MESSAGE =
+  'Add your mobile number in Account Settings before continuing.';
+
+function userHasTransactionPhone(user) {
+  return hasValidPhone(user?.phone);
+}
+
 module.exports = {
   evaluateProfile,
   syncProfileComplete,
   hasValidPhone,
   normalizePhone,
   PH_PHONE_PATTERN,
+  TRANSACTION_PHONE_SETTINGS_MESSAGE,
+  userHasTransactionPhone,
 };
