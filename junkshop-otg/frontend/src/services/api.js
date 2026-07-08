@@ -285,6 +285,16 @@ export const domainApi = {
   restoreMaterial(id) {
     return request(`/api/materials/${id}/restore`, { method: 'PATCH' });
   },
+  getMaterialSalesReport(params = {}) {
+    const query = new URLSearchParams();
+    if (params.period) query.set('period', params.period);
+    if (params.from) query.set('from', params.from);
+    if (params.to) query.set('to', params.to);
+    if (params.category) query.set('category', params.category);
+    if (params.type) query.set('type', params.type);
+    const qs = query.toString();
+    return request(`/api/materials/sales-report${qs ? `?${qs}` : ''}`);
+  },
   getTransactions({ from, to } = {}) {
     const params = new URLSearchParams();
     if (from) params.set('from', from);

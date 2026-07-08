@@ -28,6 +28,7 @@ export default function AdminLoginScreen({ onLoginSuccess, sessionExpiredMessage
       const session = await authApi.login({
         identifier: cleanedEmail,
         password,
+        role: 'admin',
       });
 
       if (session.user?.role !== 'admin') {

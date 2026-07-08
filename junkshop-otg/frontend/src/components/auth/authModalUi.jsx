@@ -8,6 +8,9 @@ export const authInputClass =
 
 export const authInputWithIconClass = `${authInputClass} pr-11`;
 
+export const authPasswordToggleButtonClass =
+  'absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center text-charcoal/40 hover:text-charcoal/60';
+
 export const authLabelClass = 'block text-sm font-semibold text-[#42493e] mb-1.5';
 
 export const authSubmitClass =

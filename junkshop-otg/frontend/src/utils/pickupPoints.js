@@ -1,9 +1,17 @@
-export const POINTS_PER_KG = 100;
+export const HOME_PICKUP_POINTS_PER_KG = 100;
+export const DROP_OFF_POINTS_PER_KG = 150;
+/** @deprecated use HOME_PICKUP_POINTS_PER_KG */
+export const POINTS_PER_KG = HOME_PICKUP_POINTS_PER_KG;
 
-export function estimateDropOffPoints(weightKg) {
+export function estimateRecyclingPoints(weightKg, { isDropOff = false } = {}) {
     const weight = Number(weightKg);
     if (!Number.isFinite(weight) || weight <= 0) return 0;
-    return Math.round(weight * POINTS_PER_KG);
+    const rate = isDropOff ? DROP_OFF_POINTS_PER_KG : HOME_PICKUP_POINTS_PER_KG;
+    return Math.round(weight * rate);
+}
+
+export function estimateDropOffPoints(weightKg) {
+    return estimateRecyclingPoints(weightKg, { isDropOff: true });
 }
 
 export function formatPoints(value) {

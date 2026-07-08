@@ -32,6 +32,7 @@ import {
     shopStatusBadgeClass,
 } from "../../utils/catalogMappers";
 import { getMaterialCategoryColors } from "../../utils/materialCategoryColors";
+import { matchesPrefixWordSearch } from "../../utils/searchFilter";
 import {
     recyclingSteps,
     recyclingDos,
@@ -203,9 +204,7 @@ export function JunkshopsPanel({
             const q = query.trim().toLowerCase();
             const matchesQuery =
                 !q ||
-                shop.name.toLowerCase().includes(q) ||
-                shop.address.toLowerCase().includes(q) ||
-                shop.materials.some((m) => m.toLowerCase().includes(q));
+                matchesPrefixWordSearch([shop.name, shop.address, shop.materials], q);
 
             const addressLower = shop.address.toLowerCase();
             const matchesLocation =
@@ -515,14 +514,14 @@ export function MaterialPricesPanel() {
             const matchesCategory = activeCategory === "all" || category === activeCategory;
             if (!matchesCategory) return false;
             if (!query) return true;
-            const haystack = [
-                item.material,
-                formatMaterialCategoryLabel(item.category),
-                item.examples,
-            ]
-                .join(" ")
-                .toLowerCase();
-            return haystack.includes(query);
+            return matchesPrefixWordSearch(
+                [
+                    item.material,
+                    formatMaterialCategoryLabel(item.category),
+                    item.examples,
+                ],
+                query
+            );
         });
     }, [materials, activeCategory, search]);
 

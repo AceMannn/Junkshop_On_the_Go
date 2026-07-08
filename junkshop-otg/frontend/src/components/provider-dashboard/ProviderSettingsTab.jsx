@@ -43,11 +43,11 @@ function Field({ label, value, onChange, type = "text", required, min, max, step
     );
 }
 
-export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
+export default function ProviderSettingsTab({ user, onNotify, onUserUpdate, embedded = false }) {
     const { shop, refresh } = useProviderJunkshop();
     const [shopForm, setShopForm] = useState({
         name: user?.junkshopName || "",
-        phone: user?.phone || "",
+        phone: "",
         address: "Teresa, Sta. Mesa, Manila",
         hours: "8:00 AM - 6:00 PM",
         lat: "14.5995",
@@ -110,7 +110,6 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
             }
             await authApiExtended.updateProviderProfile({
                 junkshopName: shopForm.name.trim(),
-                phone: shopForm.phone.trim(),
                 address: shopForm.address.trim(),
             });
             refresh();
@@ -125,15 +124,24 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
     };
 
     return (
-        <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
-            <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#191c1c]">
-                    Shop Settings
-                </h1>
-                <p className="text-[#72796e] mt-2 text-sm">
-                    Shop details appear on the customer dashboard map and shop list.
+        <div className={embedded ? "space-y-6 sm:space-y-8" : "space-y-6 sm:space-y-8 pb-24 md:pb-8"}>
+            {!embedded && (
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#191c1c]">
+                        Shop Settings
+                    </h1>
+                    <p className="text-[#72796e] mt-2 text-sm">
+                        Shop details appear on the customer dashboard map and shop list.
+                    </p>
+                </div>
+            )}
+
+            {embedded && (
+                <p className="text-sm text-[#72796e] max-w-2xl">
+                    Public shop details for the customer map and listings. Use the Account tab for your
+                    personal owner info.
                 </p>
-            </div>
+            )}
 
             <section className="rounded-xl border border-zinc-200 bg-white p-5 sm:p-6 shadow-sm">
                 <div className="flex items-center gap-3 mb-5">
@@ -156,14 +164,15 @@ export default function ProviderSettingsTab({ user, onNotify, onUserUpdate }) {
                             required
                         />
                         <Field
-                            label="Contact number"
+                            label="Shop contact number"
                             value={shopForm.phone}
                             onChange={(v) => setShopForm({ ...shopForm, phone: v })}
                             placeholder="09XXXXXXXXX"
                             inputMode="numeric"
                         />
-                        <p className="text-xs text-[#72796e] -mt-2">
-                          Required before accepting pickups. Shown to customers on your shop listing.
+                        <p className="text-xs text-[#72796e] -mt-2 sm:col-span-2">
+                            Shown to customers on your shop listing. Can differ from your personal owner
+                            number on the Account tab. Required before accepting pickups.
                         </p>
                     </div>
                     <Field

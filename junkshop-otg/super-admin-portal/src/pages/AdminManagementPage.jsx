@@ -10,6 +10,7 @@ import {
   superPageTitleClass,
   superPrimaryButtonClass,
 } from '../utils/superAdminUi';
+import { matchesPrefixWordSearch } from '../utils/searchFilter';
 
 const PAGE_SIZE = 10;
 
@@ -21,12 +22,10 @@ const statusFilters = [
 ];
 
 function matchesSearch(row, query) {
-  if (!query) return true;
-  const haystack = [row.name, row.firstName, row.lastName, row.email, row.status]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
+  return matchesPrefixWordSearch(
+    [row.name, row.firstName, row.lastName, row.email, row.status],
+    query
+  );
 }
 
 export default function AdminManagementPage() {

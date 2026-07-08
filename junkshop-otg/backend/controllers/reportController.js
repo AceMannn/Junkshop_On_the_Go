@@ -6,6 +6,12 @@ const {
   getReportReasonLabel,
   REPORT_REASONS,
 } = require('../utils/reportReasons');
+const {
+  GENERAL_MESSAGE_MAX,
+  GENERAL_MESSAGE_MIN,
+  validateOptionalText,
+  validateRequiredText,
+} = require('../utils/textLimits');
 
 function isValidReasonCode(code) {
   return REPORT_REASONS.some((row) => row.id === code);
@@ -61,8 +67,27 @@ exports.submitReport = async (req, res) => {
       return res.status(400).json({ message: 'Invalid report reason.' });
     }
 
-    if (reasonCode === 'other' && !String(details).trim()) {
-      return res.status(400).json({ message: 'Please provide details when selecting Other.' });
+    let normalizedDetails = '';
+    if (reasonCode === 'other') {
+      const detailsValidation = validateRequiredText(details, {
+        min: GENERAL_MESSAGE_MIN,
+        max: GENERAL_MESSAGE_MAX,
+        label: 'Report details',
+      });
+      if (!detailsValidation.ok) {
+        return res.status(400).json({ message: detailsValidation.message });
+      }
+      normalizedDetails = detailsValidation.value;
+    } else {
+      const detailsValidation = validateOptionalText(
+        details,
+        GENERAL_MESSAGE_MAX,
+        'Report details'
+      );
+      if (!detailsValidation.ok) {
+        return res.status(400).json({ message: detailsValidation.message });
+      }
+      normalizedDetails = detailsValidation.value;
     }
 
     let transaction = null;
@@ -145,7 +170,7 @@ exports.submitReport = async (req, res) => {
       reportedUser: reportedUser._id || reportedUser,
       reasonCode,
       reasonLabel: getReportReasonLabel(reasonCode),
-      details: String(details || '').trim().slice(0, 2000),
+      details: normalizedDetails,
       status: 'pending',
     });
 

@@ -4,6 +4,7 @@ import { domainApi } from "../../services/api";
 import LoadErrorBanner from "../ui/LoadErrorBanner";
 import ReportTransactionModal from "../ui/ReportTransactionModal";
 import { normalizeTransaction } from "../../utils/catalogMappers";
+import { matchesPrefixWordSearch } from "../../utils/searchFilter";
 import { REFRESH_INTERVAL_MS, useAutoRefresh } from "../../hooks/useAutoRefresh";
 import NumberInput from "../ui/NumberInput";
 
@@ -70,10 +71,10 @@ export default function ProviderTransactionsTab({ onNotify }) {
         const q = search.trim().toLowerCase();
         if (!q) return rows;
         return rows.filter((row) =>
-            [row.date, row.material, row.shop, row.amount, row.status]
-                .join(" ")
-                .toLowerCase()
-                .includes(q)
+            matchesPrefixWordSearch(
+                [row.date, row.material, row.shop, row.amount, row.status],
+                q
+            )
         );
     }, [rows, search]);
 

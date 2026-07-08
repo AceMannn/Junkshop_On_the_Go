@@ -10,7 +10,7 @@ import {
     Lock,
 } from "lucide-react";
 import { pickupApi } from "../../services/api";
-import { formatPoints, POINTS_PER_KG } from "../../utils/pickupPoints";
+import { formatPoints, DROP_OFF_POINTS_PER_KG, HOME_PICKUP_POINTS_PER_KG } from "../../utils/pickupPoints";
 
 const TABS = ["Activity", "Rewards", "How it works"];
 
@@ -144,7 +144,8 @@ export default function CustomerPointsWallet({ user, isOpen, onClose }) {
                         <span className="text-lg font-semibold text-white/80 ml-1.5">pts</span>
                     </p>
                     <p className="mt-2 text-xs text-white/70">
-                        Earn {formatPoints(POINTS_PER_KG)} pts per kg of recyclables delivered.
+                        Earn up to {formatPoints(DROP_OFF_POINTS_PER_KG)} pts/kg on drop-off (
+                        {formatPoints(HOME_PICKUP_POINTS_PER_KG)} pts/kg on home pickup).
                     </p>
                 </div>
 
@@ -272,7 +273,7 @@ export default function CustomerPointsWallet({ user, isOpen, onClose }) {
                                 {
                                     step: "3",
                                     title: "Points are automatically awarded",
-                                    desc: `You earn ${formatPoints(POINTS_PER_KG)} pts for every kilogram of recyclables — no manual entry needed.`,
+                                    desc: `Drop-off earns ${formatPoints(DROP_OFF_POINTS_PER_KG)} pts/kg; home pickup earns ${formatPoints(HOME_PICKUP_POINTS_PER_KG)} pts/kg — awarded automatically when the shop completes your request.`,
                                 },
                                 {
                                     step: "4",

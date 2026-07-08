@@ -28,6 +28,7 @@ export default function SuperAdminLoginScreen({ onLoginSuccess, sessionExpiredMe
       const session = await authApi.login({
         identifier: cleanedEmail,
         password,
+        role: 'super_admin',
       });
 
       if (session.user?.role !== 'super_admin') {

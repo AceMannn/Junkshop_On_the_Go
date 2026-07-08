@@ -1,5 +1,5 @@
 export const TRANSACTION_ADDRESS_SETTINGS_MESSAGE =
-  'Add and confirm your street address in Profile before booking a pickup.';
+  'Add and confirm your street address in Settings before booking a pickup.';
 
 export function hasConfirmedCustomerAddress(user) {
   const address = String(user?.address || '').trim();

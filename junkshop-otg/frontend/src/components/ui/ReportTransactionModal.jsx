@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { domainApi } from '../../services/api';
 import { REPORT_REASONS, MAX_REPORTS_PER_USER } from '../../data/reportReasons';
+import CharCount from './CharCount';
+import {
+  clampText,
+  GENERAL_MESSAGE_MAX,
+  GENERAL_MESSAGE_MIN,
+} from '../../utils/textLimits';
 
 export default function ReportTransactionModal({
   isOpen,
@@ -55,8 +61,8 @@ export default function ReportTransactionModal({
     event.preventDefault();
     if (atLimit) return;
 
-    if (reasonCode === 'other' && !details.trim()) {
-      onError?.('Please provide details when selecting Other.');
+    if (reasonCode === 'other' && details.trim().length < GENERAL_MESSAGE_MIN) {
+      onError?.(`Please provide at least ${GENERAL_MESSAGE_MIN} characters when selecting Other.`);
       return;
     }
 
@@ -145,9 +151,17 @@ export default function ReportTransactionModal({
                 <textarea
                   rows={3}
                   value={details}
-                  onChange={(event) => setDetails(event.target.value)}
+                  maxLength={GENERAL_MESSAGE_MAX}
+                  onChange={(event) =>
+                    setDetails(clampText(event.target.value, GENERAL_MESSAGE_MAX))
+                  }
                   className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-600/30"
                   placeholder="Describe what happened..."
+                />
+                <CharCount
+                  value={details}
+                  max={GENERAL_MESSAGE_MAX}
+                  min={reasonCode === 'other' ? GENERAL_MESSAGE_MIN : 0}
                 />
               </label>
 

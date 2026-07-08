@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
     AlertTriangle,
     Clock3,
+    Download,
     History,
     Layers,
     LayoutGrid,
@@ -17,7 +18,9 @@ import {
     EyeOff,
 } from "lucide-react";
 import { domainApi } from "../../services/api";
+import { matchesPrefixWordSearch } from "../../utils/searchFilter";
 import { useProviderMaterials } from "../../hooks/useProviderData";
+import { buildMaterialSalesCsv } from "../../utils/materialSalesCsv";
 import NumberInput from "../ui/NumberInput";
 import Select from "../ui/Select";
 import { formatMaterialCategoryLabel, formatUpdatedDate } from "../../utils/catalogMappers";
@@ -37,6 +40,19 @@ const CATEGORY_COLORS = {
 const FILTER_OPTIONS = [
     { value: "all", label: "All categories" },
     ...CATEGORIES.map((cat) => ({ value: cat, label: formatMaterialCategoryLabel(cat) })),
+];
+
+const SALES_PERIOD_OPTIONS = [
+    { value: "week", label: "This week" },
+    { value: "month", label: "This month" },
+    { value: "custom", label: "Custom" },
+];
+
+const SALES_TYPE_OPTIONS = [
+    { value: "all", label: "All types" },
+    { value: "home_pickup", label: "Home pickup" },
+    { value: "drop_off", label: "Drop-off" },
+    { value: "walk_in", label: "Walk-in" },
 ];
 
 const CATEGORY_OPTIONS = CATEGORIES.map((cat) => ({ value: cat, label: formatMaterialCategoryLabel(cat) }));
@@ -140,7 +156,7 @@ function historyLabel(row) {
     return row?.label || String(row?.action || "Updated").replace(/_/g, " ");
 }
 
-export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
+export default function ProviderMaterialsTab({ user, onNotify, onRefreshProfile }) {
     const { materials, loading, refresh } = useProviderMaterials({ autoRefresh: true });
     const deleteTimerRef = useRef(null);
     const [activeTab, setActiveTab] = useState("active");
@@ -149,6 +165,12 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
     const [search, setSearch] = useState("");
     const [categoryFilter, setCategoryFilter] = useState("all");
     const [viewMode, setViewMode] = useState("cards");
+    const [salesPeriod, setSalesPeriod] = useState("week");
+    const [salesType, setSalesType] = useState("all");
+    const [salesCategory, setSalesCategory] = useState("all");
+    const [customFrom, setCustomFrom] = useState("");
+    const [customTo, setCustomTo] = useState("");
+    const [downloadingReport, setDownloadingReport] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState(null);
     const [saving, setSaving] = useState(false);
@@ -177,9 +199,7 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                 categoryFilter === "all" ||
                 item.category.toLowerCase() === categoryFilter.toLowerCase();
             const matchesSearch =
-                !q ||
-                item.name.toLowerCase().includes(q) ||
-                item.category.toLowerCase().includes(q);
+                !q || matchesPrefixWordSearch([item.name, item.category], q);
             return matchesCategory && matchesSearch;
         });
     }, [currentMaterials, search, categoryFilter]);
@@ -341,6 +361,39 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
         }
     };
 
+    const canDownloadSalesReport =
+        salesPeriod !== "custom" || (customFrom && customTo);
+
+    const handleDownloadSalesReport = async () => {
+        if (!canDownloadSalesReport) {
+            onNotify?.("Choose a start and end date for the custom period.");
+            return;
+        }
+
+        setDownloadingReport(true);
+        try {
+            const report = await domainApi.getMaterialSalesReport({
+                period: salesPeriod,
+                from: salesPeriod === "custom" ? customFrom : undefined,
+                to: salesPeriod === "custom" ? customTo : undefined,
+                category: salesCategory,
+                type: salesType,
+            });
+
+            if (!report.hasData) {
+                onNotify?.("No sales in this period.");
+                return;
+            }
+
+            const shopName = user?.junkshopName || user?.name || "Shop";
+            buildMaterialSalesCsv(report, shopName);
+        } catch (err) {
+            onNotify?.(err.message);
+        } finally {
+            setDownloadingReport(false);
+        }
+    };
+
     return (
         <div className="space-y-6 sm:space-y-8 pb-24 md:pb-8">
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -389,6 +442,69 @@ export default function ProviderMaterialsTab({ onNotify, onRefreshProfile }) {
                     >
                         <Plus size={18} />
                         Add Material
+                    </button>
+                </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm space-y-3">
+                <div>
+                    <p className="text-sm font-bold text-[#191c1c]">Sales report</p>
+                    <p className="text-xs text-[#72796e] mt-0.5">
+                        Download CSV by material, category, and transaction type.
+                    </p>
+                </div>
+                <div className="flex min-w-0 flex-col lg:flex-row lg:flex-wrap gap-3 lg:items-end">
+                    <Select
+                        value={salesPeriod}
+                        onChange={setSalesPeriod}
+                        options={SALES_PERIOD_OPTIONS}
+                        ariaLabel="Sales period"
+                        className="w-full sm:w-auto sm:min-w-[10rem]"
+                    />
+                    {salesPeriod === "custom" && (
+                        <>
+                            <div className="space-y-1 w-full sm:w-auto">
+                                <label className="block text-xs font-semibold text-[#42493e]">From</label>
+                                <input
+                                    type="date"
+                                    value={customFrom}
+                                    onChange={(event) => setCustomFrom(event.target.value)}
+                                    className="h-10 w-full sm:w-auto rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-[#154212]/20"
+                                />
+                            </div>
+                            <div className="space-y-1 w-full sm:w-auto">
+                                <label className="block text-xs font-semibold text-[#42493e]">To</label>
+                                <input
+                                    type="date"
+                                    value={customTo}
+                                    onChange={(event) => setCustomTo(event.target.value)}
+                                    className="h-10 w-full sm:w-auto rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-[#154212]/20"
+                                />
+                            </div>
+                        </>
+                    )}
+                    <Select
+                        value={salesType}
+                        onChange={setSalesType}
+                        options={SALES_TYPE_OPTIONS}
+                        ariaLabel="Transaction type"
+                        className="w-full sm:w-auto sm:min-w-[10rem]"
+                    />
+                    <Select
+                        value={salesCategory}
+                        onChange={setSalesCategory}
+                        options={FILTER_OPTIONS}
+                        ariaLabel="Sales category"
+                        className="w-full sm:w-auto sm:min-w-[10rem]"
+                    />
+                    <button
+                        type="button"
+                        onClick={handleDownloadSalesReport}
+                        disabled={downloadingReport || !canDownloadSalesReport}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#154212] bg-white px-4 text-sm font-semibold text-[#154212] transition-colors hover:bg-emerald-50 disabled:opacity-50"
+                    >
+                        <Download size={16} />
+                        {downloadingReport ? "Preparing…" : "Download CSV"}
                     </button>
                 </div>
             </div>

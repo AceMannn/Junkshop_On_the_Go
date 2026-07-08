@@ -31,6 +31,7 @@ import { useCatalogJunkshops } from "../hooks/useCatalogData";
 import { useFavorites } from "../hooks/useFavorites";
 import { authApi, domainApi } from "../services/api";
 import { normalizeTransaction } from "../utils/catalogMappers";
+import { matchesPrefixWordSearch } from "../utils/searchFilter";
 import { isFavoriteShopId } from "../utils/favorites";
 import {
     DashboardPanelShell,
@@ -43,11 +44,8 @@ import ReportTransactionModal from "./ui/ReportTransactionModal";
 import EmptyState from "./ui/EmptyState";
 import StatCard from "./ui/StatCard";
 import ShopRating from "./ui/ShopRating";
-import {
-    ViewProfilePage,
-    AccountSettingsPage,
-    DeactivateAccountModal,
-} from "./customer-dashboard/CustomerAccountViews";
+import CustomerSettingsPage from "./customer-dashboard/CustomerSettingsPage";
+import { DeactivateAccountModal } from "./customer-dashboard/CustomerAccountViews";
 import { hasValidPhilippinePhone, TRANSACTION_PHONE_SETTINGS_MESSAGE } from "../utils/phone";
 import {
     hasConfirmedCustomerAddress,
@@ -59,6 +57,7 @@ import CustomerPointsWallet from "./customer-dashboard/CustomerPointsWallet";
 import {
     buildCustomerPath,
     parseCustomerPath,
+    parseCustomerSettingsTab,
 } from "../utils/dashboardRoutes";
 import { getCustomerNotificationTarget } from "../utils/notificationNavigation";
 import { formatPoints } from "../utils/pickupPoints";
@@ -180,6 +179,7 @@ export default function CustomerDashboard({
     const [junkshopFocusId, setJunkshopFocusId] = useState(null);
     const [routeToShopId, setRouteToShopId] = useState(null);
     const [accountView, setAccountView] = useState(null);
+    const [settingsTab, setSettingsTab] = useState("profile");
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [showDeactivateModal, setShowDeactivateModal] = useState(false);
     const [sidebarPinned, setSidebarPinned] = useState(() =>
@@ -214,10 +214,20 @@ export default function CustomerDashboard({
             return;
         }
 
+        if (path === "/customer/account/profile") {
+            navigate(buildCustomerPath({ accountView: "settings" }), { replace: true });
+            return;
+        }
+
         const parsed = parseCustomerPath(location.pathname);
         setActiveTab(parsed.tab);
         setOverviewPanel(parsed.panel);
         setAccountView(parsed.accountView);
+        setSettingsTab(
+            parsed.accountView === "settings"
+                ? parseCustomerSettingsTab(location.search) || parsed.settingsTab
+                : "profile"
+        );
         setJunkshopFocusId(parsed.junkshopFocusId);
         setRouteToShopId(location.state?.routeToShopId || null);
 
@@ -257,7 +267,7 @@ export default function CustomerDashboard({
         if (location.state?.openWizard && (!hasValidPhilippinePhone(user?.phone) || !hasConfirmedCustomerAddress(user))) {
             setOpenPickupWizard(false);
         }
-    }, [location.pathname, location.state, shops, navigate, user?.phone, user?.address, user?.addressConfirmed, user?.location]);
+    }, [location.pathname, location.search, location.state, shops, navigate, user?.phone, user?.address, user?.addressConfirmed, user?.location]);
 
     const showNotification = (message, type) => {
         setToastMessage(message);
@@ -321,12 +331,12 @@ export default function CustomerDashboard({
     const requireTransactionProfile = () => {
         if (!hasValidPhilippinePhone(user?.phone)) {
             showNotification(TRANSACTION_PHONE_SETTINGS_MESSAGE);
-            openAccountView("profile");
+            openSettings("profile");
             return false;
         }
         if (!hasConfirmedCustomerAddress(user)) {
             showNotification(TRANSACTION_ADDRESS_SETTINGS_MESSAGE);
-            openAccountView("profile");
+            openSettings("profile");
             return false;
         }
         return true;
@@ -349,8 +359,8 @@ export default function CustomerDashboard({
         });
     };
 
-    const openAccountView = (view) => {
-        navigate(buildCustomerPath({ accountView: view }));
+    const openSettings = (tab = "profile") => {
+        navigate(buildCustomerPath({ accountView: "settings", settingsTab: tab }));
     };
 
     const refreshUser = useCallback(async () => {
@@ -441,8 +451,7 @@ export default function CustomerDashboard({
                 showProfileMenu={showProfileMenu}
                 setShowProfileMenu={setShowProfileMenu}
                 onHelp={() => setShowHelp(true)}
-                onViewProfile={() => openAccountView("profile")}
-                onAccountSettings={() => openAccountView("settings")}
+                onSettings={() => openSettings("profile")}
                 onLogout={onLogout}
                 onDeactivate={() => {
                     setShowProfileMenu(false);
@@ -486,28 +495,28 @@ export default function CustomerDashboard({
                         <ProfileCompletionBanner
                             user={user}
                             role="customer"
-                            onGoSettings={() => openAccountView("profile")}
+                            onGoSettings={() => openSettings("profile")}
                             className="mb-5 sm:mb-6"
                         />
                     )}
 
-                    {accountView === "profile" && (
-                        <ViewProfilePage
+                    {accountView === "settings" && (
+                        <CustomerSettingsPage
                             user={user}
-                            onBack={() => navigate(buildCustomerPath({ tab: activeTab }))}
+                            initialTab={settingsTab}
+                            onBack={() =>
+                                navigate(
+                                    buildCustomerPath({
+                                        tab: activeTab,
+                                        panel: overviewPanel,
+                                    })
+                                )
+                            }
+                            onNotify={showNotification}
                             onUserUpdate={onUserUpdate}
                             onSaveSuccess={() =>
                                 showNotification("Profile updated successfully")
                             }
-                        />
-                    )}
-
-                    {accountView === "settings" && (
-                        <AccountSettingsPage
-                            user={user}
-                            onBack={() => navigate(buildCustomerPath({ tab: activeTab }))}
-                            onNotify={showNotification}
-                            onUserUpdate={onUserUpdate}
                         />
                     )}
 
@@ -597,7 +606,7 @@ export default function CustomerDashboard({
                             <CustomerPickupsTab
                                 user={user}
                                 onNotify={showNotification}
-                                onGoProfile={() => openAccountView("profile")}
+                                onGoProfile={() => openSettings("profile")}
                                 openWizardOnMount={openPickupWizard}
                                 focusPickupId={focusPickupId}
                                 onFocusHandled={() => setFocusPickupId(null)}
@@ -1145,18 +1154,13 @@ function HistoryTab({
 
             if (!query) return matchesStatus;
 
-            const haystack = [
-                row.date,
-                row.material,
-                row.weight,
-                row.amount,
-                row.shop,
-                row.status,
-            ]
-                .join(" ")
-                .toLowerCase();
-
-            return matchesStatus && haystack.includes(query);
+            return (
+                matchesStatus &&
+                matchesPrefixWordSearch(
+                    [row.date, row.material, row.weight, row.amount, row.shop, row.status],
+                    query
+                )
+            );
         });
     }, [historyRows, search, statusFilter]);
 

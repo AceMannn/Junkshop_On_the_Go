@@ -79,7 +79,13 @@ function normalizeOtp(value) {
     return String(value || "").replace(/\D/g, "").slice(0, OTP_LENGTH);
 }
 
-export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
+export function ViewProfilePage({
+    user,
+    onBack,
+    onSaveSuccess,
+    onUserUpdate,
+    embedded = false,
+}) {
     const isProvider = user?.role === "provider";
     const displayName = getDisplayName(user);
     const hasRealEmail = Boolean(user?.email) && !isPlaceholderEmail(user.email);
@@ -227,16 +233,8 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
         }
     };
 
-    return (
-        <AccountPageShell
-            title="View Profile"
-            subtitle={
-                isProvider
-                    ? "Your owner profile for verification, login, and shop contact details."
-                    : "Your personal information used for pickups and account recovery."
-            }
-            onBack={onBack}
-        >
+    const pageContent = (
+        <>
             <div className="flex items-center gap-4 p-4 sm:p-5 bg-white rounded-2xl border border-zinc-200 shadow-sm">
                 <span
                     className="flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full border-2 border-emerald-200 bg-[#154212] text-base sm:text-lg font-bold text-white"
@@ -500,6 +498,32 @@ export function ViewProfilePage({ user, onBack, onSaveSuccess, onUserUpdate }) {
                     </div>
                 </form>
             </section>
+        </>
+    );
+
+    if (embedded) {
+        return (
+            <div className="space-y-6">
+                <p className="text-sm text-[#72796e] max-w-2xl">
+                    Personal details for pickups and account recovery. Password and privacy are on
+                    the Account tab.
+                </p>
+                {pageContent}
+            </div>
+        );
+    }
+
+    return (
+        <AccountPageShell
+            title="View Profile"
+            subtitle={
+                isProvider
+                    ? "Your owner profile for verification, login, and shop contact details."
+                    : "Your personal information used for pickups and account recovery."
+            }
+            onBack={onBack}
+        >
+            {pageContent}
         </AccountPageShell>
     );
 }
@@ -510,6 +534,7 @@ export function AccountSettingsPage({
     onNotify,
     onUserUpdate,
     variant = "customer",
+    embedded = false,
 }) {
     const isProvider = variant === "provider";
     const [currentPassword, setCurrentPassword] = useState("");
@@ -542,17 +567,8 @@ export function AccountSettingsPage({
         }
     };
 
-    return (
-        <AccountPageShell
-            title="Account Settings"
-            subtitle={
-                isProvider
-                    ? "Update your login password and account security."
-                    : "Security, privacy, and account preferences."
-            }
-            onBack={onBack}
-        >
-            <div className={`grid grid-cols-1 ${isProvider ? "max-w-xl" : "lg:grid-cols-2"} gap-5 sm:gap-6`}>
+    const pageContent = (
+        <div className={`grid grid-cols-1 ${isProvider ? "max-w-xl" : "lg:grid-cols-2"} gap-5 sm:gap-6`}>
                 <section className="bg-white p-5 sm:p-8 rounded-2xl border border-zinc-200 shadow-[0_4px_12px_rgba(141,170,145,0.12)]">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="w-9 h-9 rounded-full bg-[#c9e7cc] flex items-center justify-center">
@@ -659,7 +675,30 @@ export function AccountSettingsPage({
                 </section>
                 )}
             </div>
+    );
 
+    if (embedded) {
+        return (
+            <div className="space-y-6">
+                <p className="text-sm text-[#72796e] max-w-2xl">
+                    Password, privacy, and sign-in security for your account.
+                </p>
+                {pageContent}
+            </div>
+        );
+    }
+
+    return (
+        <AccountPageShell
+            title="Account Settings"
+            subtitle={
+                isProvider
+                    ? "Update your login password and account security."
+                    : "Security, privacy, and account preferences."
+            }
+            onBack={onBack}
+        >
+            {pageContent}
         </AccountPageShell>
     );
 }

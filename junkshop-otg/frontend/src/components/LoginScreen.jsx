@@ -7,6 +7,7 @@ import {
   AuthErrorPopup,
   authInputClass,
   authInputWithIconClass,
+  authPasswordToggleButtonClass,
   authLabelClass,
   authOverlayClass,
   authModalShellClass,
@@ -88,7 +89,7 @@ export default function LoginScreen({
 }) {
   const savedDraft = readLoginDraft();
 
-  const PERSISTENT_VIEWS = ['login', 'forgot', 'verifyAccount'];
+  const PERSISTENT_VIEWS = ['login', 'verifyAccount'];
   const [view, setView] = useState(
     PERSISTENT_VIEWS.includes(savedDraft.view) ? savedDraft.view : 'login'
   );
@@ -135,6 +136,16 @@ export default function LoginScreen({
       rememberMe,
     });
   }, [view, email, recoveryContact, rememberMe]);
+
+  const handleClose = () => {
+    saveLoginDraft({
+      view: 'login',
+      email,
+      recoveryContact,
+      rememberMe,
+    });
+    onClose?.();
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -327,7 +338,7 @@ export default function LoginScreen({
       role="dialog"
       aria-modal="true"
       aria-labelledby="login-title"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className={`${authModalShellClass} max-w-lg`}
@@ -338,7 +349,7 @@ export default function LoginScreen({
             view === 'login' ? '' : 'scroll-y-clean'
           } ${error ? 'overflow-hidden' : ''}`}
         >
-          {onClose && <AuthModalClose onClick={onClose} label="Close login" />}
+          {onClose && <AuthModalClose onClick={handleClose} label="Close login" />}
 
           {view === 'resetSuccess' ? (
             <div className="flex flex-col items-center text-center py-6 gap-5">
@@ -442,16 +453,12 @@ export default function LoginScreen({
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
+                        className={authPasswordToggleButtonClass}
                         disabled={isLoading}
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                         aria-pressed={showPassword}
                       >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
@@ -616,16 +623,12 @@ export default function LoginScreen({
                       <button
                         type="button"
                         onClick={() => setShowNewPassword(!showNewPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
+                        className={authPasswordToggleButtonClass}
                         disabled={isLoading}
                         aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                         aria-pressed={showNewPassword}
                       >
-                        {showNewPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
+                        {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
                   </div>
@@ -654,16 +657,12 @@ export default function LoginScreen({
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
+                        className={authPasswordToggleButtonClass}
                         disabled={isLoading}
                         aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                         aria-pressed={showConfirmPassword}
                       >
-                        {showConfirmPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
+                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
                     {confirmPassword && confirmPassword !== newPassword && (
@@ -710,7 +709,7 @@ export default function LoginScreen({
               )}
 
               {view === 'login' && (
-                <p className="mt-4 text-sm text-charcoal/60">
+                <p className="mt-4 text-center text-sm text-charcoal/60">
                   Don&apos;t have an account?{' '}
                   <button
                     type="button"

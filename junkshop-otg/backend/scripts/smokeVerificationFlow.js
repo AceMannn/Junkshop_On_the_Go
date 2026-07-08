@@ -94,7 +94,7 @@ async function main() {
     fail('Admin blocked on public login', error.message);
   }
 
-  // 3. Admin portal login (no role)
+  // 3. Admin portal login
   let adminToken = '';
   try {
     const { response, data } = await request('/api/auth/login', {
@@ -102,6 +102,7 @@ async function main() {
       body: {
         identifier: ADMIN_EMAIL,
         password: ADMIN_PASSWORD,
+        role: 'admin',
       },
     });
     if (response.ok && data.user?.role === 'admin') {

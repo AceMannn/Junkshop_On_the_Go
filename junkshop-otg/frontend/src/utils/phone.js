@@ -7,4 +7,4 @@ export function hasValidPhilippinePhone(phone) {
 }
 
 export const TRANSACTION_PHONE_SETTINGS_MESSAGE =
-  'Add your mobile number in Account Settings before continuing.';
+  'Add your mobile number in Settings before continuing.';

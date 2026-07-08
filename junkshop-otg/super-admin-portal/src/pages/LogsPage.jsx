@@ -17,6 +17,7 @@ import {
   superPrimaryButtonClass,
   superSecondaryButtonClass,
 } from '../utils/superAdminUi';
+import { matchesPrefixWordSearch } from '../utils/searchFilter';
 
 const PAGE_SIZE = 10;
 
@@ -68,37 +69,33 @@ function transactionStatus(tx) {
 }
 
 function matchesAuditSearch(log, query) {
-  if (!query) return true;
-  const haystack = [
-    log.action,
-    log.targetType,
-    log.targetId,
-    log.actor?.name,
-    log.actor?.email,
-    log.actor?.role,
-    JSON.stringify(log.details || {}),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
+  return matchesPrefixWordSearch(
+    [
+      log.action,
+      log.targetType,
+      log.targetId,
+      log.actor?.name,
+      log.actor?.email,
+      log.actor?.role,
+      JSON.stringify(log.details || {}),
+    ],
+    query
+  );
 }
 
 function matchesTransactionSearch(tx, query) {
-  if (!query) return true;
-  const haystack = [
-    tx.id,
-    tx.material,
-    tx.customer?.name,
-    tx.customer?.email,
-    tx.provider?.name,
-    tx.provider?.email,
-    transactionStatus(tx),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
+  return matchesPrefixWordSearch(
+    [
+      tx.id,
+      tx.material,
+      tx.customer?.name,
+      tx.customer?.email,
+      tx.provider?.name,
+      tx.provider?.email,
+      transactionStatus(tx),
+    ],
+    query
+  );
 }
 
 function formatDetails(details) {

@@ -17,6 +17,14 @@ import LoadErrorBanner from '../components/ui/LoadErrorBanner';
 import EmptyState from '../components/ui/EmptyState';
 import ShopRating from '../components/ui/ShopRating';
 import { siteCardClass, siteContainerClass, siteHeroGradientClass, siteInputClass, sitePageClass, siteBtnPrimaryClass } from '../components/ui/siteUi';
+import CharCount from '../components/ui/CharCount';
+import {
+  clampText,
+  CONTACT_EMAIL_MAX,
+  CONTACT_MESSAGE_MAX,
+  CONTACT_MESSAGE_MIN,
+  CONTACT_NAME_MAX,
+} from '../utils/textLimits';
 
 const AVATAR_STYLES = [
   'bg-emerald-50 text-emerald-700',
@@ -178,6 +186,12 @@ export default function ContactPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (formData.message.trim().length < CONTACT_MESSAGE_MIN) {
+      setError(`Message must be at least ${CONTACT_MESSAGE_MIN} characters.`);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -198,7 +212,15 @@ export default function ContactPage() {
   };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    const limits = {
+      firstName: CONTACT_NAME_MAX,
+      lastName: CONTACT_NAME_MAX,
+      email: CONTACT_EMAIL_MAX,
+      message: CONTACT_MESSAGE_MAX,
+    };
+    const nextValue = limits[name] ? clampText(value, limits[name]) : value;
+    setFormData({ ...formData, [name]: nextValue });
     setError('');
   };
 
@@ -313,6 +335,7 @@ export default function ContactPage() {
                       value={formData.firstName}
                       onChange={handleChange}
                       required
+                      maxLength={CONTACT_NAME_MAX}
                       placeholder="Juan"
                       className={inputClass}
                     />
@@ -327,6 +350,7 @@ export default function ContactPage() {
                       value={formData.lastName}
                       onChange={handleChange}
                       required
+                      maxLength={CONTACT_NAME_MAX}
                       placeholder="Dela Cruz"
                       className={inputClass}
                     />
@@ -343,6 +367,7 @@ export default function ContactPage() {
                     value={formData.email}
                     onChange={handleChange}
                     required
+                    maxLength={CONTACT_EMAIL_MAX}
                     placeholder="juan@email.com"
                     className={inputClass}
                   />
@@ -382,8 +407,14 @@ export default function ContactPage() {
                     onChange={handleChange}
                     required
                     rows={4}
+                    maxLength={CONTACT_MESSAGE_MAX}
                     placeholder="Tell us what's on your mind…"
                     className={`${inputClass} min-h-[80px] resize-y`}
+                  />
+                  <CharCount
+                    value={formData.message}
+                    max={CONTACT_MESSAGE_MAX}
+                    min={CONTACT_MESSAGE_MIN}
                   />
                 </div>
                 <div className="flex justify-center">

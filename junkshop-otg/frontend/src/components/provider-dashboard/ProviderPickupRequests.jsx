@@ -23,12 +23,14 @@ import {
     pickupEstimatedPayout,
 } from "../../utils/pickupHelpers";
 import PickupTrackingMap, { formatLastUpdated } from "../maps/PickupTrackingMap";
+import CharCount from "../ui/CharCount";
+import { clampText, GENERAL_MESSAGE_MAX } from "../../utils/textLimits";
 import NumberInput from "../ui/NumberInput";
 import PickupMaterialPhotosGallery from "../ui/PickupMaterialPhotosGallery";
 import {
     estimateDropOffPoints,
     formatPoints,
-    POINTS_PER_KG,
+    DROP_OFF_POINTS_PER_KG,
 } from "../../utils/pickupPoints";
 import { maskCustomerName } from "../../utils/maskCustomerName";
 import PickupDetailDrawerShell from "../ui/PickupDetailDrawerShell";
@@ -289,11 +291,11 @@ export default function ProviderPickupRequests({
         }
     };
 
-    const handleCompleteDropOff = async (id, actualWeight) => {
+    const handleCompleteDropOff = async (id, { actualWeight, totalAmount }) => {
         if (!requirePhoneForTransactions()) return;
         try {
-            await pickupApi.updateStatus(id, "completed", { actualWeight });
-            showToast("Drop-off completed. Points awarded to the customer.");
+            await pickupApi.updateStatus(id, "completed", { actualWeight, totalAmount });
+            showToast("Drop-off completed. Cash recorded and bonus points awarded.");
             setTrackingId(null);
             load();
             closeDetail();
@@ -603,9 +605,13 @@ export default function ProviderPickupRequests({
                             rows={3}
                             placeholder="Optional note to customer"
                             value={rejectMessage}
-                            onChange={(e) => setRejectMessage(e.target.value)}
+                            maxLength={GENERAL_MESSAGE_MAX}
+                            onChange={(e) =>
+                                setRejectMessage(clampText(e.target.value, GENERAL_MESSAGE_MAX))
+                            }
                             className="w-full border rounded-xl px-4 py-3 text-sm resize-none"
                         />
+                        <CharCount value={rejectMessage} max={GENERAL_MESSAGE_MAX} />
                         <div className="flex gap-2">
                             <button
                                 type="button"
@@ -801,10 +807,12 @@ function ProviderPickupDetailDrawer({
 
     const handleCompleteDropOff = async () => {
         const weight = Number(actualWeight);
+        const totalAmount = Number(cashPaid);
         if (!weight || weight < 0.1) return;
+        if (cashPaid === "" || !Number.isFinite(totalAmount) || totalAmount <= 0) return;
         setCompletingDropOff(true);
         try {
-            await onCompleteDropOff(request.id, weight);
+            await onCompleteDropOff(request.id, { actualWeight: weight, totalAmount });
         } finally {
             setCompletingDropOff(false);
         }
@@ -937,7 +945,8 @@ function ProviderPickupDetailDrawer({
                         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
                             <p className="text-sm font-semibold text-emerald-900">Complete drop-off</p>
                             <p className="text-xs text-[#72796e]">
-                                Weigh the customer&apos;s items and award recycling points ({POINTS_PER_KG} pts/kg).
+                                Weigh the items, pay the customer, and award bonus recycling points (
+                                {DROP_OFF_POINTS_PER_KG} pts/kg for drop-off).
                             </p>
                             <div className="space-y-1">
                                 <label className="block text-xs font-semibold text-[#42493e]">
@@ -950,8 +959,25 @@ function ProviderPickupDetailDrawer({
                                     step={0.1}
                                 />
                             </div>
+                            <div className="space-y-1">
+                                <label className="block text-xs font-semibold text-[#42493e]">
+                                    Cash paid to customer (₱)
+                                </label>
+                                <NumberInput
+                                    value={cashPaid}
+                                    onChange={setCashPaid}
+                                    min={0.01}
+                                    max={20000}
+                                    step={0.01}
+                                />
+                                {estimatedTotal > 0 && (
+                                    <p className="text-xs text-[#72796e]">
+                                        Estimated from booking: {formatPeso(estimatedTotal)}
+                                    </p>
+                                )}
+                            </div>
                             <p className="text-sm font-semibold text-[#154212]">
-                                Points to award: {formatPoints(estimatedPoints)} pts
+                                Bonus points to award: {formatPoints(estimatedPoints)} pts
                             </p>
                             <button
                                 type="button"
@@ -959,7 +985,7 @@ function ProviderPickupDetailDrawer({
                                 onClick={handleCompleteDropOff}
                                 className="w-full py-2.5 rounded-xl bg-[#154212] text-white text-sm font-semibold disabled:opacity-50"
                             >
-                                {completingDropOff ? "Completing…" : "Complete & award points"}
+                                {completingDropOff ? "Completing…" : "Complete drop-off"}
                             </button>
                         </div>
                     )}

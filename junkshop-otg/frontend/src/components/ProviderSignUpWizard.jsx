@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { CheckCircle2, Eye, EyeOff, MapPin } from 'lucide-react';
+import { CheckCircle2, MapPin } from 'lucide-react';
 import { authApi } from '../services/api';
 import LocationPickerMap from './maps/LocationPickerMap';
 import {
@@ -11,7 +11,6 @@ import {
   AuthModalClose,
   AuthErrorPopup,
   authInputClass,
-  authInputWithIconClass,
   authLabelClass,
   authModalShellClass,
   authOverlayClass,
@@ -29,7 +28,7 @@ import {
 } from '../utils/operatingHours';
 import { validatePasswordStrength } from '../utils/passwordPolicy';
 import AccountVerificationStep from './auth/AccountVerificationStep';
-import PasswordRequirements from './auth/PasswordRequirements';
+import SignUpPasswordFields from './auth/SignUpPasswordFields';
 import TermsAndConditionsModal, { TERMS_VERSION } from './auth/TermsAndConditionsModal';
 import PrivacyPolicyModal from './auth/PrivacyPolicyModal';
 
@@ -101,8 +100,6 @@ export default function ProviderSignUpWizard({
 
   const [step, setStep] = useState(Math.min(providerDraft?.step ?? 1, STEPS.length));
   const [form, setForm] = useState(() => readProviderDraft() || initialForm);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -507,70 +504,15 @@ export default function ProviderSignUpWizard({
                   />
                 </div>
 
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="ownerPassword" className={authLabelClass}>
-                        Password <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="ownerPassword"
-                          type={showPassword ? 'text' : 'password'}
-                          value={form.password}
-                          onChange={(event) => updateField('password', event.target.value)}
-                          className={authInputWithIconClass}
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword((open) => !open)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
-                          disabled={isLoading}
-                          aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="ownerConfirmPassword" className={authLabelClass}>
-                        Confirm password <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="ownerConfirmPassword"
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          value={form.confirmPassword}
-                          onChange={(event) => updateField('confirmPassword', event.target.value)}
-                          className={authInputWithIconClass}
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword((open) => !open)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
-                          disabled={isLoading}
-                          aria-label={
-                            showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'
-                          }
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <PasswordRequirements password={form.password} />
-                </div>
+                <SignUpPasswordFields
+                  password={form.password}
+                  confirmPassword={form.confirmPassword}
+                  onPasswordChange={(value) => updateField('password', value)}
+                  onConfirmChange={(value) => updateField('confirmPassword', value)}
+                  disabled={isLoading}
+                  passwordId="ownerPassword"
+                  confirmId="ownerConfirmPassword"
+                />
               </div>
             )}
 

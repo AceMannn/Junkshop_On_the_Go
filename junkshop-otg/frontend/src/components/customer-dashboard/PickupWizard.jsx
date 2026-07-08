@@ -27,6 +27,8 @@ import {
 } from '../../utils/pickupHelpers';
 import { getUserFullName } from '../../utils/userDisplay';
 import { hasValidPhilippinePhone, normalizePhilippinePhone } from '../../utils/phone';
+import CharCount from '../ui/CharCount';
+import { clampText, GENERAL_MESSAGE_MAX, LANDMARK_MAX } from '../../utils/textLimits';
 import { haversineKm, NEAREST_SHOP_RADIUS_KM } from '../../utils/geo';
 import PickupAddressPicker from './PickupAddressPicker';
 
@@ -287,7 +289,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
         return false;
       }
       if (!hasValidPhilippinePhone(accountPhone)) {
-        setError('Add your mobile number in Account Settings before booking.');
+        setError('Add your mobile number in Settings before booking.');
         return false;
       }
       if (!isDropOff && (!addressConfirmed || !address.trim())) {
@@ -647,7 +649,7 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
               <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
                 Contact number: <strong>{accountPhone || 'Not set'}</strong>
                 {!hasValidPhilippinePhone(accountPhone) ? (
-                  <span> — add your mobile number in Account Settings first.</span>
+                  <span> — add your mobile number in Settings first.</span>
                 ) : null}
               </p>
               <input
@@ -678,16 +680,22 @@ export default function PickupWizard({ user, shops, onClose, onSuccess, prefill 
                   className={inputClass}
                   placeholder="e.g. Near 7-Eleven, Blue gate house"
                   value={landmark}
-                  onChange={(event) => setLandmark(event.target.value)}
+                  maxLength={LANDMARK_MAX}
+                  onChange={(event) => setLandmark(clampText(event.target.value, LANDMARK_MAX))}
                 />
+                <CharCount value={landmark} max={LANDMARK_MAX} />
               </div>
-              <textarea
-                rows={2}
-                className={`${inputClass} resize-none`}
-                placeholder="Notes for the shop (optional)"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-              />
+              <div>
+                <textarea
+                  rows={2}
+                  className={`${inputClass} resize-none`}
+                  placeholder="Notes for the shop (optional)"
+                  value={notes}
+                  maxLength={GENERAL_MESSAGE_MAX}
+                  onChange={(event) => setNotes(clampText(event.target.value, GENERAL_MESSAGE_MAX))}
+                />
+                <CharCount value={notes} max={GENERAL_MESSAGE_MAX} />
+              </div>
             </div>
           )}
 

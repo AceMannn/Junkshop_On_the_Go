@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import {
     HelpCircle,
-    User,
     Settings,
     LogOut,
     UserX,
@@ -31,8 +30,7 @@ export default function CustomerTopbar({
     showProfileMenu,
     setShowProfileMenu,
     onHelp,
-    onViewProfile,
-    onAccountSettings,
+    onSettings,
     onLogout,
     onDeactivate,
     onNotificationNavigate,
@@ -138,17 +136,7 @@ export default function CustomerTopbar({
                                 <button
                                     type="button"
                                     role="menuitem"
-                                    onClick={() => runMenuAction(onViewProfile)}
-                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#191c1c] hover:bg-[#f3f4f3]"
-                                >
-                                    <User size={18} className="text-[#4e6953]" />
-                                    View Profile
-                                </button>
-
-                                <button
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={() => runMenuAction(onAccountSettings)}
+                                    onClick={() => runMenuAction(onSettings)}
                                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#191c1c] hover:bg-[#f3f4f3]"
                                 >
                                     <Settings size={18} className="text-[#4e6953]" />

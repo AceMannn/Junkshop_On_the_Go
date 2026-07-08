@@ -15,16 +15,15 @@ import {
   superPageTitleClass,
   superPrimaryButtonClass,
 } from '../utils/superAdminUi';
+import { matchesPrefixWordSearch } from '../utils/searchFilter';
 
 const PAGE_SIZE = 10;
 
 function matchesSearch(row, query) {
-  if (!query) return true;
-  const haystack = [row.name, row.email, row.phone, row.junkshopName, row.role]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
+  return matchesPrefixWordSearch(
+    [row.name, row.email, row.phone, row.junkshopName, row.role],
+    query
+  );
 }
 
 function verificationLabel(status) {

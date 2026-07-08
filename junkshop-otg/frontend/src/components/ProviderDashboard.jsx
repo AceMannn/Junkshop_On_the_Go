@@ -9,18 +9,18 @@ import ProviderSidebar, { ProviderMobileNav } from "./provider-dashboard/Provide
 import ProviderOverviewTab from "./provider-dashboard/ProviderOverviewTab";
 import ProviderMaterialsTab from "./provider-dashboard/ProviderMaterialsTab";
 import ProviderAvailabilityTab from "./provider-dashboard/ProviderAvailabilityTab";
-import ProviderSettingsTab from "./provider-dashboard/ProviderSettingsTab";
+import ProviderSettingsPage from "./provider-dashboard/ProviderSettingsPage";
 import ProviderTransactionsTab from "./provider-dashboard/ProviderTransactionsTab";
 import ProviderVerificationTab from "./provider-dashboard/ProviderVerificationTab";
 import ProfileCompletionBanner from "./ui/ProfileCompletionBanner";
 import VerificationStatusBanner from "./ui/VerificationStatusBanner";
-import {
-    ViewProfilePage,
-    AccountSettingsPage,
-    DeactivateAccountModal,
-} from "./customer-dashboard/CustomerAccountViews";
+import { DeactivateAccountModal } from "./customer-dashboard/CustomerAccountViews";
 import { dashboardMainPaddingClass } from "./dashboard/dashboardTopbarUi";
-import { buildProviderPath, parseProviderPath } from "../utils/dashboardRoutes";
+import {
+    buildProviderPath,
+    parseProviderPath,
+    parseProviderSettingsTab,
+} from "../utils/dashboardRoutes";
 import { getProviderNotificationTarget } from "../utils/notificationNavigation";
 
 function readSidebarPinnedPreference(key) {
@@ -82,6 +82,7 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
     const [showHelp, setShowHelp] = useState(false);
     const [focusRequestId, setFocusRequestId] = useState(null);
     const [accountView, setAccountView] = useState(null);
+    const [settingsTab, setSettingsTab] = useState("shop");
     const [showDeactivateModal, setShowDeactivateModal] = useState(false);
     const [sidebarPinned, setSidebarPinned] = useState(() =>
         readSidebarPinnedPreference("provider-sidebar-pinned")
@@ -95,13 +96,24 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
         }
 
         const parsed = parseProviderPath(location.pathname);
+
+        if (parsed.legacySettingsTab) {
+            navigate(buildProviderPath({ accountView: "settings" }), { replace: true });
+            return;
+        }
+
         setActiveTab(parsed.tab);
         setAccountView(parsed.accountView);
+        setSettingsTab(
+            parsed.accountView === "settings"
+                ? parseProviderSettingsTab(location.search) || parsed.settingsTab
+                : "shop"
+        );
 
         if (location.state?.focusRequestId) {
             setFocusRequestId(location.state.focusRequestId);
         }
-    }, [location.pathname, location.state, navigate]);
+    }, [location.pathname, location.search, location.state, navigate]);
 
     const refreshUser = useCallback(async () => {
         try {
@@ -116,8 +128,8 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
         navigate(buildProviderPath({ tab: tabId }));
     };
 
-    const openAccountView = (view) => {
-        navigate(buildProviderPath({ accountView: view }));
+    const openSettings = (tab = "shop") => {
+        navigate(buildProviderPath({ accountView: "settings", settingsTab: tab }));
     };
 
     const handleDeactivateConfirm = () => {
@@ -183,9 +195,7 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                 showProfileMenu={showProfileMenu}
                 setShowProfileMenu={setShowProfileMenu}
                 onHelp={() => setShowHelp(true)}
-                onViewProfile={() => openAccountView("profile")}
-                onNavigateShopSettings={() => handleNavigate("settings")}
-                onNavigateAccountSettings={() => openAccountView("accountSettings")}
+                onSettings={() => openSettings("shop")}
                 onLogout={onLogout}
                 onDeactivate={() => {
                     setShowProfileMenu(false);
@@ -227,32 +237,21 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                                     onGoVerification={() => handleNavigate("verification")}
                                 />
                             )}
-                            {activeTab !== "settings" && (
+                            {activeTab !== "verification" && !accountView && (
                                 <ProfileCompletionBanner
                                     user={user}
                                     role="provider"
-                                    onGoSettings={() => handleNavigate("settings")}
+                                    onGoSettings={() => openSettings("shop")}
                                     className="mb-5 sm:mb-6"
                                 />
                             )}
                         </>
                     )}
 
-                    {accountView === "profile" && (
-                        <ViewProfilePage
+                    {accountView === "settings" && (
+                        <ProviderSettingsPage
                             user={user}
-                            onBack={() => navigate(buildProviderPath({ tab: activeTab }))}
-                            onUserUpdate={onUserUpdate}
-                            onSaveSuccess={() =>
-                                showNotification("Profile updated successfully")
-                            }
-                        />
-                    )}
-
-                    {accountView === "accountSettings" && (
-                        <AccountSettingsPage
-                            user={user}
-                            variant="provider"
+                            initialTab={settingsTab}
                             onBack={() => navigate(buildProviderPath({ tab: activeTab }))}
                             onNotify={showNotification}
                             onUserUpdate={onUserUpdate}
@@ -264,6 +263,7 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                     )}
                     {!accountView && activeTab === "materials" && (
                         <ProviderMaterialsTab
+                            user={user}
                             onNotify={showNotification}
                             onRefreshProfile={refreshUser}
                         />
@@ -287,13 +287,6 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                     )}
                     {!accountView && activeTab === "verification" && (
                         <ProviderVerificationTab
-                            user={user}
-                            onNotify={showNotification}
-                            onUserUpdate={onUserUpdate}
-                        />
-                    )}
-                    {!accountView && activeTab === "settings" && (
-                        <ProviderSettingsTab
                             user={user}
                             onNotify={showNotification}
                             onUserUpdate={onUserUpdate}

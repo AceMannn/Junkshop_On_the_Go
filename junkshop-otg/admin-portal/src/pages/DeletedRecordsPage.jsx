@@ -8,6 +8,7 @@ import {
   adminPageTitleClass,
   adminSelectClass,
 } from '../utils/adminUi';
+import { matchesPrefixWordSearch } from '../utils/searchFilter';
 
 function typeLabel(type) {
   return String(type || '')
@@ -60,18 +61,20 @@ export default function DeletedRecordsPage() {
     const search = searchTerm.trim().toLowerCase();
     return records.filter((record) => {
       const matchesType = typeFilter === 'all' || record.type === typeFilter;
-      const haystack = [
-        record.type,
-        record.label,
-        record.status,
-        record.deletedAt,
-        record.deletedBy?.name,
-        record.deletedBy?.email,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return matchesType && (!search || haystack.includes(search));
+      return (
+        matchesType &&
+        matchesPrefixWordSearch(
+          [
+            record.type,
+            record.label,
+            record.status,
+            record.deletedAt,
+            record.deletedBy?.name,
+            record.deletedBy?.email,
+          ],
+          search
+        )
+      );
     });
   }, [records, searchTerm, typeFilter]);
 

@@ -4,7 +4,8 @@ const CUSTOMER_PANELS = new Set([
   'prices',
   'guide',
 ]);
-const CUSTOMER_ACCOUNT_VIEWS = new Set(['profile', 'settings']);
+const CUSTOMER_ACCOUNT_VIEWS = new Set(['settings']);
+const CUSTOMER_LEGACY_ACCOUNT_VIEWS = new Set(['profile']);
 
 const PROVIDER_TABS = new Set([
   'dashboard',
@@ -13,9 +14,9 @@ const PROVIDER_TABS = new Set([
   'availability',
   'requests',
   'transactions',
-  'settings',
 ]);
-const PROVIDER_ACCOUNT_VIEWS = new Set(['profile', 'accountSettings']);
+const PROVIDER_ACCOUNT_VIEWS = new Set(['settings']);
+const PROVIDER_LEGACY_ACCOUNT_VIEWS = new Set(['profile', 'accountSettings']);
 
 function splitPath(pathname) {
   return pathname.replace(/\/+$/, '').split('/').filter(Boolean);
@@ -29,6 +30,7 @@ export function parseCustomerPath(pathname) {
     shopId: null,
     accountView: null,
     junkshopFocusId: null,
+    settingsTab: 'profile',
   };
 
   if (parts[0] !== 'customer') return result;
@@ -36,9 +38,16 @@ export function parseCustomerPath(pathname) {
   const rest = parts.slice(1);
   if (rest.length === 0) return result;
 
-  if (rest[0] === 'account' && CUSTOMER_ACCOUNT_VIEWS.has(rest[1])) {
-    result.accountView = rest[1];
-    return result;
+  if (rest[0] === 'account') {
+    if (CUSTOMER_ACCOUNT_VIEWS.has(rest[1])) {
+      result.accountView = 'settings';
+      return result;
+    }
+    if (CUSTOMER_LEGACY_ACCOUNT_VIEWS.has(rest[1])) {
+      result.accountView = 'settings';
+      result.settingsTab = 'profile';
+      return result;
+    }
   }
 
   if (rest[0] === 'shop' && rest[1]) {
@@ -61,15 +70,25 @@ export function parseCustomerPath(pathname) {
   return result;
 }
 
+export function parseCustomerSettingsTab(search) {
+  const tab = new URLSearchParams(search || '').get('tab');
+  return tab === 'account' ? 'account' : 'profile';
+}
+
 export function buildCustomerPath({
   tab = 'overview',
   panel = null,
   shopId = null,
   accountView = null,
   junkshopFocusId = null,
+  settingsTab = null,
 } = {}) {
-  if (accountView && CUSTOMER_ACCOUNT_VIEWS.has(accountView)) {
-    return `/customer/account/${accountView}`;
+  if (accountView === 'settings') {
+    const base = '/customer/account/settings';
+    if (settingsTab === 'account') {
+      return `${base}?tab=account`;
+    }
+    return base;
   }
 
   if (shopId) {
@@ -92,6 +111,8 @@ export function parseProviderPath(pathname) {
   const result = {
     tab: 'dashboard',
     accountView: null,
+    settingsTab: 'shop',
+    legacySettingsTab: false,
   };
 
   if (parts[0] !== 'provider') return result;
@@ -99,8 +120,20 @@ export function parseProviderPath(pathname) {
   const rest = parts.slice(1);
   if (rest.length === 0) return result;
 
-  if (rest[0] === 'account' && PROVIDER_ACCOUNT_VIEWS.has(rest[1])) {
-    result.accountView = rest[1];
+  if (rest[0] === 'account') {
+    if (PROVIDER_ACCOUNT_VIEWS.has(rest[1])) {
+      result.accountView = rest[1];
+      return result;
+    }
+    if (PROVIDER_LEGACY_ACCOUNT_VIEWS.has(rest[1])) {
+      result.accountView = 'settings';
+      result.settingsTab = 'account';
+      return result;
+    }
+  }
+
+  if (rest[0] === 'settings') {
+    result.legacySettingsTab = true;
     return result;
   }
 
@@ -111,9 +144,22 @@ export function parseProviderPath(pathname) {
   return result;
 }
 
-export function buildProviderPath({ tab = 'dashboard', accountView = null } = {}) {
+export function parseProviderSettingsTab(search) {
+  const tab = new URLSearchParams(search || '').get('tab');
+  return tab === 'account' ? 'account' : 'shop';
+}
+
+export function buildProviderPath({
+  tab = 'dashboard',
+  accountView = null,
+  settingsTab = null,
+} = {}) {
   if (accountView && PROVIDER_ACCOUNT_VIEWS.has(accountView)) {
-    return `/provider/account/${accountView}`;
+    const base = `/provider/account/${accountView}`;
+    if (settingsTab === 'account') {
+      return `${base}?tab=account`;
+    }
+    return base;
   }
 
   const safeTab = PROVIDER_TABS.has(tab) ? tab : 'dashboard';

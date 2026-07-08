@@ -21,7 +21,7 @@ export const providerTabs = [
 ];
 
 const mobilePrimaryIds = ["dashboard", "verification", "requests", "materials"];
-const mobileMoreIds = ["availability", "transactions", "settings"];
+const mobileMoreIds = ["availability", "transactions"];
 
 const primarySidebarButtonClass =
     "w-full flex items-center rounded-2xl border border-[#154212] bg-[#154212] py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-900 hover:shadow transition-colors";

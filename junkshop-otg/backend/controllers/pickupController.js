@@ -12,7 +12,7 @@ const {
   isHomePickup,
   isZeroServiceFee,
   isPaymentConfirmed,
-  dropOffPoints,
+  recyclingPointsForCompletion,
   clearPaymentCooldownIfExpired,
   assertCustomerCanSubmitPayment,
   MAX_PAYMENT_SUBMITS,
@@ -20,6 +20,13 @@ const {
 const { MAX_DOCUMENT_BYTES } = require('../utils/verificationConstants');
 const { normalizeImageData } = require('../utils/verificationImageData');
 const { uploadImageData } = require('../utils/cloudinaryStorage');
+const {
+  GENERAL_MESSAGE_MAX,
+  LANDMARK_MAX,
+  trimText,
+  validateOptionalText,
+  validateRequiredText,
+} = require('../utils/textLimits');
 const {
   canStartNewActivity,
   isBanned,
@@ -371,7 +378,7 @@ exports.createPickupRequest = async (req, res) => {
 
     if (!hasValidPhone(req.user.phone)) {
       return res.status(403).json({
-        message: 'Add your mobile number in Account Settings before booking a pickup.',
+        message: 'Add your mobile number in Settings before booking a pickup.',
       });
     }
 
@@ -380,8 +387,8 @@ exports.createPickupRequest = async (req, res) => {
       const missing = customerProfile.missing || [];
       return res.status(403).json({
         message: missing.includes('address')
-          ? 'Add your street address in Account Settings before booking a home pickup.'
-          : 'Complete your profile in Account Settings before booking a pickup.',
+          ? 'Add your street address in Settings before booking a home pickup.'
+          : 'Complete your profile in Settings before booking a pickup.',
         profileStatus: customerProfile,
       });
     }
@@ -530,7 +537,7 @@ exports.createPickupRequest = async (req, res) => {
     const normalizedPhone = normalizePhone(req.user.phone);
     if (!hasValidPhone(normalizedPhone)) {
       return res.status(403).json({
-        message: 'Add your mobile number in Account Settings before booking a pickup.',
+        message: 'Add your mobile number in Settings before booking a pickup.',
       });
     }
 
@@ -622,11 +629,11 @@ exports.createPickupRequest = async (req, res) => {
       estimatedTotalAmount,
       address: pickupAddress,
       pickupLocation: resolvedPickupLocation || undefined,
-      landmark: landmark?.trim() || '',
+      landmark: trimText(landmark, LANDMARK_MAX),
       scheduledDate,
       timeSlot,
       scheduledAt: buildScheduledAt(scheduledDate, timeSlot),
-      notes: notes?.trim() || '',
+      notes: trimText(notes, GENERAL_MESSAGE_MAX),
       status: 'pending',
     });
 
@@ -666,7 +673,7 @@ exports.acceptPickupRequest = async (req, res) => {
 
     if (!hasValidPhone(req.user.phone)) {
       return res.status(403).json({
-        message: 'Add your mobile number in Account Settings before accepting pickups.',
+        message: 'Add your mobile number in Settings before accepting pickups.',
       });
     }
 
@@ -774,6 +781,11 @@ exports.rejectPickupRequest = async (req, res) => {
     }
 
     const { reason = '', message = '' } = req.body;
+    const messageValidation = validateOptionalText(message, GENERAL_MESSAGE_MAX, 'Note');
+    if (!messageValidation.ok) {
+      return res.status(400).json({ message: messageValidation.message });
+    }
+
     const request = await PickupRequest.findOne({ _id: req.params.id, deletedAt: null });
 
     if (!request || request.status !== 'pending') {
@@ -782,7 +794,7 @@ exports.rejectPickupRequest = async (req, res) => {
 
     request.status = 'rejected';
     request.rejectReason = reason.trim() || REJECT_PRESETS[0];
-    request.rejectMessage = message.trim();
+    request.rejectMessage = messageValidation.value;
     request.provider = req.user._id;
 
     await request.save();
@@ -829,9 +841,17 @@ exports.updatePickupStatus = async (req, res) => {
         });
       }
       const reason = String(req.body.reason || '').trim();
-      const message = String(req.body.message || '').trim();
+      const isOtherReason = /^other(\s+reason)?$/i.test(reason);
+      const messageValidation = isOtherReason
+        ? validateRequiredText(req.body.message, {
+            label: 'Cancellation note',
+          })
+        : validateOptionalText(req.body.message, GENERAL_MESSAGE_MAX, 'Cancellation note');
+      if (!messageValidation.ok) {
+        return res.status(400).json({ message: messageValidation.message });
+      }
       request.rejectReason = reason || 'Cancelled by customer';
-      request.rejectMessage = message;
+      request.rejectMessage = messageValidation.value;
     } else if (!isProvider) {
       return res.status(403).json({ message: 'Not allowed to update this request.' });
     }
@@ -842,7 +862,7 @@ exports.updatePickupStatus = async (req, res) => {
       !hasValidPhone(req.user.phone)
     ) {
       return res.status(403).json({
-        message: 'Add your mobile number in Account Settings before updating pickup transactions.',
+        message: 'Add your mobile number in Settings before updating pickup transactions.',
       });
     }
 
@@ -873,57 +893,48 @@ exports.updatePickupStatus = async (req, res) => {
     }
 
     if (status === 'completed') {
-      if (request.requestType === 'drop_off') {
-        const actualWeight = Number(req.body.actualWeight);
-        if (!actualWeight || actualWeight < 0.1) {
-          return res.status(400).json({ message: 'Enter actual weight (min 0.1 kg).' });
-        }
-        request.actualWeightKg = actualWeight;
-        request.pointsAwarded = dropOffPoints(actualWeight);
-        await User.findByIdAndUpdate(request.customer, {
-          $inc: { recyclingPoints: request.pointsAwarded },
-        });
-      } else {
-        const actualWeight = Number(req.body.actualWeight);
-        if (!actualWeight || actualWeight < 0.1) {
-          return res.status(400).json({ message: 'Enter actual weight (min 0.1 kg).' });
-        }
-        const totalAmount = Number(req.body.totalAmount);
-        if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
-          return res.status(400).json({ message: 'Enter cash paid to the customer (must be greater than ₱0).' });
-        }
-        if (totalAmount > MAX_AMOUNT) {
-          return res.status(400).json({ message: `Cash paid cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.` });
-        }
+      const actualWeight = Number(req.body.actualWeight);
+      if (!actualWeight || actualWeight < 0.1) {
+        return res.status(400).json({ message: 'Enter actual weight (min 0.1 kg).' });
+      }
 
-        request.actualWeightKg = actualWeight;
-        request.pointsAwarded = dropOffPoints(actualWeight);
-
-        const existingTx = await Transaction.findOne({ pickupRequest: request._id });
-        if (!existingTx && request.customer && request.provider) {
-          const materialLabel =
-            request.materials?.map((m) => m.name).join(', ') || 'Mixed recyclables';
-          const pricePerUnit =
-            actualWeight > 0
-              ? Math.round((totalAmount / actualWeight) * 100) / 100
-              : 0;
-
-          await Transaction.create({
-            customer: request.customer,
-            provider: request.provider,
-            pickupRequest: request._id,
-            material: materialLabel,
-            weight: actualWeight,
-            pricePerUnit,
-            totalAmount,
-            status: 'completed',
-          });
-        }
-
-        await User.findByIdAndUpdate(request.customer, {
-          $inc: { recyclingPoints: request.pointsAwarded },
+      const totalAmount = Number(req.body.totalAmount);
+      if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+        return res.status(400).json({
+          message: 'Enter cash paid to the customer (must be greater than ₱0).',
         });
       }
+      if (totalAmount > MAX_AMOUNT) {
+        return res.status(400).json({
+          message: `Cash paid cannot exceed ₱${MAX_AMOUNT.toLocaleString()}.`,
+        });
+      }
+
+      request.actualWeightKg = actualWeight;
+      request.pointsAwarded = recyclingPointsForCompletion(request, actualWeight);
+
+      const existingTx = await Transaction.findOne({ pickupRequest: request._id });
+      if (!existingTx && request.customer && request.provider) {
+        const materialLabel =
+          request.materials?.map((m) => m.name).join(', ') || 'Mixed recyclables';
+        const pricePerUnit =
+          actualWeight > 0 ? Math.round((totalAmount / actualWeight) * 100) / 100 : 0;
+
+        await Transaction.create({
+          customer: request.customer,
+          provider: request.provider,
+          pickupRequest: request._id,
+          material: materialLabel,
+          weight: actualWeight,
+          pricePerUnit,
+          totalAmount,
+          status: 'completed',
+        });
+      }
+
+      await User.findByIdAndUpdate(request.customer, {
+        $inc: { recyclingPoints: request.pointsAwarded },
+      });
     }
 
     await request.save();
@@ -948,7 +959,7 @@ exports.updatePickupStatus = async (req, res) => {
     if (status === 'completed' && request.requestType === 'drop_off' && request.customer) {
       await notifyUser(request.customer, {
         title: 'Drop-off completed',
-        message: `You earned ${request.pointsAwarded} recycling points!`,
+        message: `Payment recorded. You earned ${request.pointsAwarded} bonus recycling points!`,
         pickupRequestId: request._id,
       });
     } else if (status === 'completed' && request.requestType !== 'drop_off' && request.customer) {
@@ -1208,7 +1219,16 @@ exports.ratePickupRequest = async (req, res) => {
       return res.status(400).json({ message: 'You have already rated this pickup.' });
     }
 
-    request.rating = { score: rating, comment: comment.trim(), createdAt: new Date() };
+    const commentValidation = validateOptionalText(comment, GENERAL_MESSAGE_MAX, 'Comment');
+    if (!commentValidation.ok) {
+      return res.status(400).json({ message: commentValidation.message });
+    }
+
+    request.rating = {
+      score: rating,
+      comment: commentValidation.value,
+      createdAt: new Date(),
+    };
     await request.save();
 
     if (request.junkshop) {

@@ -37,6 +37,7 @@ const {
 const { sendMaterialExpiryWarningEmail } = require('../utils/deliveryService');
 const reportController = require('../controllers/reportController');
 const { loadCancelledPickupsForHistory } = require('../utils/historyMerge');
+const { buildMaterialSalesReport } = require('../utils/materialSalesReport');
 
 const router = express.Router();
 const MAX_AMOUNT = 20000;
@@ -648,6 +649,27 @@ router.get('/materials/deleted', protect, requireProvider, async (req, res) => {
     })),
     purgedCount: expired.length,
   });
+});
+
+router.get('/materials/sales-report', protect, requireProvider, async (req, res) => {
+  try {
+    const report = await buildMaterialSalesReport(req.user._id, {
+      period: req.query.period,
+      from: req.query.from,
+      to: req.query.to,
+      category: req.query.category,
+      type: req.query.type,
+    });
+
+    if (!report.ok) {
+      return res.status(400).json({ message: report.message });
+    }
+
+    return res.json(report);
+  } catch (error) {
+    console.error('[materials] sales report failed:', error.message);
+    return res.status(500).json({ message: 'Could not generate sales report.' });
+  }
 });
 
 router.get('/materials/:id/history', protect, requireProvider, async (req, res) => {

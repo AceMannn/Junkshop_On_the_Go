@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { HelpCircle, Lock, LogOut, Store, User, UserX } from "lucide-react";
+import { HelpCircle, LogOut, Settings, UserX } from "lucide-react";
 import { getUserInitials, getUserFullName } from "../../utils/userDisplay";
 import logoImage from "../../assets/junkshop-logo.png";
 import DashboardNotificationMenu from "../dashboard/DashboardNotificationMenu";
@@ -20,9 +20,7 @@ export default function ProviderTopbar({
     showProfileMenu,
     setShowProfileMenu,
     onHelp,
-    onViewProfile,
-    onNavigateShopSettings,
-    onNavigateAccountSettings,
+    onSettings,
     onLogout,
     onDeactivate,
     onNotificationNavigate,
@@ -115,31 +113,11 @@ export default function ProviderTopbar({
                                 <button
                                     type="button"
                                     role="menuitem"
-                                    onClick={() => runMenuAction(onViewProfile)}
+                                    onClick={() => runMenuAction(onSettings)}
                                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#191c1c] hover:bg-[#f3f4f3]"
                                 >
-                                    <User size={18} className="text-[#4e6953]" />
-                                    View Profile
-                                </button>
-
-                                <button
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={() => runMenuAction(onNavigateShopSettings)}
-                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#191c1c] hover:bg-[#f3f4f3]"
-                                >
-                                    <Store size={18} className="text-[#4e6953]" />
-                                    Shop Settings
-                                </button>
-
-                                <button
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={() => runMenuAction(onNavigateAccountSettings)}
-                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#191c1c] hover:bg-[#f3f4f3]"
-                                >
-                                    <Lock size={18} className="text-[#4e6953]" />
-                                    Account Settings
+                                    <Settings size={18} className="text-[#4e6953]" />
+                                    Settings
                                 </button>
 
                                 <div className="h-px bg-zinc-100 my-1" />

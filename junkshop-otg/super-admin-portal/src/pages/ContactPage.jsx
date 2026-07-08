@@ -11,6 +11,7 @@ import {
   superPrimaryButtonClass,
   superSecondaryButtonClass,
 } from '../utils/superAdminUi';
+import { matchesPrefixWordSearch } from '../utils/searchFilter';
 
 const statusFilters = [
   { id: '', label: 'All' },
@@ -24,12 +25,7 @@ function notifyContactUpdated() {
 }
 
 function matchesSearch(row, query) {
-  if (!query) return true;
-  const haystack = [row.subject, row.name, row.email, row.message]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
+  return matchesPrefixWordSearch([row.subject, row.name, row.email, row.message], query);
 }
 
 function buildReplyUrl(message) {

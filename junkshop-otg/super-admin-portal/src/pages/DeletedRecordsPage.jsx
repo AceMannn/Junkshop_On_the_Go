@@ -18,6 +18,7 @@ import {
   superPrimaryButtonClass,
   superSecondaryButtonClass,
 } from '../utils/superAdminUi';
+import { matchesPrefixWordSearch } from '../utils/searchFilter';
 
 const PAGE_SIZE = 10;
 
@@ -43,20 +44,18 @@ function deletedByLabel(record) {
 }
 
 function matchesSearch(record, query) {
-  if (!query) return true;
-  const haystack = [
-    record.type,
-    record.label,
-    record.status,
-    record.id,
-    record.deletedBy?.name,
-    record.deletedBy?.email,
-    record.deletedBy?.role,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
+  return matchesPrefixWordSearch(
+    [
+      record.type,
+      record.label,
+      record.status,
+      record.id,
+      record.deletedBy?.name,
+      record.deletedBy?.email,
+      record.deletedBy?.role,
+    ],
+    query
+  );
 }
 
 export default function DeletedRecordsPage() {

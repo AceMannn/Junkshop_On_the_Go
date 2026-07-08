@@ -41,7 +41,7 @@ const transactionReportSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: '',
-      maxlength: 2000,
+      maxlength: 1000,
     },
     status: {
       type: String,

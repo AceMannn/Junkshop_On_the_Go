@@ -7,6 +7,13 @@ const ALLOWED_SUBJECTS = [
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_REGEX = /^[A-Za-zÀ-ÿÑñ\s.'-]{2,100}$/;
+const {
+  CONTACT_MESSAGE_MIN,
+  CONTACT_MESSAGE_MAX,
+  CONTACT_NAME_MAX,
+  CONTACT_EMAIL_MAX,
+  validateRequiredText,
+} = require('./textLimits');
 
 function validateContactPayload(body) {
   const firstName = String(body?.firstName || '').trim();
@@ -29,11 +36,19 @@ function validateContactPayload(body) {
     return { ok: false, message: 'Last name is required.' };
   }
 
+  if (firstName.length > CONTACT_NAME_MAX) {
+    return { ok: false, message: `First name must be at most ${CONTACT_NAME_MAX} characters.` };
+  }
+
+  if (lastName.length > CONTACT_NAME_MAX) {
+    return { ok: false, message: `Last name must be at most ${CONTACT_NAME_MAX} characters.` };
+  }
+
   if (name.length < 2 || name.length > 100 || !NAME_REGEX.test(name)) {
     return { ok: false, message: 'Please enter a valid name (2–100 characters).' };
   }
 
-  if (!EMAIL_REGEX.test(email) || email.length > 254) {
+  if (!EMAIL_REGEX.test(email) || email.length > CONTACT_EMAIL_MAX) {
     return { ok: false, message: 'Please enter a valid email address.' };
   }
 
@@ -45,13 +60,25 @@ function validateContactPayload(body) {
     return { ok: false, message: 'Please choose a valid subject.' };
   }
 
-  if (message.length < 10 || message.length > 2000) {
-    return { ok: false, message: 'Message must be 10–2000 characters.' };
+  const messageValidation = validateRequiredText(message, {
+    min: CONTACT_MESSAGE_MIN,
+    max: CONTACT_MESSAGE_MAX,
+    label: 'Message',
+  });
+  if (!messageValidation.ok) {
+    return { ok: false, message: messageValidation.message };
   }
 
   return {
     ok: true,
-    data: { name, firstName, lastName, email, subject, message },
+    data: {
+      name,
+      firstName,
+      lastName,
+      email,
+      subject,
+      message: messageValidation.value,
+    },
   };
 }
 

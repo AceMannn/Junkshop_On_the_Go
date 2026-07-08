@@ -17,6 +17,8 @@ import {
   hasConfirmedCustomerAddress,
   TRANSACTION_ADDRESS_SETTINGS_MESSAGE,
 } from '../../utils/transactionGates';
+import CharCount from '../ui/CharCount';
+import { clampText, GENERAL_MESSAGE_MAX, GENERAL_MESSAGE_MIN } from '../../utils/textLimits';
 import {
     STATUS_STYLES,
     formatPickupSchedule,
@@ -35,7 +37,7 @@ import PickupMaterialPhotosGallery from "../ui/PickupMaterialPhotosGallery";
 import {
     estimateDropOffPoints,
     formatPoints,
-    POINTS_PER_KG,
+    DROP_OFF_POINTS_PER_KG,
 } from "../../utils/pickupPoints";
 
 const STATUS_BORDER_STYLES = {
@@ -384,8 +386,8 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate
             CUSTOMER_CANCEL_REASONS.find((reason) => reason.id === cancelReasonId) ||
             CUSTOMER_CANCEL_REASONS[0];
         const message = cancelMessage.trim();
-        if (selectedReason.id === "other" && !message) {
-            onNotify?.("Please add a short reason before cancelling.");
+        if (selectedReason.id === "other" && message.length < GENERAL_MESSAGE_MIN) {
+            onNotify?.(`Please provide at least ${GENERAL_MESSAGE_MIN} characters when selecting Other reason.`);
             return;
         }
 
@@ -535,7 +537,7 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate
                                 ~{formatPoints(estimateDropOffPoints(live.estimatedWeightKg))} pts
                             </p>
                             <p className="text-xs text-[#72796e]">
-                                {live.estimatedWeightKg} kg × {POINTS_PER_KG} pts/kg — final points when the shop weighs your items.
+                                {live.estimatedWeightKg} kg × {DROP_OFF_POINTS_PER_KG} pts/kg (drop-off bonus) — final points when the shop weighs your items.
                             </p>
                         </div>
                     )}
@@ -622,9 +624,13 @@ function PickupDetailModal({ request, onClose, onRefresh, onNotify, onUserUpdate
                                 rows={2}
                                 placeholder="Optional comment"
                                 value={comment}
-                                onChange={(e) => setComment(e.target.value)}
+                                maxLength={GENERAL_MESSAGE_MAX}
+                                onChange={(e) =>
+                                    setComment(clampText(e.target.value, GENERAL_MESSAGE_MAX))
+                                }
                                 className="w-full border rounded-lg px-3 py-2 text-sm"
                             />
+                            <CharCount value={comment} max={GENERAL_MESSAGE_MAX} />
                             <button
                                 type="button"
                                 onClick={handleRate}
@@ -747,13 +753,21 @@ function CancelRequestModal({
                             <textarea
                                 rows={3}
                                 value={message}
-                                onChange={(event) => onMessageChange(event.target.value)}
+                                maxLength={GENERAL_MESSAGE_MAX}
+                                onChange={(event) =>
+                                    onMessageChange(clampText(event.target.value, GENERAL_MESSAGE_MAX))
+                                }
                                 placeholder={
                                     needsMessage
                                         ? "Tell the junkshop why you need to cancel..."
                                         : "Add more details if needed..."
                                 }
                                 className="w-full resize-none rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-100"
+                            />
+                            <CharCount
+                                value={message}
+                                max={GENERAL_MESSAGE_MAX}
+                                min={needsMessage ? GENERAL_MESSAGE_MIN : 0}
                             />
                         </label>
                     )}
@@ -769,7 +783,11 @@ function CancelRequestModal({
                     </button>
                     <button
                         type="button"
-                        disabled={submitting || (needsMessage && !message.trim())}
+                        disabled={
+                            submitting ||
+                            (needsMessage &&
+                                message.trim().length < GENERAL_MESSAGE_MIN)
+                        }
                         onClick={onConfirm}
                         className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >

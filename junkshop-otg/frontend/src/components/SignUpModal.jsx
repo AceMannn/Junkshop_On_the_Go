@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../services/api';
 import ProviderSignUpWizard from './ProviderSignUpWizard';
 import AccountVerificationStep from './auth/AccountVerificationStep';
@@ -16,7 +15,6 @@ import {
   AuthModalClose,
   AuthErrorPopup,
   authInputClass,
-  authInputWithIconClass,
   authLabelClass,
   authOverlayClass,
   authModalShellClass,
@@ -26,7 +24,7 @@ import {
   authSubmitClass,
 } from './auth/authModalUi';
 import { validatePasswordStrength } from '../utils/passwordPolicy';
-import PasswordRequirements from './auth/PasswordRequirements';
+import SignUpPasswordFields from './auth/SignUpPasswordFields';
 import TermsAndConditionsModal, { TERMS_VERSION } from './auth/TermsAndConditionsModal';
 import PrivacyPolicyModal from './auth/PrivacyPolicyModal';
 
@@ -51,8 +49,6 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
 
   const [selectedRole, setSelectedRole] = useState(metaDraft?.selectedRole || 'customer');
   const [formData, setFormData] = useState(readCustomerDraft);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(customerDraft?.step || 'form');
@@ -307,70 +303,15 @@ export default function SignUpModal({ isOpen, onClose, onSignUpComplete, onShowL
               />
             </div>
 
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="signup-password" className={authLabelClass}>
-                  Password <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    id="signup-password"
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    placeholder="••••••••"
-                    className={authInputWithIconClass}
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
-                    disabled={isLoading}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    aria-pressed={showPassword}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="confirmPassword" className={authLabelClass}>
-                  Confirm Password <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    id="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                    placeholder="••••••••"
-                    className={authInputWithIconClass}
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal/60"
-                    disabled={isLoading}
-                    aria-label={
-                      showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'
-                    }
-                    aria-pressed={showConfirmPassword}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-              <PasswordRequirements password={formData.password} />
-            </div>
+            <SignUpPasswordFields
+              password={formData.password}
+              confirmPassword={formData.confirmPassword}
+              onPasswordChange={(value) => handleInputChange('password', value)}
+              onConfirmChange={(value) => handleInputChange('confirmPassword', value)}
+              disabled={isLoading}
+              passwordId="signup-password"
+              confirmId="signup-confirm-password"
+            />
 
             <label className="flex items-start gap-2.5 text-sm leading-snug text-charcoal/75">
               <input

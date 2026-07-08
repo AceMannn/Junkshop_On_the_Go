@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { matchesPrefixWordSearch } from "../../utils/searchFilter";
 import { Search } from "lucide-react";
 import { domainApi } from "../../services/api";
 import { useProviderMaterials } from "../../hooks/useProviderData";
@@ -17,9 +18,7 @@ export default function ProviderPricesTab({ onNotify }) {
         const q = search.trim().toLowerCase();
         return materials.filter(
             (item) =>
-                !q ||
-                item.name.toLowerCase().includes(q) ||
-                item.category.toLowerCase().includes(q)
+                !q || matchesPrefixWordSearch([item.name, item.category], q)
         );
     }, [materials, search]);
 
