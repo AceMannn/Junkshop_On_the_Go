@@ -1,4 +1,5 @@
 import { siteContainerClass, siteSectionPadClass } from '../ui/siteUi';
+import Reveal, { RevealItem, RevealStagger } from '../ui/Reveal';
 
 const CATEGORY_CARDS = [
   {
@@ -61,50 +62,51 @@ export default function MaterialMarketplaceSection() {
   return (
     <section className={`${siteSectionPadClass} site-page-bg`}>
       <div className={siteContainerClass}>
-        <div className="text-center mb-10">
-          <h2 className="mb-4">What Can You Recycle?</h2>
-          <p className="text-xl text-[#72796e] max-w-3xl mx-auto">
+        <Reveal className="text-center mb-10">
+          <h2 className="mb-4 text-[var(--site-text)]">What Can You Recycle?</h2>
+          <p className="text-xl text-[var(--site-muted)] max-w-3xl mx-auto">
             Hover over each category to learn what items are accepted and how much you can earn.
           </p>
-        </div>
+        </Reveal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <RevealStagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {CATEGORY_CARDS.map((card) => (
-            <div
-              key={card.id}
-              className="group relative overflow-hidden rounded-2xl shadow-sm border border-zinc-200 cursor-default"
-              style={{ aspectRatio: '4/3' }}
-            >
-              {/* Background image */}
-              <img
-                src={card.image}
-                alt={card.label}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
+            <RevealItem key={card.id}>
+              <div
+                className="group relative overflow-hidden rounded-2xl shadow-sm border border-[var(--site-border)] cursor-default"
+                style={{ aspectRatio: '4/3' }}
+              >
+                {/* Background image */}
+                <img
+                  src={card.image}
+                  alt={card.label}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
 
-              {/* Always-visible dark gradient at bottom for the label */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                {/* Always-visible dark gradient at bottom for the label */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
 
-              {/* Hover overlay — darkens the full card */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                {/* Hover overlay — darkens the full card */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
-              {/* Default label (always visible) */}
-              <div className="absolute bottom-0 left-0 right-0 p-5 transition-all duration-300 group-hover:translate-y-2 group-hover:opacity-0">
-                <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Recyclable</p>
-                <h3 className="text-xl font-bold text-white leading-tight">{card.label}</h3>
-                <p className="text-sm font-semibold text-emerald-300 mt-0.5">{card.priceHint}</p>
+                {/* Default label (always visible) */}
+                <div className="absolute bottom-0 left-0 right-0 p-5 transition-all duration-300 group-hover:translate-y-2 group-hover:opacity-0">
+                  <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Recyclable</p>
+                  <h3 className="text-xl font-bold text-white leading-tight">{card.label}</h3>
+                  <p className="text-sm font-semibold text-emerald-300 mt-0.5">{card.priceHint}</p>
+                </div>
+
+                {/* Hover content */}
+                <div className="absolute inset-0 flex flex-col justify-end p-5 opacity-0 translate-y-3 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
+                  <h3 className="text-xl font-bold text-white mb-2">{card.label}</h3>
+                  <p className="text-sm text-white/90 leading-relaxed mb-3">{card.description}</p>
+                  <p className="text-xs font-semibold text-emerald-300 tracking-wide">{card.examples}</p>
+                  <p className="mt-2 text-sm font-bold text-emerald-300">{card.priceHint}</p>
+                </div>
               </div>
-
-              {/* Hover content */}
-              <div className="absolute inset-0 flex flex-col justify-end p-5 opacity-0 translate-y-3 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
-                <h3 className="text-xl font-bold text-white mb-2">{card.label}</h3>
-                <p className="text-sm text-white/90 leading-relaxed mb-3">{card.description}</p>
-                <p className="text-xs font-semibold text-emerald-300 tracking-wide">{card.examples}</p>
-                <p className="mt-2 text-sm font-bold text-emerald-300">{card.priceHint}</p>
-              </div>
-            </div>
+            </RevealItem>
           ))}
-        </div>
+        </RevealStagger>
       </div>
     </section>
   );

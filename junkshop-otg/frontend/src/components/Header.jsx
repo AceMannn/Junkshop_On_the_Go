@@ -6,6 +6,7 @@ import {
   siteContainerClass,
   siteHeaderShellClass,
 } from './ui/siteUi';
+import ThemeToggle from './ui/ThemeToggle';
 
 const headerAuthBtnClass =
   'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-full transition-all';
@@ -85,11 +86,12 @@ export default function Header({
           </nav>
 
           <div className="hidden lg:flex items-center gap-2">
+            <ThemeToggle className="text-[var(--site-body)] hover:bg-[var(--site-hover)] hover:text-[var(--site-accent)]" />
             {!isAuthenticated && onShowLogin && (
               <button
                 type="button"
                 onClick={onShowLogin}
-                className={`${headerAuthBtnClass} bg-[#154212] text-white hover:bg-emerald-900 shadow-sm`}
+                className={`${headerAuthBtnClass} bg-[var(--site-btn)] text-[var(--site-btn-text)] hover:bg-[var(--site-btn-hover)] shadow-sm`}
               >
                 Login
                 <LogIn size={18} />
@@ -97,21 +99,24 @@ export default function Header({
             )}
           </div>
 
-          <button
-            className="lg:hidden flex min-h-11 min-w-11 items-center justify-center rounded-xl text-[#191c1c] hover:bg-zinc-100"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle navigation menu"
-            aria-expanded={isMobileMenuOpen}
-          >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          <div className="lg:hidden flex items-center gap-1">
+            <ThemeToggle className="text-[var(--site-text)] hover:bg-[var(--site-hover)]" compact />
+            <button
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-[var(--site-text)] hover:bg-[var(--site-hover)]"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle navigation menu"
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
       </div>
 
       <AnimatePresence>
         {isMobileMenuOpen && (
           <Motion.div
-            className="lg:hidden border-t border-zinc-200 bg-white"
+            className="lg:hidden border-t border-[var(--site-border)] bg-[var(--site-surface-alt)]"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -126,8 +131,8 @@ export default function Header({
                     type="button"
                     className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
                       isActive
-                        ? 'bg-emerald-50 text-[#154212] ring-1 ring-emerald-200'
-                        : 'text-[#42493e] hover:bg-zinc-50'
+                        ? 'bg-[var(--site-brand-deep)]/40 text-[var(--site-accent)] ring-1 ring-[var(--site-brand)]/40'
+                        : 'text-[var(--site-body)] hover:bg-[var(--site-hover)]'
                     }`}
                     onClick={() => {
                       onNavigate(item.id);
@@ -141,7 +146,7 @@ export default function Header({
               {!isAuthenticated && onShowLogin && (
                 <button
                   type="button"
-                  className={`${headerAuthBtnClass} w-full justify-center mt-3 bg-[#154212] text-white hover:bg-emerald-900 shadow-sm`}
+                  className={`${headerAuthBtnClass} w-full justify-center mt-3 bg-[var(--site-btn)] text-[var(--site-btn-text)] hover:bg-[var(--site-btn-hover)] shadow-sm`}
                   onClick={() => {
                     onShowLogin();
                     setIsMobileMenuOpen(false);
@@ -162,12 +167,12 @@ function NavLink({ label, isActive, onClick }) {
   return (
     <button
       type="button"
-      className="relative text-[#42493e] hover:text-[#154212] transition-colors py-2 text-sm font-semibold"
+      className="relative text-[var(--site-body)] hover:text-[var(--site-accent)] transition-colors py-2 text-sm font-semibold"
       onClick={onClick}
     >
       {label}
       <span
-        className={`absolute bottom-0 left-0 h-0.5 bg-[#154212] transition-all duration-300 ${
+        className={`absolute bottom-0 left-0 h-0.5 bg-[var(--site-accent)] transition-all duration-300 ${
           isActive ? 'w-full' : 'w-0'
         }`}
       />

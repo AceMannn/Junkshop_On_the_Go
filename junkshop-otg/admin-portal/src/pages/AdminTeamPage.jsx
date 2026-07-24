@@ -70,7 +70,28 @@ export default function AdminTeamPage() {
           No admin accounts found.
         </div>
       ) : (
-        <div className={`${adminCardClass} overflow-hidden`}>
+        <>
+        <div className="space-y-3 md:hidden">
+          {admins.map((row) => (
+            <article key={row.id} className={`${adminCardClass} p-4 space-y-2`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#191c1c]">{row.name}</p>
+                  <p className="truncate text-sm text-zinc-500">{row.email}</p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${statusPillClass(
+                    row.status
+                  )}`}
+                >
+                  {row.status}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500">Joined {formatDate(row.createdAt)}</p>
+            </article>
+          ))}
+        </div>
+        <div className={`${adminCardClass} hidden md:block overflow-hidden`}>
           <div className="scroll-x-clean">
             <table className="min-w-full text-sm">
               <thead className="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500">
@@ -102,6 +123,7 @@ export default function AdminTeamPage() {
             </table>
           </div>
         </div>
+        </>
       )}
     </div>
   );

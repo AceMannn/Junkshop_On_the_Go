@@ -4,8 +4,8 @@ import { siteContainerClass, siteFooterShellClass } from './ui/siteUi';
 
 export default function Footer({ onNavigate }) {
   const linkClass =
-    'text-zinc-400 hover:text-emerald-400 transition-colors text-sm text-left';
-  const contactIconClass = 'shrink-0 mt-0.5 text-emerald-500';
+    'text-zinc-400 hover:text-[var(--site-accent)] transition-colors text-sm text-left';
+  const contactIconClass = 'shrink-0 mt-0.5 text-[var(--site-brand)]';
 
   return (
     <footer className={`${siteFooterShellClass} py-14 sm:py-16`}>

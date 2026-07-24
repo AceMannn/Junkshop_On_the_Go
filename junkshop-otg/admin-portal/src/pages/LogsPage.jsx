@@ -59,7 +59,37 @@ export default function LogsPage() {
             <div className="border-b border-zinc-100 px-4 py-3">
               <h2 className="font-bold text-[#191c1c]">Transaction Logs</h2>
             </div>
-            <div className="scroll-x-clean">
+            <div className="space-y-3 p-4 md:hidden">
+              {transactions.length === 0 ? (
+                <p className="py-4 text-center text-sm text-zinc-500">No transactions found.</p>
+              ) : (
+                transactions.map((tx) => (
+                  <article key={tx.id} className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[#191c1c]">{tx.material}</p>
+                        <p className="text-xs text-zinc-500">{formatDate(tx.createdAt)}</p>
+                      </div>
+                      <p className="shrink-0 font-bold text-emerald-800">{formatCurrency(tx.totalAmount)}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-zinc-500">Customer</p>
+                        <p className="truncate">{tx.customer?.name || 'Unknown'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-zinc-500">Provider</p>
+                        <p className="truncate">{tx.provider?.name || 'Unknown'}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs capitalize text-zinc-600">
+                      Status: {tx.deletedAt ? 'deleted' : tx.status}
+                    </p>
+                  </article>
+                ))
+              )}
+            </div>
+            <div className="scroll-x-clean hidden md:block">
               <table className="w-full min-w-[760px] text-sm">
                 <thead className="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500">
                   <tr>

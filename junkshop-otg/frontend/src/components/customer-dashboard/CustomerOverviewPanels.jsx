@@ -305,7 +305,7 @@ export function JunkshopsPanel({
                             className="w-full bg-transparent outline-none text-sm min-w-0"
                         />
                     </div>
-                    <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-nowrap sm:gap-2">
                         <select
                             value={locationFilter}
                             onChange={(e) => setLocationFilter(e.target.value)}
@@ -599,7 +599,7 @@ export function MaterialPricesPanel() {
                         ))}
                     </select>
 
-                    <div className="inline-flex h-10 w-fit shrink-0 rounded-xl border border-zinc-200 bg-white p-0.5 shadow-sm">
+                    <div className="hidden md:inline-flex h-10 w-fit shrink-0 rounded-xl border border-zinc-200 bg-white p-0.5 shadow-sm">
                     <button
                         type="button"
                         onClick={() => setViewMode("cards")}
@@ -636,64 +636,66 @@ export function MaterialPricesPanel() {
                     title="No materials match your search"
                     description="Try another keyword or reset the category filter."
                 />
-            ) : viewMode === "table" ? (
-                <div className="scroll-x-clean overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
-                    <table className="w-full min-w-[780px] text-sm">
-                        <thead className="bg-[#f3f4f3] text-[#42493e]">
-                            <tr>
-                                <th className="px-4 py-3 text-left font-semibold">Material</th>
-                                <th className="px-4 py-3 text-left font-semibold">Category</th>
-                                <th className="px-4 py-3 text-left font-semibold">Price</th>
-                                <th className="px-4 py-3 text-left font-semibold">Trend</th>
-                                <th className="px-4 py-3 text-left font-semibold">Examples</th>
-                                <th className="px-4 py-3 text-left font-semibold">Updated</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-100">
-                            {filteredPrices.map((item) => {
-                                const trend =
-                                    item.price != null
-                                        ? getMaterialTrend(item)
-                                        : ["up", "down", "stable"][
-                                        (item.id?.length || 0) % 3
-                                        ];
-                                const unitLabel = materialUnitLabel(item);
-                                const mid = parsePriceMid(item.perKgPrice);
-
-                                return (
-                                    <tr key={item.id} className="hover:bg-zinc-50">
-                                        <td className="px-4 py-4">
-                                            <p className="font-bold text-[#191c1c]">{item.material}</p>
-                                            <p className="text-xs text-[#72796e]">Midpoint: ₱{mid}</p>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">
-                                                {formatMaterialCategoryLabel(item.category)}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-4 font-bold text-emerald-900">
-                                            {item.perKgPrice}
-                                            <span className="ml-1 text-xs font-semibold text-[#72796e]">
-                                                / {unitLabel === "piece" ? "pc" : "kg"}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <TrendBadge trend={trend} />
-                                        </td>
-                                        <td className="px-4 py-4 text-[#42493e]">
-                                            <span className="line-clamp-2">{item.examples}</span>
-                                        </td>
-                                        <td className="px-4 py-4 text-[#72796e]">
-                                            {formatUpdatedDate(item.updatedAt)}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
             ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <>
+                    {viewMode === "table" && (
+                        <div className="hidden md:block scroll-x-clean overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+                            <table className="w-full min-w-[780px] text-sm">
+                                <thead className="bg-[#f3f4f3] text-[#42493e]">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left font-semibold">Material</th>
+                                        <th className="px-4 py-3 text-left font-semibold">Category</th>
+                                        <th className="px-4 py-3 text-left font-semibold">Price</th>
+                                        <th className="px-4 py-3 text-left font-semibold">Trend</th>
+                                        <th className="px-4 py-3 text-left font-semibold">Examples</th>
+                                        <th className="px-4 py-3 text-left font-semibold">Updated</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-100">
+                                    {filteredPrices.map((item) => {
+                                        const trend =
+                                            item.price != null
+                                                ? getMaterialTrend(item)
+                                                : ["up", "down", "stable"][
+                                                (item.id?.length || 0) % 3
+                                                ];
+                                        const unitLabel = materialUnitLabel(item);
+                                        const mid = parsePriceMid(item.perKgPrice);
+
+                                        return (
+                                            <tr key={item.id} className="hover:bg-zinc-50">
+                                                <td className="px-4 py-4">
+                                                    <p className="font-bold text-[#191c1c]">{item.material}</p>
+                                                    <p className="text-xs text-[#72796e]">Midpoint: ₱{mid}</p>
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">
+                                                        {formatMaterialCategoryLabel(item.category)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4 font-bold text-emerald-900">
+                                                    {item.perKgPrice}
+                                                    <span className="ml-1 text-xs font-semibold text-[#72796e]">
+                                                        / {unitLabel === "piece" ? "pc" : "kg"}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <TrendBadge trend={trend} />
+                                                </td>
+                                                <td className="px-4 py-4 text-[#42493e]">
+                                                    <span className="line-clamp-2">{item.examples}</span>
+                                                </td>
+                                                <td className="px-4 py-4 text-[#72796e]">
+                                                    {formatUpdatedDate(item.updatedAt)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${viewMode === "table" ? "md:hidden" : ""}`}>
                 {filteredPrices.map((item) => {
                     const trend =
                         item.price != null
@@ -742,6 +744,7 @@ export function MaterialPricesPanel() {
                     );
                 })}
             </div>
+                </>
             )}
         </div>
     );

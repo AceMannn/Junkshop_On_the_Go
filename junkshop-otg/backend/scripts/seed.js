@@ -80,47 +80,52 @@ const seed = async () => {
 
   console.log(`Seeded ${junkshopCount} junkshops and ${materialCount} catalog materials.`);
 
-  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@junkshop-otg.ph').trim().toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD || 'AdminChangeMe123!';
+  const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || '';
+  if (!adminEmail || !adminPassword) {
+    console.warn(
+      'Skipping admin seed: set ADMIN_EMAIL and ADMIN_PASSWORD in backend/.env'
+    );
+  } else {
+    await User.findOneAndUpdate(
+      { email: adminEmail },
+      {
+        firstName: 'Platform',
+        lastName: 'Admin',
+        email: adminEmail,
+        password: await bcrypt.hash(adminPassword, 10),
+        role: 'admin',
+        status: 'active',
+        emailVerified: true,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    console.log(`Admin account ready: ${adminEmail}`);
+  }
 
-  await User.findOneAndUpdate(
-    { email: adminEmail },
-    {
-      firstName: 'Platform',
-      lastName: 'Admin',
-      email: adminEmail,
-      password: await bcrypt.hash(adminPassword, 10),
-      role: 'admin',
-      status: 'active',
-      emailVerified: true,
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+  const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || '';
+  if (!superAdminEmail || !superAdminPassword) {
+    console.warn(
+      'Skipping super admin seed: set SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD in backend/.env'
+    );
+  } else {
+    await User.findOneAndUpdate(
+      { email: superAdminEmail },
+      {
+        firstName: 'Platform',
+        lastName: 'Super Admin',
+        email: superAdminEmail,
+        password: await bcrypt.hash(superAdminPassword, 10),
+        role: 'super_admin',
+        status: 'active',
+        emailVerified: true,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    console.log(`Super Admin account ready: ${superAdminEmail}`);
+  }
 
-  console.log(`Admin account ready: ${adminEmail}`);
-
-  const superAdminEmail = (
-    process.env.SUPER_ADMIN_EMAIL || 'superadmin@junkshop-otg.ph'
-  )
-    .trim()
-    .toLowerCase();
-  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'SuperAdminChangeMe123!';
-
-  await User.findOneAndUpdate(
-    { email: superAdminEmail },
-    {
-      firstName: 'Platform',
-      lastName: 'Super Admin',
-      email: superAdminEmail,
-      password: await bcrypt.hash(superAdminPassword, 10),
-      role: 'super_admin',
-      status: 'active',
-      emailVerified: true,
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
-
-  console.log(`Super Admin account ready: ${superAdminEmail}`);
   process.exit(0);
 };
 

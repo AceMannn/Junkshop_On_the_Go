@@ -11,7 +11,8 @@
   --color-light-gray: #F2F2F2;
   --color-charcoal: #2E2E2E;
 
-  --font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-family-base: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Syne', 'DM Sans', system-ui, sans-serif;
 
   --spacing-1: 8px;
   --spacing-2: 16px;
@@ -25,6 +26,116 @@
   --radius-card: 16px;
 }
 
+/* ─── Theme tokens (light default) ─── */
+:root,
+html[data-theme="light"] {
+  color-scheme: light;
+
+  --site-bg: #f9f9f8;
+  --site-surface: #ffffff;
+  --site-surface-alt: #ffffff;
+  --site-text: #191c1c;
+  --site-muted: #72796e;
+  --site-body: #42493e;
+  --site-border: #e4e4e7;
+  --site-brand: #154212;
+  --site-accent: #154212;
+  --site-brand-deep: #154212;
+  --site-btn: #154212;
+  --site-btn-hover: #0f2e0e;
+  --site-btn-text: #ffffff;
+  --site-chip-active-text: #ffffff;
+  --site-hover: #f4f4f5;
+  --site-input-bg: #ffffff;
+  --site-header-bg: rgba(255, 255, 255, 0.85);
+  --site-footer-bg: #191c1c;
+  --site-footer-text: #e8ede9;
+  --site-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --site-card-hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --site-hero-gradient: linear-gradient(to bottom right, #eef8f0, #ffffff, #f4fbf5),
+    radial-gradient(circle at 12px 12px, rgba(21, 66, 18, 0.06) 2px, transparent 0);
+  --site-pill-bg: #dcfce7;
+  --site-pill-text: #154212;
+  --site-pill-border: #a7f3d0;
+  --site-orb: rgba(16, 185, 129, 0.12);
+  --site-danger-bg: rgba(254, 226, 226, 0.85);
+  --site-danger-border: #fecaca;
+  --site-danger-text: #b91c1c;
+  --site-success-bg: rgba(236, 253, 245, 0.9);
+  --site-success-border: #a7f3d0;
+
+  --dash-bg: #f9f9f8;
+  --dash-surface: #ffffff;
+  --dash-surface-alt: #fafafa;
+  --dash-text: #191c1c;
+  --dash-muted: #72796e;
+  --dash-body: #42493e;
+  --dash-border: #e4e4e7;
+  --dash-hover: #f4f4f5;
+  --dash-topbar-bg: rgba(255, 255, 255, 0.9);
+  --dash-sidebar-bg: #fafafa;
+  --dash-active-bg: rgba(209, 250, 229, 0.8);
+  --dash-active-text: #065f46;
+  --dash-brand: #154212;
+
+  --app-bg: var(--dash-bg);
+  --app-text: var(--dash-text);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --site-bg: #0e1411;
+  --site-surface: #172019;
+  --site-surface-alt: #121a16;
+  --site-text: #e8ede9;
+  --site-muted: #8b9a90;
+  --site-body: #c5d0c8;
+  --site-border: #2a3830;
+  --site-brand: #6d8f72;
+  --site-accent: #a3b18a;
+  --site-brand-deep: #3d5a42;
+  --site-btn: #4a6b52;
+  --site-btn-hover: #5a7d62;
+  --site-btn-text: #e8ede9;
+  --site-chip-active-text: #e8ede9;
+  --site-hover: #1c2820;
+  --site-input-bg: #121a16;
+  --site-header-bg: rgba(14, 20, 17, 0.85);
+  --site-footer-bg: #0a0f0c;
+  --site-footer-text: #e8ede9;
+  --site-card-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  --site-card-hover-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+  --site-hero-gradient: linear-gradient(to bottom right, #121a16, #0e1411, #152019),
+    radial-gradient(circle at 12px 12px, rgba(163, 177, 138, 0.07) 2px, transparent 0);
+  --site-pill-bg: rgba(61, 90, 66, 0.35);
+  --site-pill-text: #a3b18a;
+  --site-pill-border: rgba(109, 143, 114, 0.4);
+  --site-orb: rgba(61, 90, 66, 0.2);
+  --site-danger-bg: rgba(42, 23, 23, 0.55);
+  --site-danger-border: rgba(127, 29, 29, 0.4);
+  --site-danger-text: #fca5a5;
+  --site-success-bg: rgba(26, 40, 32, 0.8);
+  --site-success-border: rgba(109, 143, 114, 0.35);
+
+  --dash-bg: #0e1411;
+  --dash-surface: #172019;
+  --dash-surface-alt: #121a16;
+  --dash-text: #e8ede9;
+  --dash-muted: #8b9a90;
+  --dash-body: #c5d0c8;
+  --dash-border: #2a3830;
+  --dash-hover: #1c2820;
+  --dash-topbar-bg: rgba(14, 20, 17, 0.92);
+  --dash-sidebar-bg: #121a16;
+  --dash-active-bg: rgba(61, 90, 66, 0.45);
+  --dash-active-text: #a3b18a;
+  --dash-brand: #6d8f72;
+
+  --app-bg: var(--dash-bg);
+  --app-text: var(--dash-text);
+}
+
 @layer base {
 
   html {
@@ -33,8 +144,8 @@
   }
 
   body {
-    background-color: #f9f9f8;
-    color: #191c1c;
+    background-color: var(--app-bg);
+    color: var(--app-text);
     font-family: var(--font-family-base);
     overflow-x: clip;
     -webkit-font-smoothing: antialiased;
@@ -93,7 +204,17 @@
   }
 
   .fluid-map-min-height {
-    min-height: clamp(11rem, 32vh, 20rem);
+    min-height: clamp(11rem, 38vh, 22rem);
+  }
+
+  .dashboard-mobile-pb {
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (min-width: 768px) {
+    .dashboard-mobile-pb {
+      padding-bottom: 0;
+    }
   }
 
   .responsive-shell {
@@ -166,15 +287,26 @@
   }
 
   .site-muted {
-    color: #72796e;
+    color: var(--site-muted);
   }
 
   .site-page-bg {
-    background-color: #f9f9f8;
+    background-color: var(--site-bg);
   }
 
   .site-brand-text {
-    color: #154212;
+    color: var(--site-accent);
+  }
+
+  .site-hero-gradient {
+    background-image: var(--site-hero-gradient);
+    background-size: 28px 28px;
+  }
+
+  .public-marketing h1,
+  .public-marketing h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 
   .from-eco-green {
@@ -196,7 +328,6 @@
     border: none !important;
   }
 
-  /* Hide native number spinners — custom steppers via NumberInput */
   .number-input-field::-webkit-outer-spin-button,
   .number-input-field::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -210,9 +341,90 @@
 }
 
 /*
- * Dashboard panel scroll — unlayered, last in file so it wins over Tailwind.
- * Windows Chromium can ignore scrollbar-button rules; pair with arrow covers in JSX.
+ * Dashboard dark-mode remaps for common light Tailwind / hex classes.
+ * Keeps tab content readable without rewriting every dashboard file.
  */
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-white\/90,
+html[data-theme="dark"] .bg-white\/95 {
+  background-color: var(--dash-surface) !important;
+}
+
+html[data-theme="dark"] .bg-zinc-50,
+html[data-theme="dark"] .bg-zinc-100,
+html[data-theme="dark"] .bg-\[\#f9f9f8\],
+html[data-theme="dark"] .bg-\[\#fafafa\] {
+  background-color: var(--dash-surface-alt) !important;
+}
+
+html[data-theme="dark"] .text-\[\#191c1c\],
+html[data-theme="dark"] .text-charcoal,
+html[data-theme="dark"] .text-zinc-900,
+html[data-theme="dark"] .text-zinc-800 {
+  color: var(--dash-text) !important;
+}
+
+html[data-theme="dark"] .text-\[\#72796e\],
+html[data-theme="dark"] .text-\[\#42493e\],
+html[data-theme="dark"] .text-zinc-600,
+html[data-theme="dark"] .text-zinc-500,
+html[data-theme="dark"] .text-gray-600,
+html[data-theme="dark"] .text-gray-500 {
+  color: var(--dash-muted) !important;
+}
+
+html[data-theme="dark"] .border-zinc-200,
+html[data-theme="dark"] .border-zinc-100,
+html[data-theme="dark"] .border-gray-200,
+html[data-theme="dark"] .border-gray-100,
+html[data-theme="dark"] .border-\[\#c2c9bb\] {
+  border-color: var(--dash-border) !important;
+}
+
+html[data-theme="dark"] .hover\:bg-zinc-100:hover,
+html[data-theme="dark"] .hover\:bg-zinc-50:hover,
+html[data-theme="dark"] .hover\:bg-emerald-50:hover,
+html[data-theme="dark"] .hover\:bg-emerald-50\/50:hover {
+  background-color: var(--dash-hover) !important;
+}
+
+html[data-theme="dark"] .bg-emerald-50,
+html[data-theme="dark"] .bg-emerald-50\/30,
+html[data-theme="dark"] .bg-emerald-50\/40,
+html[data-theme="dark"] .bg-emerald-50\/50,
+html[data-theme="dark"] .bg-emerald-100,
+html[data-theme="dark"] .bg-emerald-100\/80 {
+  background-color: var(--dash-active-bg) !important;
+}
+
+html[data-theme="dark"] .text-emerald-800,
+html[data-theme="dark"] .text-emerald-700,
+html[data-theme="dark"] .text-\[\#154212\],
+html[data-theme="dark"] .text-dashboard-green {
+  color: var(--dash-active-text) !important;
+}
+
+html[data-theme="dark"] .border-emerald-200,
+html[data-theme="dark"] .border-emerald-100,
+html[data-theme="dark"] .border-emerald-200\/70,
+html[data-theme="dark"] .border-emerald-200\/80 {
+  border-color: var(--dash-border) !important;
+}
+
+html[data-theme="dark"] .bg-\[\#154212\],
+html[data-theme="dark"] .bg-dashboard-green {
+  background-color: var(--site-brand-deep) !important;
+}
+
+html[data-theme="dark"] .ring-white {
+  --tw-ring-color: var(--dash-surface) !important;
+}
+
+html[data-theme="dark"] .shadow-sm,
+html[data-theme="dark"] .shadow-md {
+  --tw-shadow-color: rgba(0, 0, 0, 0.35);
+}
+
 .dashboard-panel-scroll {
   overflow-y: auto;
   overflow-x: hidden;
@@ -220,6 +432,10 @@
   scrollbar-width: thin;
   scrollbar-color: #d4d4d8 transparent;
   --scrollbar-size: 17px;
+}
+
+html[data-theme="dark"] .dashboard-panel-scroll {
+  scrollbar-color: #3d5a42 transparent;
 }
 
 .dashboard-panel-scroll::-webkit-scrollbar {
@@ -240,6 +456,10 @@
   min-height: 32px;
   border: 4px solid transparent;
   background-clip: padding-box;
+}
+
+html[data-theme="dark"] .dashboard-panel-scroll::-webkit-scrollbar-thumb {
+  background: #3d5a42 !important;
 }
 
 .dashboard-panel-scroll::-webkit-scrollbar-corner {

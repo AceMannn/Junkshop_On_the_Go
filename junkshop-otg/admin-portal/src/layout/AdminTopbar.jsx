@@ -82,7 +82,7 @@ export default function AdminTopbar({
             </button>
 
             {open && (
-              <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl">
+              <div className="absolute right-0 top-12 z-50 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl">
                 <div className="border-b border-zinc-100 px-4 py-3">
                   <p className="text-sm font-bold text-[#191c1c]">Contact notifications</p>
                   <p className="text-xs text-zinc-500">

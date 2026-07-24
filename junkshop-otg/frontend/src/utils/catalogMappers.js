@@ -218,10 +218,11 @@ export function normalizeTransaction(row, viewerRole = 'customer') {
   const amount = amountValue > 0 ? `₱${amountValue.toFixed(2)}` : '—';
 
   const formatStatus = (status) => {
-    if (status === 'completed') return 'Completed';
-    if (status === 'cancelled') return 'Cancelled';
-    if (status === 'processing') return 'Processing';
-    return status;
+    const normalized = String(status || '').toLowerCase();
+    if (normalized === 'completed') return 'Completed';
+    if (normalized === 'cancelled') return 'Cancelled';
+    if (normalized === 'processing') return 'Processing';
+    return status ? String(status) : 'Unknown';
   };
 
   const canReport = ['completed', 'cancelled'].includes(String(row.status || '').toLowerCase());

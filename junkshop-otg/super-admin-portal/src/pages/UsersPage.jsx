@@ -14,6 +14,7 @@ import {
   superCardClass,
   superPageTitleClass,
   superPrimaryButtonClass,
+  superSecondaryButtonClass,
 } from '../utils/superAdminUi';
 import { matchesPrefixWordSearch } from '../utils/searchFilter';
 
@@ -207,7 +208,64 @@ export default function UsersPage() {
           {search || statusFilter ? 'No users match your filters.' : 'No users found.'}
         </div>
       ) : (
-        <div className={`${superCardClass} overflow-hidden`}>
+        <>
+        <div className="space-y-3 md:hidden">
+          {pageRows.map((row) => (
+            <article key={row.id} className={`${superCardClass} p-4 space-y-3`}>
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-100 text-sm font-semibold text-zinc-600">
+                  {userInitials(row.name, row.email)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-[#191c1c]">{row.name || row.email}</p>
+                  <p className="truncate text-xs text-zinc-500">{row.email}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${rolePillClass(row.role)}`}>
+                      {row.role === 'provider' ? 'Junkshop' : row.role}
+                    </span>
+                    <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${statusPillClass(row.status)}`}>
+                      {row.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {row.role === 'provider' && (
+                <p className="text-xs text-zinc-500">
+                  Verification: {verificationLabel(row.verificationStatus)}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => openManage(row)}
+                  className={`${superPrimaryButtonClass} px-3 py-1.5 text-xs`}
+                >
+                  Manage
+                </button>
+                {row.role === 'provider' && (
+                  <button
+                    type="button"
+                    onClick={() => openApplication(row.id)}
+                    className={`${superSecondaryButtonClass} px-3 py-1.5 text-xs`}
+                  >
+                    Application
+                  </button>
+                )}
+              </div>
+            </article>
+          ))}
+          <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-3 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, filtered.length)} of{' '}
+              {filtered.length} entries
+            </span>
+            <div className="flex gap-2">
+              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-lg border border-zinc-200 bg-white px-3 py-1 disabled:opacity-50">Previous</button>
+              <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="rounded-lg border border-zinc-200 bg-white px-3 py-1 disabled:opacity-50">Next</button>
+            </div>
+          </div>
+        </div>
+        <div className={`${superCardClass} hidden md:block overflow-hidden`}>
           <div className="scroll-x-clean">
             <table className="min-w-full text-sm">
               <thead className="bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -295,7 +353,7 @@ export default function UsersPage() {
             </table>
           </div>
 
-          <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50/50 px-6 py-3 text-sm text-zinc-500">
+          <div className="hidden md:flex items-center justify-between border-t border-zinc-200 bg-zinc-50/50 px-6 py-3 text-sm text-zinc-500">
             <span>
               Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, filtered.length)} of{' '}
               {filtered.length} entries
@@ -320,6 +378,7 @@ export default function UsersPage() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {manageUser && (

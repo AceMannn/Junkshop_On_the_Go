@@ -127,18 +127,28 @@ export default function JunkshopsMap({
         }
 
         setGpsStatus("loading");
+        setRouteError("");
         navigator.geolocation.getCurrentPosition(
             (pos) => {
-                setOriginPoint({
+                const point = {
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude,
                     label: "Your current location",
                     source: "gps",
-                });
+                };
+                setOriginQuery(point.label);
+                setOriginSuggestions([]);
+                setOriginPoint(point);
                 setGpsStatus("ready");
+
+                const map = mapRef.current;
+                if (map) {
+                    map.flyTo([point.lat, point.lng], 15, { animate: true, duration: 0.7 });
+                }
             },
-            () => {
-                setGpsStatus("denied");
+            (err) => {
+                // 1 = permission denied, 2 = unavailable, 3 = timeout
+                setGpsStatus(err?.code === 1 ? "denied" : "unsupported");
             },
             { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
         );
@@ -416,14 +426,14 @@ export default function JunkshopsMap({
         ? "fluid-map-min-height h-full w-full min-h-0 z-0 bg-zinc-100 overflow-hidden [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]"
         : "min-h-[18rem] sm:min-h-[22rem] lg:min-h-[26rem] w-full z-0 bg-zinc-100 overflow-hidden rounded-xl [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-control-attribution]:text-[10px]";
     const routingOverlayClassName = compactRoutingControls
-        ? "absolute top-3 left-1/2 z-[800] w-[calc(100%-1.5rem)] max-w-[18rem] -translate-x-1/2 pointer-events-none"
-        : "absolute top-3 left-3 right-3 z-[800] pointer-events-none sm:right-auto sm:max-w-[26rem]";
+        ? "absolute top-3 left-3 z-[1000] max-w-[calc(100%-1.5rem)]"
+        : "absolute top-3 left-3 right-3 z-[1000] sm:right-auto sm:max-w-[26rem]";
     const routingSearchClassName = compactRoutingControls
         ? "flex h-10 items-center bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md rounded-xl px-3"
         : "flex items-center bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md rounded-xl px-3 py-2.5";
     const routingButtonClassName = compactRoutingControls
-        ? "inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md text-[#154212] hover:bg-emerald-50 shrink-0"
-        : "inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md px-3 py-2.5 text-xs font-semibold text-[#154212] hover:bg-emerald-50 shrink-0 whitespace-nowrap";
+        ? "inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md text-[#154212] hover:bg-emerald-50 shrink-0 disabled:opacity-60"
+        : "inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/95 backdrop-blur-sm border border-zinc-200 shadow-md px-3 py-2.5 text-xs font-semibold text-[#154212] hover:bg-emerald-50 shrink-0 whitespace-nowrap disabled:opacity-60";
 
     return (
         <div className={shellClassName}>
@@ -432,9 +442,13 @@ export default function JunkshopsMap({
                 {/* Search overlay — floats on top of the map */}
                 {routingEnabled && (
                     <div className={routingOverlayClassName}>
-                        <div className="pointer-events-auto space-y-1.5">
-                            <div className="flex gap-2">
-                                <div className="relative flex-1 min-w-0">
+                        <div className="space-y-1.5">
+                            <div className="flex items-start gap-2">
+                                <div
+                                    className={`relative min-w-0 flex-1 ${
+                                        compactRoutingControls ? "max-w-[14rem]" : ""
+                                    }`}
+                                >
                                     <div className={routingSearchClassName}>
                                         <Search size={15} className="text-[#72796e] shrink-0 mr-2" />
                                         <input
@@ -446,7 +460,7 @@ export default function JunkshopsMap({
                                         />
                                     </div>
                                     {originSuggestions.length > 0 && (
-                                        <ul className="scroll-y-clean absolute z-[900] mt-1 w-full max-h-40 rounded-xl border border-zinc-200 bg-white shadow-lg">
+                                        <ul className="scroll-y-clean absolute z-[1100] mt-1 w-full max-h-40 rounded-xl border border-zinc-200 bg-white shadow-lg">
                                             {originSuggestions.map((item) => (
                                                 <li key={`${item.lat}-${item.lng}-${item.label}`}>
                                                     <button
@@ -464,14 +478,25 @@ export default function JunkshopsMap({
 
                                 <button
                                     type="button"
-                                    onClick={requestGpsOrigin}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        requestGpsOrigin();
+                                    }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    disabled={gpsStatus === "loading"}
                                     className={routingButtonClassName}
                                     title="Use my location"
                                     aria-label="Use my location"
                                 >
-                                    <LocateFixed size={14} />
+                                    <LocateFixed
+                                        size={14}
+                                        className={gpsStatus === "loading" ? "animate-pulse" : undefined}
+                                    />
                                     {!compactRoutingControls && (
-                                        <span className="hidden sm:inline">Use my location</span>
+                                        <span className="hidden sm:inline">
+                                            {gpsStatus === "loading" ? "Locating…" : "Use my location"}
+                                        </span>
                                     )}
                                 </button>
                             </div>

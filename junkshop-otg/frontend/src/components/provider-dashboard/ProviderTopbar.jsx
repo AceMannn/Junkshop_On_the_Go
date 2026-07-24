@@ -14,6 +14,7 @@ import {
     dashboardTopbarLogoClass,
     dashboardTopbarShellClass,
 } from "../dashboard/dashboardTopbarUi";
+import ThemeToggle from "../ui/ThemeToggle";
 
 export default function ProviderTopbar({
     user,
@@ -66,6 +67,7 @@ export default function ProviderTopbar({
                 </div>
 
                 <div className={dashboardTopbarActionsClass}>
+                    <ThemeToggle compact className="text-[var(--dash-text)] hover:bg-[var(--dash-hover)]" />
                     <DashboardNotificationMenu
                         isNavigable={isProviderNotificationNavigable}
                         onNavigate={(notification) => {

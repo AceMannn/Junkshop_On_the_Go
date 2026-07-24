@@ -13,12 +13,12 @@ export default function SiteSectionHeader({
   return (
     <div className={`mb-10 sm:mb-12 ${alignClass} ${className}`}>
       {eyebrow && (
-        <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-2">{eyebrow}</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-[var(--site-accent)] mb-2">{eyebrow}</p>
       )}
-      <h2 className="mb-3 text-[#191c1c]">{title}</h2>
+      <h2 className="mb-3 text-[var(--site-text)]">{title}</h2>
       {description && (
         <p
-          className={`text-base sm:text-lg text-[#72796e] leading-relaxed ${
+          className={`text-base sm:text-lg text-[var(--site-muted)] leading-relaxed ${
             align === 'center' ? 'max-w-3xl mx-auto' : 'max-w-2xl'
           }`}
         >

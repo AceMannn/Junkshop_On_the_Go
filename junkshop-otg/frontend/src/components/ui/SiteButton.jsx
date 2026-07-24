@@ -10,7 +10,7 @@ const VARIANTS = {
   secondary: siteBtnSecondaryClass,
   outline: siteBtnOutlineClass,
   ghost: siteBtnGhostClass,
-  dark: 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#191c1c] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#154212]',
+  dark: 'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--site-brand-deep)] px-4 py-2.5 text-[15px] font-semibold text-[var(--site-btn-text)] shadow-sm transition hover:bg-[var(--site-btn)]',
 };
 
 export default function SiteButton({

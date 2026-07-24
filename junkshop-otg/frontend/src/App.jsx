@@ -29,6 +29,7 @@ import {
 import { setAuthHandlers } from './utils/authEvents';
 import { defaultDashboardPath } from './utils/dashboardRoutes';
 import { clearSignUpDrafts } from './utils/authFormDraft';
+import { ThemeProvider } from './context/ThemeContext';
 
 const LEGACY_HASH_SECTIONS = {
   home: '/',
@@ -83,7 +84,7 @@ function PublicShell({
   }, [location.pathname, user]);
 
   return (
-    <div className="min-h-screen site-page-bg">
+    <div className="min-h-screen site-page-bg public-marketing">
       <Header
         activeSection={activeSection}
         onNavigate={handleNavigate}
@@ -491,8 +492,10 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

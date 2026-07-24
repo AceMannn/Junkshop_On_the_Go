@@ -159,7 +159,62 @@ export default function ApplicationsPage() {
           {search ? 'No applications match your search.' : 'No applications found.'}
         </div>
       ) : (
-        <div className={`${superCardClass} overflow-hidden`}>
+        <>
+        <div className="space-y-3 md:hidden">
+          {pageRows.map((row) => (
+            <article key={row.id} className={`${superCardClass} p-4 space-y-3`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs text-zinc-500">{shortAppId(row.id)}</p>
+                  <p className="font-semibold text-[#191c1c]">{row.junkshopName}</p>
+                  <p className="text-sm text-zinc-500">{row.ownerName}</p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${statusPillClass(
+                    row.verificationStatus
+                  )}`}
+                >
+                  {row.verificationStatus}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500">
+                Submitted {formatShortDate(row.verificationSubmittedAt)}
+              </p>
+              <button
+                type="button"
+                onClick={() => setSelectedId(row.id)}
+                className="text-sm font-semibold text-[#006c49] hover:underline"
+              >
+                {row.verificationStatus === 'pending' ? 'Review' : 'View'}
+              </button>
+            </article>
+          ))}
+          <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-3 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, filtered.length)} of{' '}
+              {filtered.length} results
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-1 text-sm transition-colors hover:bg-zinc-50 disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-1 text-sm transition-colors hover:bg-zinc-50 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className={`${superCardClass} hidden md:block overflow-hidden`}>
           <div className="scroll-x-clean">
             <table className="min-w-full text-sm">
               <thead className="bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -208,7 +263,7 @@ export default function ApplicationsPage() {
             </table>
           </div>
 
-          <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50/50 px-6 py-3 text-sm text-zinc-500">
+          <div className="hidden md:flex items-center justify-between border-t border-zinc-200 bg-zinc-50/50 px-6 py-3 text-sm text-zinc-500">
             <span>
               Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, filtered.length)} of{' '}
               {filtered.length} results
@@ -233,6 +288,7 @@ export default function ApplicationsPage() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {selectedId && (

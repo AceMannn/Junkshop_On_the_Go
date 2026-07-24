@@ -391,7 +391,62 @@ export default function LogsPage() {
             : 'No logs found yet.'}
         </div>
       ) : (
-        <div className={`${superCardClass} overflow-hidden`}>
+        <>
+        <div className="space-y-3 md:hidden">
+          {activeTab === 'audit'
+            ? pageRows.map((log) => (
+                <article key={log.id} className={`${superCardClass} p-4 space-y-2`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-semibold text-[#191c1c]">{formatActionLabel(log.action)}</p>
+                    <p className="shrink-0 text-xs text-zinc-500">{formatShortDate(log.createdAt)}</p>
+                  </div>
+                  <p className="text-sm capitalize text-zinc-600">{log.targetType}</p>
+                  <p className="text-sm text-zinc-600">{log.actor?.name || 'System'}</p>
+                  <button type="button" onClick={() => setSelectedAudit(log)} className="text-sm font-semibold text-[#006c49] hover:underline">
+                    View details
+                  </button>
+                </article>
+              ))
+            : pageRows.map((tx) => {
+                const status = transactionStatus(tx);
+                return (
+                  <article key={tx.id} className={`${superCardClass} p-4 space-y-2`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[#191c1c]">{tx.material}</p>
+                        <p className="text-xs text-zinc-500">{formatShortDate(tx.createdAt)}</p>
+                      </div>
+                      <p className="shrink-0 font-bold text-emerald-800">{formatCurrency(tx.totalAmount)}</p>
+                    </div>
+                    <p className="text-sm text-zinc-600">{tx.customer?.name || 'Unknown'} → {tx.provider?.name || 'Unknown'}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => setSelectedTransaction(tx)} className="text-sm font-semibold text-[#006c49] hover:underline">
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteTransaction(tx.id)}
+                        disabled={Boolean(tx.deletedAt) || deletingId === tx.id}
+                        className="text-xs font-semibold text-red-700 disabled:opacity-50"
+                      >
+                        {deletingId === tx.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+          <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-3 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, activeRows.length)} of{' '}
+              {activeRows.length} results
+            </span>
+            <div className="flex gap-2">
+              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-lg border border-zinc-200 bg-white px-3 py-1 disabled:opacity-50">Prev</button>
+              <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="rounded-lg border border-zinc-200 bg-white px-3 py-1 disabled:opacity-50">Next</button>
+            </div>
+          </div>
+        </div>
+        <div className={`${superCardClass} hidden md:block overflow-hidden`}>
           <div className="scroll-x-clean">
             {activeTab === 'audit' ? (
               <table className="min-w-full text-sm">
@@ -508,7 +563,7 @@ export default function LogsPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50/50 px-6 py-3 text-sm text-zinc-500">
+          <div className="hidden md:flex items-center justify-between border-t border-zinc-200 bg-zinc-50/50 px-6 py-3 text-sm text-zinc-500">
             <span>
               Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, activeRows.length)} of{' '}
               {activeRows.length} results
@@ -533,6 +588,7 @@ export default function LogsPage() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {selectedAudit && (

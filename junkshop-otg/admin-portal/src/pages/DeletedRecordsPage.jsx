@@ -139,7 +139,52 @@ export default function DeletedRecordsPage() {
           No deleted records match your filters.
         </div>
       ) : (
-        <div className={`${adminCardClass} overflow-hidden`}>
+        <>
+        <div className="space-y-3 md:hidden">
+          {filteredRecords.map((record) => {
+            const key = `${record.type}:${record.id}`;
+            return (
+              <article key={key} className={`${adminCardClass} p-4 space-y-3`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-semibold text-zinc-600">
+                      {typeLabel(record.type)}
+                    </span>
+                    <p className="mt-2 font-semibold text-[#191c1c]">{record.label}</p>
+                    {record.status ? (
+                      <span
+                        className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${statusPillClass(
+                          record.status
+                        )}`}
+                      >
+                        {record.status}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-zinc-500">Deleted</p>
+                    <p>{formatDate(record.deletedAt)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-zinc-500">Deleted by</p>
+                    <p className="truncate">{deletedByLabel(record)}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRecord(record)}
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline"
+                >
+                  <Eye size={15} />
+                  View details
+                </button>
+              </article>
+            );
+          })}
+        </div>
+        <div className={`${adminCardClass} hidden md:block overflow-hidden`}>
           <div className="scroll-x-clean">
             <table className="min-w-full text-sm">
               <thead className="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500">
@@ -192,6 +237,7 @@ export default function DeletedRecordsPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {selectedRecord ? (

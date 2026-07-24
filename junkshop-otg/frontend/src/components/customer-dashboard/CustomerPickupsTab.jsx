@@ -21,6 +21,7 @@ import CharCount from '../ui/CharCount';
 import { clampText, GENERAL_MESSAGE_MAX, GENERAL_MESSAGE_MIN } from '../../utils/textLimits';
 import {
     STATUS_STYLES,
+    STATUS_LABELS,
     formatPickupSchedule,
     formatPeso,
     getShopName,

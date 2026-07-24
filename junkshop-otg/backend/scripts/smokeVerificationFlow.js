@@ -4,10 +4,12 @@
  * Usage (backend must be running):
  *   node scripts/smokeVerificationFlow.js
  *
+ * Requires in backend/.env (same seed accounts):
+ *   ADMIN_EMAIL=...
+ *   ADMIN_PASSWORD=...
+ *
  * Optional env:
  *   SMOKE_BASE_URL=http://localhost:5000
- *   ADMIN_EMAIL=admin@junkshop-otg.ph
- *   ADMIN_PASSWORD=AdminChangeMe123!
  *   SMOKE_KEEP_DATA=1   (skip cleanup)
  */
 
@@ -15,10 +17,16 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const BASE_URL = (process.env.SMOKE_BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@junkshop-otg.ph').trim().toLowerCase();
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'AdminChangeMe123!';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const KEEP_DATA = process.env.SMOKE_KEEP_DATA === '1';
 
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  console.error(
+    'Missing ADMIN_EMAIL / ADMIN_PASSWORD in backend/.env. Seed the admin account first, then set those values.'
+  );
+  process.exit(1);
+}
 const TINY_PNG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
 

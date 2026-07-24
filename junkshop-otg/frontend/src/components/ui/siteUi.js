@@ -1,42 +1,44 @@
-/** Shared public-site + auth design tokens (matches dashboard emerald/zinc theme). */
+/** Shared public-site design tokens — values come from CSS vars (light/dark). */
 
 export const siteColors = {
-  bg: '#f9f9f8',
-  surface: '#ffffff',
-  text: '#191c1c',
-  muted: '#72796e',
-  body: '#42493e',
-  border: '#e4e4e7',
-  brand: '#154212',
-  accent: '#3DA35D',
+  bg: 'var(--site-bg)',
+  surface: 'var(--site-surface)',
+  surfaceAlt: 'var(--site-surface-alt)',
+  text: 'var(--site-text)',
+  muted: 'var(--site-muted)',
+  body: 'var(--site-body)',
+  border: 'var(--site-border)',
+  brand: 'var(--site-brand)',
+  accent: 'var(--site-accent)',
+  brandDeep: 'var(--site-brand-deep)',
 };
 
 export const siteContainerClass = 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8';
 
-export const sitePageClass = 'min-h-screen bg-[#f9f9f8] text-[#191c1c]';
+export const sitePageClass = 'min-h-screen bg-[var(--site-bg)] text-[var(--site-text)]';
 
 export const siteSectionPadClass = 'py-16 sm:py-20';
 
 export const siteHeroGradientClass =
-  'relative overflow-hidden bg-gradient-to-br from-[#eef8f0] via-white to-[#f4fbf5] bg-[radial-gradient(circle_at_12px_12px,rgba(21,66,18,0.06)_2px,transparent_0)] bg-[size:28px_28px]';
+  'relative overflow-hidden site-hero-gradient';
 
 export const siteCardClass =
-  'min-w-0 overflow-hidden bg-white rounded-2xl border border-zinc-200 shadow-sm';
+  'min-w-0 overflow-hidden bg-[var(--site-surface)] rounded-2xl border border-[var(--site-border)] shadow-[var(--site-card-shadow)]';
 
 export const siteCardHoverClass =
-  'transition-all duration-300 hover:shadow-md hover:-translate-y-0.5';
+  'transition-all duration-300 hover:shadow-[var(--site-card-hover-shadow)] hover:-translate-y-0.5 hover:border-[var(--site-brand-deep)]';
 
 export const siteInputClass =
-  'w-full text-sm px-4 py-3 rounded-xl border border-zinc-200 bg-white text-[#191c1c] placeholder:text-[#72796e]/70 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 disabled:opacity-60';
+  'w-full text-sm px-4 py-3 rounded-xl border border-[var(--site-border)] bg-[var(--site-input-bg)] text-[var(--site-text)] placeholder:text-[var(--site-muted)]/70 outline-none transition focus:border-[var(--site-brand)] focus:ring-2 focus:ring-[var(--site-brand)]/25 disabled:opacity-60';
 
 export const siteLabelClass =
-  'block text-xs font-semibold uppercase tracking-wide text-[#72796e]';
+  'block text-xs font-semibold uppercase tracking-wide text-[var(--site-muted)]';
 
 export const siteChipActiveClass =
-  'bg-[#154212] text-white border-[#154212] shadow-sm';
+  'bg-[var(--site-brand-deep)] text-[var(--site-chip-active-text)] border-[var(--site-brand)] shadow-sm';
 
 export const siteChipIdleClass =
-  'bg-white text-[#42493e] border-zinc-200 hover:border-emerald-300 hover:bg-emerald-50/50';
+  'bg-[var(--site-surface)] text-[var(--site-body)] border-[var(--site-border)] hover:border-[var(--site-brand)] hover:bg-[var(--site-hover)]';
 
 /** Pill filter chips (marketplace, sell section, etc.) */
 export function siteFilterChipClass(active) {
@@ -46,19 +48,19 @@ export function siteFilterChipClass(active) {
 }
 
 export const siteBtnPrimaryClass =
-  'inline-flex items-center justify-center gap-2 rounded-xl bg-[#154212] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900 disabled:opacity-50';
+  'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--site-btn)] px-4 py-2.5 text-[15px] font-semibold text-[var(--site-btn-text)] shadow-sm transition hover:bg-[var(--site-btn-hover)] disabled:opacity-50';
 
 export const siteBtnSecondaryClass =
-  'inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-[#42493e] transition hover:bg-zinc-50';
+  'inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--site-border)] bg-[var(--site-surface)] px-4 py-2.5 text-[15px] font-semibold text-[var(--site-body)] transition hover:bg-[var(--site-hover)] hover:border-[var(--site-brand-deep)]';
 
 export const siteBtnOutlineClass =
-  'inline-flex items-center justify-center gap-2 rounded-xl border-2 border-[#154212] bg-white px-5 py-3 text-sm font-semibold text-[#154212] transition hover:bg-emerald-50';
+  'inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--site-brand)] bg-transparent px-4 py-2.5 text-[15px] font-semibold text-[var(--site-accent)] transition hover:bg-[var(--site-brand-deep)]/30';
 
 export const siteBtnGhostClass =
-  'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-[#42493e] transition hover:bg-emerald-50 hover:text-[#154212]';
+  'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-[15px] font-semibold text-[var(--site-body)] transition hover:bg-[var(--site-hover)] hover:text-[var(--site-accent)]';
 
 export const siteHeaderShellClass =
-  'fixed top-0 left-0 right-0 z-50 border-b border-zinc-200/80 bg-white/85 backdrop-blur-md';
+  'fixed top-0 left-0 right-0 z-50 border-b border-[var(--site-border)]/90 bg-[var(--site-header-bg)] backdrop-blur-md';
 
 export const siteFooterShellClass =
-  'bg-[#191c1c] text-white border-t border-zinc-800';
+  'bg-[var(--site-footer-bg)] text-[var(--site-footer-text)] border-t border-[var(--site-border)]';

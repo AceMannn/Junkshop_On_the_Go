@@ -16,7 +16,13 @@ import { useCatalogJunkshops } from '../hooks/useCatalogData';
 import LoadErrorBanner from '../components/ui/LoadErrorBanner';
 import EmptyState from '../components/ui/EmptyState';
 import ShopRating from '../components/ui/ShopRating';
-import { siteCardClass, siteContainerClass, siteHeroGradientClass, siteInputClass, sitePageClass, siteBtnPrimaryClass } from '../components/ui/siteUi';
+import {
+  siteContainerClass,
+  siteHeroGradientClass,
+  siteInputClass,
+  sitePageClass,
+} from '../components/ui/siteUi';
+import Reveal from '../components/ui/Reveal';
 import CharCount from '../components/ui/CharCount';
 import {
   clampText,
@@ -25,12 +31,6 @@ import {
   CONTACT_MESSAGE_MIN,
   CONTACT_NAME_MAX,
 } from '../utils/textLimits';
-
-const AVATAR_STYLES = [
-  'bg-emerald-50 text-emerald-700',
-  'bg-blue-50 text-blue-700',
-  'bg-amber-50 text-amber-700',
-];
 
 const HERO_PILLS = [
   { id: 'browse', label: 'Browse partner shops', icon: Store, subject: null },
@@ -49,7 +49,7 @@ const FAQ_ITEMS = [
   {
     question: 'How do I find the nearest junkshop?',
     answer:
-      "Use the Partners or Map tab below — or tap 'Browse partner shops' in the banner above.",
+      "Use the map on this page or Home — or tap 'Browse partner shops' above.",
   },
   {
     question: 'What materials can I recycle?',
@@ -64,32 +64,16 @@ const FAQ_ITEMS = [
   {
     question: 'How do I suggest a new junkshop?',
     answer:
-      "Use the Quick Links above or set Subject in the contact form to 'Suggest a junkshop' and fill in the details.",
+      "Use the quick links above or set Subject to 'Suggest a junkshop' and fill in the details.",
   },
 ];
 
 const CONTACT_ROWS = [
   { icon: Mail, label: 'Email', value: 'hello@junkshop-otg.ph', href: 'mailto:hello@junkshop-otg.ph' },
-  { icon: Facebook, label: 'Facebook', value: 'JunkShop On-The-Go Teresa', href: '#' },
+  { icon: Facebook, label: 'Facebook', value: 'JunkShop On-The-Go Teresa', href: null },
   { icon: Phone, label: 'Phone', value: '0912 345 6789', href: 'tel:09123456789' },
   { icon: MapPin, label: 'Location', value: 'Teresa, Sta. Mesa, Manila', href: null },
 ];
-
-const inputClass = siteInputClass;
-
-function ContactCard({ children, className = '', id }) {
-  return (
-    <div id={id} className={`${siteCardClass} p-4 sm:p-6 ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-function SectionLabel({ children }) {
-  return (
-    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-4">{children}</p>
-  );
-}
 
 function getShopInitials(name = '') {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -105,38 +89,6 @@ function shortenAddress(address = '') {
   return parts.slice(-2).join(', ');
 }
 
-function PartnerPreviewRow({ shop, index }) {
-  const avatarStyle = AVATAR_STYLES[index % AVATAR_STYLES.length];
-
-  return (
-    <div className="flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2.5">
-      <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ${avatarStyle}`}
-      >
-        {getShopInitials(shop.name)}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[13px] font-medium text-charcoal truncate">{shop.name}</p>
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
-            Verified
-          </span>
-        </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-          <span className="inline-flex items-center gap-1">
-            <MapPin size={11} className="shrink-0" />
-            {shortenAddress(shop.address)}
-          </span>
-          <ShopRating shop={shop} />
-        </div>
-      </div>
-      <p className="hidden sm:block shrink-0 text-[11px] text-gray-500">
-        {shop.phone || '—'}
-      </p>
-    </div>
-  );
-}
-
 export default function ContactPage() {
   const { shops, loading: shopsLoading, error: shopsError, refresh: refreshShops } = useCatalogJunkshops({
     autoRefresh: false,
@@ -144,8 +96,6 @@ export default function ContactPage() {
   });
 
   const subjectRef = useRef(null);
-  const tabsRef = useRef(null);
-
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -224,316 +174,380 @@ export default function ContactPage() {
     setError('');
   };
 
-  const toggleFaq = (index) => {
-    setOpenFaqIndex((current) => (current === index ? null : index));
-  };
-
   return (
-    <div className={`${sitePageClass} pb-16`}>
-      <section className={`${siteHeroGradientClass} px-4 pt-28 pb-8 sm:px-6 lg:px-8`}>
+    <div className={`${sitePageClass} public-marketing pb-16`}>
+      <section className={`${siteHeroGradientClass} px-4 pt-28 pb-8 sm:px-6 sm:pb-10 lg:px-8`}>
         <div className={`${siteContainerClass} max-w-5xl`}>
-          <div className="rounded-2xl border border-emerald-200/60 bg-white/90 backdrop-blur-sm px-6 py-10 text-center sm:px-10 shadow-sm">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-700">
-              JunkShop On-The-Go
+          <Reveal>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--site-accent)]">
+              Contact
             </p>
-            <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-[#191c1c]">Let&apos;s connect</h1>
-            <p className="mx-auto mt-3 max-w-xl text-sm sm:text-base text-[#72796e]">
-              Browse verified partners, share feedback, or reach our team.
+            <h1 className="mt-2 font-[family-name:var(--font-display)] text-[var(--site-text)]">
+              Let&apos;s connect
+            </h1>
+            <p className="mt-2 max-w-xl text-base text-[var(--site-muted)] sm:text-lg">
+              Reach platform support, browse partners, or report an issue — we typically reply in 1–2
+              business days.
             </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <div className="mt-5 flex flex-wrap gap-2">
               {HERO_PILLS.map((pill) => (
                 <button
                   key={pill.id}
                   type="button"
                   onClick={() => handleHeroAction(pill)}
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs sm:text-sm font-semibold text-[#154212] transition-colors hover:bg-emerald-100 sm:px-4"
+                  className="inline-flex items-center gap-2 rounded-full border border-[var(--site-pill-border)] bg-[var(--site-pill-bg)] px-3 py-2 text-xs font-semibold text-[var(--site-accent)] transition hover:opacity-90 sm:px-4 sm:text-sm"
                 >
                   <pill.icon size={15} />
                   {pill.label}
                 </button>
               ))}
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
-      <div className="mx-auto max-w-5xl space-y-4 px-4 sm:px-6 lg:px-8">
-        {/* Section 2 — Contact info + form */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <ContactCard>
-            <SectionLabel>Contact info</SectionLabel>
-            <div className="space-y-4">
-              {CONTACT_ROWS.map((row) => {
-                const content = (
-                  <>
-                    <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg bg-emerald-50">
-                      <row.icon size={16} className="text-eco-green" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] text-gray-500">{row.label}</p>
-                      <p className="text-[13px] font-medium text-charcoal">{row.value}</p>
-                    </div>
-                  </>
-                );
+      <div className={`${siteContainerClass} mt-8 max-w-5xl space-y-5 sm:mt-10`}>
+        {/* One console panel — equal columns, shared height */}
+        <Reveal>
+          <div
+            id="platform-support"
+            className="scroll-mt-24 overflow-hidden rounded-[1.5rem] border border-[var(--site-border)] bg-[var(--site-surface)] shadow-[var(--site-card-shadow)]"
+          >
+            <div className="grid lg:grid-cols-2 lg:items-stretch">
+              {/* Contact rail */}
+              <aside className="flex flex-col border-b border-[var(--site-border)] bg-[var(--site-surface-alt)] p-5 sm:p-6 lg:border-b-0 lg:border-r">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--site-accent)]">
+                  Reach us
+                </p>
+                <p className="mt-1 text-sm text-[var(--site-muted)]">
+                  Direct channels for Teresa, Sta. Mesa support.
+                </p>
 
-                if (row.href) {
-                  return (
-                    <a key={row.label} href={row.href} className="flex items-start gap-3 hover:opacity-80">
-                      {content}
-                    </a>
-                  );
-                }
+                <div className="mt-6 flex flex-1 flex-col gap-1">
+                  {CONTACT_ROWS.map((row) => {
+                    const rowClass =
+                      'flex items-center gap-3 rounded-xl px-2 py-3 transition hover:bg-[var(--site-hover)]';
+                    const content = (
+                      <>
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--site-pill-bg)]">
+                          <row.icon size={16} className="text-[var(--site-accent)]" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--site-muted)]">
+                            {row.label}
+                          </p>
+                          <p className="truncate text-sm font-semibold text-[var(--site-text)]">
+                            {row.value}
+                          </p>
+                        </div>
+                      </>
+                    );
 
-                return (
-                  <div key={row.label} className="flex items-start gap-3">
-                    {content}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-6 border-t border-gray-200 pt-5">
-              <SectionLabel>Response time</SectionLabel>
-              <p className="text-xs leading-relaxed text-gray-500">
-                We typically reply within{' '}
-                <span className="font-medium text-charcoal">1–2 business days</span>. For
-                junkshop-specific questions, contact them directly using their phone number in the
-                directory.
-              </p>
-            </div>
-          </ContactCard>
+                    if (row.href) {
+                      return (
+                        <a key={row.label} href={row.href} className={rowClass}>
+                          {content}
+                        </a>
+                      );
+                    }
 
-          <ContactCard id="platform-support" className="scroll-mt-24">
-            <SectionLabel>Send a message</SectionLabel>
-            <p className="mb-4 text-xs text-gray-500">
-              Platform support only — messages are stored in our database, not sent to individual
-              junkshops.
-            </p>
-
-            {isSubmitted ? (
-              <div className="py-8 text-center">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#154212]">
-                  <Send className="text-white" size={26} />
+                    return (
+                      <div key={row.label} className={rowClass}>
+                        {content}
+                      </div>
+                    );
+                  })}
                 </div>
-                <h3 className="mb-2 text-eco-green">Message sent!</h3>
-                <p className="text-sm text-gray-600">Thank you — our team will review your message soon.</p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {error && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                    {error}
+
+                <div className="mt-6 border-t border-[var(--site-border)] pt-4">
+                  <p className="text-xs leading-relaxed text-[var(--site-muted)]">
+                    Typical reply:{' '}
+                    <span className="font-semibold text-[var(--site-text)]">1–2 business days</span>.
+                    For shop-specific questions, use the partner phone numbers below.
+                  </p>
+                </div>
+              </aside>
+
+              {/* Form pane */}
+              <div className="flex flex-col p-5 sm:p-6">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--site-accent)]">
+                  Send a message
+                </p>
+                <p className="mt-1 mb-5 text-xs text-[var(--site-muted)]">
+                  Platform support only — messages go to our team, not individual junkshops.
+                </p>
+
+                {isSubmitted ? (
+                  <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--site-brand-deep)]">
+                      <Send className="text-[var(--site-btn-text)]" size={26} />
+                    </div>
+                    <h3 className="mb-2 text-[var(--site-accent)]">Message sent!</h3>
+                    <p className="text-sm text-[var(--site-muted)]">
+                      Thank you — our team will review your message soon.
+                    </p>
                   </div>
+                ) : (
+                  <form onSubmit={handleSubmit} className="flex flex-1 flex-col space-y-4">
+                    {error && (
+                      <div className="rounded-lg border border-[var(--site-danger-border)] bg-[var(--site-danger-bg)] p-3 text-sm text-[var(--site-danger-text)]">
+                        {error}
+                      </div>
+                    )}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="firstName" className="mb-1 block text-xs font-medium text-[var(--site-muted)]">
+                          First name
+                        </label>
+                        <input
+                          id="firstName"
+                          name="firstName"
+                          value={formData.firstName}
+                          onChange={handleChange}
+                          required
+                          maxLength={CONTACT_NAME_MAX}
+                          placeholder="Juan"
+                          className={siteInputClass}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="lastName" className="mb-1 block text-xs font-medium text-[var(--site-muted)]">
+                          Last name
+                        </label>
+                        <input
+                          id="lastName"
+                          name="lastName"
+                          value={formData.lastName}
+                          onChange={handleChange}
+                          required
+                          maxLength={CONTACT_NAME_MAX}
+                          placeholder="Dela Cruz"
+                          className={siteInputClass}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="email" className="mb-1 block text-xs font-medium text-[var(--site-muted)]">
+                        Email
+                      </label>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        maxLength={CONTACT_EMAIL_MAX}
+                        placeholder="juan@email.com"
+                        className={siteInputClass}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="subject" className="mb-1 block text-xs font-medium text-[var(--site-muted)]">
+                        Subject
+                      </label>
+                      <select
+                        ref={subjectRef}
+                        id="subject"
+                        name="subject"
+                        value={formData.subject}
+                        onChange={handleChange}
+                        required
+                        className={siteInputClass}
+                      >
+                        {SUBJECT_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option === 'Junkshop suggestion'
+                              ? 'Suggest a junkshop'
+                              : option === 'Issue report'
+                                ? 'Report an issue'
+                                : option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex flex-1 flex-col">
+                      <label htmlFor="message" className="mb-1 block text-xs font-medium text-[var(--site-muted)]">
+                        Message
+                      </label>
+                      <textarea
+                        id="message"
+                        name="message"
+                        value={formData.message}
+                        onChange={handleChange}
+                        required
+                        rows={5}
+                        maxLength={CONTACT_MESSAGE_MAX}
+                        placeholder="Tell us what's on your mind…"
+                        className={`${siteInputClass} min-h-[7rem] flex-1 resize-y`}
+                      />
+                      <CharCount
+                        value={formData.message}
+                        max={CONTACT_MESSAGE_MAX}
+                        min={CONTACT_MESSAGE_MIN}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--site-btn)] px-4 text-sm font-semibold text-[var(--site-btn-text)] transition hover:bg-[var(--site-btn-hover)] disabled:opacity-60"
+                    >
+                      <Send size={14} />
+                      {isSubmitting ? 'Sending…' : 'Send to platform support'}
+                    </button>
+                  </form>
                 )}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="firstName" className="mb-1 block text-xs font-medium text-gray-600">
-                      First name
-                    </label>
-                    <input
-                      id="firstName"
-                      name="firstName"
-                      value={formData.firstName}
-                      onChange={handleChange}
-                      required
-                      maxLength={CONTACT_NAME_MAX}
-                      placeholder="Juan"
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="lastName" className="mb-1 block text-xs font-medium text-gray-600">
-                      Last name
-                    </label>
-                    <input
-                      id="lastName"
-                      name="lastName"
-                      value={formData.lastName}
-                      onChange={handleChange}
-                      required
-                      maxLength={CONTACT_NAME_MAX}
-                      placeholder="Dela Cruz"
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="email" className="mb-1 block text-xs font-medium text-gray-600">
-                    Email
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    maxLength={CONTACT_EMAIL_MAX}
-                    placeholder="juan@email.com"
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="subject" className="mb-1 block text-xs font-medium text-gray-600">
-                    Subject
-                  </label>
-                  <select
-                    ref={subjectRef}
-                    id="subject"
-                    name="subject"
-                    value={formData.subject}
-                    onChange={handleChange}
-                    required
-                    className={inputClass}
-                  >
-                    {SUBJECT_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option === 'Junkshop suggestion'
-                          ? 'Suggest a junkshop'
-                          : option === 'Issue report'
-                            ? 'Report an issue'
-                            : option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="message" className="mb-1 block text-xs font-medium text-gray-600">
-                    Message
-                  </label>
-                  <textarea
-                    id="message"
-                    name="message"
-                    value={formData.message}
-                    onChange={handleChange}
-                    required
-                    rows={4}
-                    maxLength={CONTACT_MESSAGE_MAX}
-                    placeholder="Tell us what's on your mind…"
-                    className={`${inputClass} min-h-[80px] resize-y`}
-                  />
-                  <CharCount
-                    value={formData.message}
-                    max={CONTACT_MESSAGE_MAX}
-                    min={CONTACT_MESSAGE_MIN}
-                  />
-                </div>
-                <div className="flex justify-center">
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-[#154212] px-4 text-xs font-semibold text-white transition-colors hover:bg-emerald-900 disabled:opacity-60"
-                  >
-                    <Send size={13} />
-                    {isSubmitting ? 'Sending…' : 'Send to platform support'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </ContactCard>
-        </div>
-
-        {/* Section 3 — Tabs + FAQ */}
-        <div id="partner-preview" ref={tabsRef} className="grid gap-4 scroll-mt-24 md:grid-cols-2">
-          <ContactCard>
-            <div className="mb-4 flex border-b border-gray-200">
-              {['partners', 'map'].map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 pb-3 text-sm capitalize transition-colors ${
-                    activeTab === tab
-                      ? 'border-b-2 border-eco-green font-medium text-eco-green'
-                      : 'text-gray-500 hover:text-charcoal'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
+              </div>
             </div>
+          </div>
+        </Reveal>
 
-            {shopsError && (
-              <LoadErrorBanner
-                message={shopsError}
-                onRetry={refreshShops}
-                className="mb-3"
+        {/* Full-width map band — desktop only; mobile uses partners card map tab */}
+        <Reveal className="hidden lg:block">
+          <div>
+            <div className="mb-3">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--site-accent)]">
+                Partner map
+              </p>
+              <p className="text-xs text-[var(--site-muted)]">Verified junkshops near Teresa</p>
+            </div>
+            {shopsLoading ? (
+              <div className="flex min-h-[200px] items-center justify-center text-sm text-[var(--site-muted)]">
+                Loading map…
+              </div>
+            ) : shops.length === 0 ? (
+              <EmptyState
+                compact
+                icon={MapPin}
+                title="No shops on the map yet"
+                description="Partner pins appear once providers publish their shop."
+              />
+            ) : (
+              <JunkshopsMap
+                shops={shops}
+                routingEnabled
+                compactRoutingControls
+                className="min-h-[220px]"
               />
             )}
+          </div>
+        </Reveal>
 
-            {activeTab === 'partners' ? (
-              <div className="space-y-2">
-                {shopsLoading ? (
-                  <p className="text-sm text-gray-500">Loading partners…</p>
-                ) : previewShops.length === 0 ? (
-                  <EmptyState
-                    compact
-                    icon={Store}
-                    title="No partners yet"
-                    description="Verified junkshops appear here once providers finish setup."
-                  />
-                ) : (
-                  previewShops.map((shop, index) => (
-                    <PartnerPreviewRow key={shop.id} shop={shop} index={index} />
-                  ))
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {shopsLoading ? (
-                  <p className="text-sm text-gray-500">Loading map…</p>
-                ) : shops.length === 0 ? (
-                  <EmptyState
-                    compact
-                    icon={MapPin}
-                    title="No shops on the map yet"
-                    description="Partner pins appear once providers publish their shop."
-                  />
-                ) : (
-                  <div className="overflow-hidden rounded-lg border border-gray-200">
-                    <JunkshopsMap
-                      shops={shops}
-                      routingEnabled
-                      compactRoutingControls
-                      className="min-h-[220px]"
-                    />
-                  </div>
-                )}
-                <p className="text-[11px] text-gray-500">
-                  Verified partner junkshops in Metro Manila and nearby areas.
-                </p>
-              </div>
-            )}
-          </ContactCard>
-
-          <ContactCard>
-            <SectionLabel>Common questions</SectionLabel>
-            <div>
-              {FAQ_ITEMS.map((item, index) => {
-                const isOpen = openFaqIndex === index;
-                return (
-                  <div
-                    key={item.question}
-                    className={index < FAQ_ITEMS.length - 1 ? 'border-b border-gray-200' : ''}
+        {/* Partners + FAQ — equal columns */}
+        <div id="partner-preview" className="grid scroll-mt-24 gap-5 lg:grid-cols-2 lg:items-stretch">
+          <Reveal className="h-full">
+            <div className="flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-[var(--site-border)] bg-[var(--site-surface)] p-5 shadow-[var(--site-card-shadow)] sm:p-6">
+              <div className="mb-4 flex border-b border-[var(--site-border)]">
+                {['partners', 'map'].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 pb-3 text-sm capitalize transition-colors ${
+                      activeTab === tab
+                        ? 'border-b-2 border-[var(--site-accent)] font-medium text-[var(--site-accent)]'
+                        : 'text-[var(--site-muted)] hover:text-[var(--site-text)]'
+                    }`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => toggleFaq(index)}
-                      className="flex w-full items-center justify-between gap-3 py-3 text-left text-[13px] font-medium text-charcoal"
-                    >
-                      {item.question}
-                      <ChevronDown
-                        size={14}
-                        className={`shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              {shopsError && (
+                <LoadErrorBanner message={shopsError} onRetry={refreshShops} className="mb-3" />
+              )}
+
+              {activeTab === 'partners' ? (
+                <div className="space-y-2">
+                  {shopsLoading ? (
+                    <p className="text-sm text-[var(--site-muted)]">Loading partners…</p>
+                  ) : previewShops.length === 0 ? (
+                    <EmptyState
+                      compact
+                      icon={Store}
+                      title="No partners yet"
+                      description="Verified junkshops appear here once providers finish setup."
+                    />
+                  ) : (
+                    previewShops.map((shop) => (
+                      <div
+                        key={shop.id}
+                        className="flex items-center gap-3 rounded-lg border border-[var(--site-border)] bg-[var(--site-surface-alt)] px-3 py-2.5"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--site-pill-bg)] text-[13px] font-semibold text-[var(--site-accent)]">
+                          {getShopInitials(shop.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-medium text-[var(--site-text)]">{shop.name}</p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-[var(--site-muted)]">
+                            <span>{shortenAddress(shop.address)}</span>
+                            <ShopRating shop={shop} />
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {shopsLoading ? (
+                    <p className="text-sm text-[var(--site-muted)]">Loading map…</p>
+                  ) : shops.length === 0 ? (
+                    <EmptyState
+                      compact
+                      icon={MapPin}
+                      title="No shops on the map yet"
+                      description="Partner pins appear once providers publish their shop."
+                    />
+                  ) : (
+                    <div className="overflow-hidden rounded-lg border border-[var(--site-border)]">
+                      <JunkshopsMap
+                        shops={shops}
+                        routingEnabled
+                        compactRoutingControls
+                        className="fluid-map-min-height min-h-[260px]"
                       />
-                    </button>
-                    {isOpen && (
-                      <p className="pb-3 text-xs leading-relaxed text-gray-500">{item.answer}</p>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          </ContactCard>
+          </Reveal>
+
+          <Reveal delay={0.06} className="h-full">
+            <div className="flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-[var(--site-border)] bg-[var(--site-surface)] p-5 shadow-[var(--site-card-shadow)] sm:p-6">
+              <p className="mb-4 text-[11px] font-bold uppercase tracking-wider text-[var(--site-accent)]">
+                Common questions
+              </p>
+              <div className="flex-1">
+                {FAQ_ITEMS.map((item, index) => {
+                  const isOpen = openFaqIndex === index;
+                  return (
+                    <div
+                      key={item.question}
+                      className={index < FAQ_ITEMS.length - 1 ? 'border-b border-[var(--site-border)]' : ''}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaqIndex(isOpen ? null : index)}
+                        className="flex w-full items-center justify-between gap-3 py-3 text-left text-[13px] font-medium text-[var(--site-text)]"
+                      >
+                        {item.question}
+                        <ChevronDown
+                          size={14}
+                          className={`shrink-0 text-[var(--site-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                      {isOpen && (
+                        <p className="pb-3 text-xs leading-relaxed text-[var(--site-muted)]">{item.answer}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </Reveal>
         </div>
       </div>
     </div>

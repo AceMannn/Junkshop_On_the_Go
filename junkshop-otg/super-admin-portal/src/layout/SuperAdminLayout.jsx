@@ -140,15 +140,21 @@ export default function SuperAdminLayout({ user, onLogout }) {
       <div className="flex min-h-screen flex-col pt-16 md:pl-64">
         <div className="border-b border-zinc-200 bg-white md:hidden">
           <div className="scroll-x-clean flex gap-2 px-4 py-3">
-            {allNavItems.map((item) => (
+            {allNavItems.map((item) => {
+              const Icon = item.icon;
+              return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) => superMobileNavClass(isActive)}
               >
-                {item.label}
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon size={14} className="shrink-0" />
+                  {item.label}
+                </span>
               </NavLink>
-            ))}
+            );
+            })}
           </div>
         </div>
 

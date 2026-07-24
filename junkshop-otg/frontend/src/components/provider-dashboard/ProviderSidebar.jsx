@@ -24,7 +24,41 @@ const mobilePrimaryIds = ["dashboard", "verification", "requests", "materials"];
 const mobileMoreIds = ["availability", "transactions"];
 
 const primarySidebarButtonClass =
-    "w-full flex items-center rounded-2xl border border-[#154212] bg-[#154212] py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-900 hover:shadow transition-colors";
+    "w-full flex items-center text-sm font-semibold transition-colors";
+
+const sidebarIconSlotClass = "flex h-10 w-20 shrink-0 items-center justify-center";
+
+const sidebarIconInnerClass = "flex h-10 w-10 items-center justify-center shrink-0";
+
+function sidebarIconHighlightClass(isActive, pinned) {
+    if (pinned) return sidebarIconInnerClass;
+    const shell =
+        "flex h-10 w-10 items-center justify-center shrink-0 rounded-xl transition-colors group-hover/sidebar:bg-transparent group-hover/sidebar:text-inherit";
+    if (isActive) {
+        return `${shell} bg-[var(--dash-active-bg)] text-[var(--dash-active-text)]`;
+    }
+    return `${shell} group-hover/nav:bg-[var(--dash-hover)]`;
+}
+
+function sidebarNavButtonClass(isActive, pinned) {
+    const base =
+        "group/nav flex min-h-11 w-full items-center rounded-lg py-0.5 text-sm font-medium text-left whitespace-nowrap overflow-hidden transition-colors focus:outline-none";
+    if (pinned) {
+        return `${base} ${
+            isActive
+                ? "bg-[var(--dash-active-bg)] text-[var(--dash-active-text)]"
+                : "text-[var(--dash-muted)] hover:bg-[var(--dash-hover)]"
+        }`;
+    }
+    return `${base} ${
+        isActive
+            ? "text-[var(--dash-muted)] group-hover/sidebar:bg-[var(--dash-active-bg)] group-hover/sidebar:text-[var(--dash-active-text)]"
+            : "text-[var(--dash-muted)] group-hover/sidebar:hover:bg-[var(--dash-hover)]"
+    }`;
+}
+
+const primaryIconShellClass =
+    "flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--dash-brand)] bg-[var(--dash-brand)] text-white shadow-sm transition-colors hover:opacity-90";
 
 const sidebarNavItems = [
     { id: "requests", label: "Pickups", icon: Truck, primary: true },
@@ -39,23 +73,13 @@ export default function ProviderSidebar({ activeTab, onNavigate, pinned, onPinne
     const sidebarWidthClass = pinned ? "w-56" : "w-20 hover:w-56";
     const labelClass = pinned
         ? "max-w-[10rem] opacity-100"
-        : "max-w-0 opacity-0 group-hover:max-w-[10rem] group-hover:opacity-100";
-    const itemLayoutClass = pinned
-        ? "justify-start"
-        : "justify-center group-hover:justify-start";
-    const itemPaddingClass = pinned
-        ? "px-3"
-        : "px-0 group-hover:px-3";
-    const primaryPaddingClass = pinned
-        ? "px-4"
-        : "px-0 group-hover:px-4";
-    const gapClass = pinned ? "gap-2.5" : "gap-0 group-hover:gap-2.5";
+        : "max-w-0 opacity-0 group-hover/sidebar:max-w-[10rem] group-hover/sidebar:opacity-100";
 
     return (
         <aside
-            className={`group fixed left-0 top-16 h-[calc(100vh-4rem)] ${sidebarWidthClass} overflow-hidden border-r border-zinc-200 bg-zinc-50 hidden md:flex flex-col z-30 transition-[width] duration-300 ease-out`}
+            className={`group/sidebar fixed left-0 top-16 h-[calc(100vh-4rem)] ${sidebarWidthClass} overflow-hidden border-r border-[var(--dash-border)] bg-[var(--dash-sidebar-bg)] hidden md:flex flex-col z-30 transition-[width] duration-300 ease-out`}
         >
-            <nav className="overflow-hidden flex flex-col gap-0.5 px-3 pt-3 flex-1">
+            <nav className="overflow-hidden flex flex-col gap-0.5 px-1.5 pt-3 flex-1">
                 {sidebarNavItems.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -67,12 +91,16 @@ export default function ProviderSidebar({ activeTab, onNavigate, pinned, onPinne
                                 type="button"
                                 onClick={() => onNavigate(tab.id)}
                                 title={tab.label}
-                                className={`${primarySidebarButtonClass} ${itemLayoutClass} ${primaryPaddingClass} ${gapClass} mb-2 min-h-10 whitespace-nowrap overflow-hidden transition-[padding,gap] duration-300 ${
-                                    isActive ? "ring-2 ring-emerald-400/80" : ""
-                                }`}
+                                className={`${primarySidebarButtonClass} group/nav mb-2 min-h-10 whitespace-nowrap overflow-hidden focus:outline-none`}
                             >
-                                <Icon size={20} className="shrink-0" />
-                                <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
+                                <span className={sidebarIconSlotClass}>
+                                    <span className={primaryIconShellClass}>
+                                        <Icon size={20} />
+                                    </span>
+                                </span>
+                                <span
+                                    className={`min-w-0 flex-1 overflow-hidden truncate pr-3 text-left font-semibold text-[var(--dash-brand)] transition-[max-width,opacity] duration-300 ease-out ${labelClass}`}
+                                >
                                     {tab.label}
                                 </span>
                             </button>
@@ -85,20 +113,27 @@ export default function ProviderSidebar({ activeTab, onNavigate, pinned, onPinne
                             type="button"
                             onClick={() => onNavigate(tab.id)}
                             title={tab.label}
-                            className={`flex min-h-11 items-center ${itemLayoutClass} ${gapClass} ${itemPaddingClass} py-2.5 text-sm font-medium transition-[padding,gap,colors] duration-300 text-left rounded-lg whitespace-nowrap overflow-hidden ${isActive
-                                ? "text-emerald-800 bg-emerald-100/80"
-                                : "text-zinc-600 hover:bg-zinc-100"
-                                }`}
+                            className={sidebarNavButtonClass(isActive, pinned)}
                         >
-                            <Icon size={20} className="shrink-0" />
-                            <span className={`min-w-0 overflow-hidden truncate transition-all duration-200 ${labelClass}`}>
+                            <span className={sidebarIconSlotClass}>
+                                <span className={sidebarIconHighlightClass(isActive, pinned)}>
+                                    <Icon size={20} />
+                                </span>
+                            </span>
+                            <span
+                                className={`min-w-0 flex-1 overflow-hidden truncate pr-2 transition-[max-width,opacity] duration-300 ease-out ${labelClass}`}
+                            >
                                 {tab.label}
                             </span>
                         </button>
                     );
                 })}
             </nav>
-            <div className="px-3 py-2 flex justify-end">
+            <div
+                className={`flex py-2 ${
+                    pinned ? "justify-end px-3" : "justify-center group-hover/sidebar:justify-end group-hover/sidebar:px-3"
+                }`}
+            >
                 <button
                     type="button"
                     onClick={() => onPinnedChange(!pinned)}

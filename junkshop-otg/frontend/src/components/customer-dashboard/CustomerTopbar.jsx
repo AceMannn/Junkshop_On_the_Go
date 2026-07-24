@@ -19,6 +19,7 @@ import {
     dashboardTopbarLogoClass,
     dashboardTopbarShellClass,
 } from "../dashboard/dashboardTopbarUi";
+import ThemeToggle from "../ui/ThemeToggle";
 
 function getDisplayName(user) {
     if (!user) return "User";
@@ -78,6 +79,7 @@ export default function CustomerTopbar({
                 </div>
 
                 <div className={dashboardTopbarActionsClass}>
+                    <ThemeToggle compact className="text-[var(--dash-text)] hover:bg-[var(--dash-hover)]" />
                     <DashboardNotificationMenu
                         isNavigable={isCustomerNotificationNavigable}
                         onNavigate={(notification) => {

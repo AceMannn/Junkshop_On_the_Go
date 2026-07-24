@@ -187,7 +187,7 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
 
     return (
         <div
-            className="min-h-screen bg-[#f9f9f8] text-[#191c1c] font-sans overflow-x-hidden"
+            className="min-h-screen bg-[var(--dash-bg)] text-[var(--dash-text)] font-sans overflow-x-hidden"
             style={{ "--dashboard-sidebar-offset": sidebarOffset }}
         >
             <ProviderTopbar
@@ -219,7 +219,7 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                 onPinnedChange={handleSidebarPinChange}
             />
 
-            <main className="md:pl-[var(--dashboard-sidebar-offset)] pt-16 min-h-screen pb-24 md:pb-8 transition-[padding] duration-300">
+            <main className={`md:pl-[var(--dashboard-sidebar-offset)] pt-16 min-h-screen transition-[padding] duration-300 ${accountView ? "pb-8" : "pb-24 md:pb-8"}`}>
                 <div className={dashboardMainPaddingClass}>
                     {showToast && (
                         <div className={`fixed top-20 right-4 left-4 sm:left-auto z-50 flex items-center gap-3 border px-4 py-3 sm:px-5 rounded-xl shadow-lg max-w-md sm:ml-auto ${toastStyle.wrapper}`}>
@@ -295,7 +295,9 @@ export default function ProviderDashboard({ onLogout, user, onUserUpdate }) {
                 </div>
             </main>
 
-            <ProviderMobileNav activeTab={activeTab} onNavigate={handleNavigate} />
+            {!accountView && (
+                <ProviderMobileNav activeTab={activeTab} onNavigate={handleNavigate} />
+            )}
 
             <DeactivateAccountModal
                 isOpen={showDeactivateModal}

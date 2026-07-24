@@ -526,7 +526,7 @@ export default function ProviderMaterialsTab({ user, onNotify, onRefreshProfile 
                     ariaLabel="Filter by category"
                     className="w-full sm:w-auto sm:min-w-[10rem]"
                 />
-                <div className="inline-flex h-10 rounded-xl border border-zinc-200 bg-white p-0.5 shadow-sm">
+                <div className="hidden md:inline-flex h-10 rounded-xl border border-zinc-200 bg-white p-0.5 shadow-sm">
                     <button
                         type="button"
                         onClick={() => setViewMode("cards")}
@@ -583,8 +583,10 @@ export default function ProviderMaterialsTab({ user, onNotify, onRefreshProfile 
                             : "Add your first listing to start accepting pickups."}
                     </p>
                 </div>
-            ) : activeTab === "active" && viewMode === "table" ? (
-                <div className="scroll-x-clean overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+            ) : (
+                <>
+                    {activeTab === "active" && viewMode === "table" && (
+                <div className="hidden md:block scroll-x-clean overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
                     <table className="w-full min-w-[760px] text-sm">
                         <thead className="bg-[#f3f4f3] text-[#42493e]">
                             <tr>
@@ -670,8 +672,8 @@ export default function ProviderMaterialsTab({ user, onNotify, onRefreshProfile 
                         </tbody>
                     </table>
                 </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    )}
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${activeTab === "active" && viewMode === "table" ? "md:hidden" : ""}`}>
                     {filtered.map((item) => {
                         const catKey = item.category?.toLowerCase() || "other";
                         const cat = CATEGORY_COLORS[catKey] || CATEGORY_COLORS.other;
@@ -788,6 +790,7 @@ export default function ProviderMaterialsTab({ user, onNotify, onRefreshProfile 
                         );
                     })}
                 </div>
+                </>
             )}
 
             {pendingDelete && (

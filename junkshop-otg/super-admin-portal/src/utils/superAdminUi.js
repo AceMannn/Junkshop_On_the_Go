@@ -27,7 +27,7 @@ export const superSecondaryButtonClass =
   'inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-[#191c1c] transition-colors hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-60';
 
 export const superMobileNavClass = (active) =>
-  `rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+  `inline-flex shrink-0 items-center rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
     active
       ? 'bg-emerald-600 text-white'
       : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
